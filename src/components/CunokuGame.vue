@@ -9,15 +9,26 @@
         </li>
       </ul>
     </div>
-    <div>
-      <h2>Baralho</h2>
-      <p>Cartas restantes: {{ baralho.length }}</p>
+    <div class="baralho-pilha">
+      <div>
+        <h2>Baralho</h2>
+        <p>Cartas restantes: {{ baralho.length }}</p>
+      </div>
+      <div>
+        <h2>Pilha de Descarte</h2>
+        <div v-if="pilha.length > 0">
+          <CartaSvg :valor="mapValorSvg(pilha[pilha.length-1].nome)" :naipe="mapNaipeSvg(pilha[pilha.length-1].naipe)" :width="60" :height="90" />
+          <p class="topo-pilha">Topo: {{ pilha[pilha.length-1].nome }} {{ pilha[pilha.length-1].naipe || '' }}</p>
+        </div>
+        <div v-else>
+          <p>Pilha vazia</p>
+        </div>
+      </div>
     </div>
     <div>
       <h3>Sua mão</h3>
       <div class="mao">
-        <button v-for="(carta, idx) in players[jogadorDaVez].mao" :key="idx" class="carta-btn animate__animated animate__fadeInUp"
-          :class="{ 'carta-espia': cartaEspiada && cartaEspiada === carta }">
+        <div v-for="(carta, idx) in players[jogadorDaVez].mao" :key="idx" class="carta-btn animate__animated animate__fadeInUp" :class="{ 'carta-espia': cartaEspiada && cartaEspiada === carta }">
           <CartaSvg
             v-if="
               (habilidadeAtiva === 'espiar_propria' && cartaEspiada && cartaEspiada === carta) ||
@@ -30,7 +41,9 @@
             :height="90"
           />
           <CartaSvg v-else valor="?" :width="60" :height="90" />
-        </button>
+          <!-- Botão de descarte -->
+          <button v-if="podeDescartarCarta(idx)" class="btn-descartar-carta" @click="descartarCartaDaMao(idx)">Descartar</button>
+        </div>
       </div>
     </div>
     <div v-if="!cartaComprada && !turnoFinalizado">
@@ -128,6 +141,7 @@
     <div v-if="turnoFinalizado">
       <button class="btn-principal" @click="proximoTurno">Próximo turno</button>
     </div>
+    <div v-if="mensagemPilha" class="mensagem-pilha animate__animated animate__shakeX">{{ mensagemPilha }}</div>
   </div>
 </template>
 
@@ -194,6 +208,8 @@ export default {
       jogadorEspiar: null,
       cartaEspiada: null,
       substituindoTrocaSelf: false,
+      pilha: [],
+      mensagemPilha: '',
     };
   },
   watch: {
@@ -220,6 +236,8 @@ export default {
           player.mao.push(this.baralho.pop());
         });
       }
+      // Inicializa a pilha de descarte
+      this.pilha = [this.baralho.pop()];
       this.jogadorDaVez = 0;
       this.cartaComprada = null;
       this.turnoFinalizado = false;
@@ -233,6 +251,7 @@ export default {
       this.jogadorEspiar = null;
       this.cartaEspiada = null;
       this.substituindoTrocaSelf = false;
+      this.mensagemPilha = '';
     },
     comprarCarta() {
       if (this.baralho.length === 0) return;
@@ -252,21 +271,25 @@ export default {
       this.substituindoCarta = true;
     },
     substituirCarta(idx) {
+      const cartaSubstituida = this.players[this.jogadorDaVez].mao[idx];
       this.players[this.jogadorDaVez].mao[idx] = this.cartaComprada;
       this.cartaComprada = null;
       this.substituindoCarta = false;
       this.turnoFinalizado = true;
       this.mensagemHabilidade = '';
       this.habilidadeAtiva = '';
-      this.substituindoTrocaSelf = false;
+      // Coloca a carta substituída na pilha
+      this.pilha.push(cartaSubstituida);
     },
     descartarCarta() {
+      if (this.cartaComprada) {
+        this.pilha.push(this.cartaComprada);
+      }
       this.cartaComprada = null;
       this.substituindoCarta = false;
       this.turnoFinalizado = true;
       this.mensagemHabilidade = '';
       this.habilidadeAtiva = '';
-      this.substituindoTrocaSelf = false;
     },
     proximoTurno() {
       this.jogadorDaVez = (this.jogadorDaVez + 1) % this.players.length;
@@ -281,6 +304,7 @@ export default {
       this.jogadorEspiar = null;
       this.cartaEspiada = null;
       this.substituindoTrocaSelf = false;
+      this.mensagemPilha = '';
     },
     getMensagemHabilidade(carta) {
       if (!carta) return '';
@@ -379,6 +403,33 @@ export default {
         case '♣': return 'C';
         default: return null;
       }
+    },
+    podeDescartarCarta(idx) {
+      // Só pode descartar se houver carta na pilha e a carta for igual ao topo
+      if (this.pilha.length === 0) return false;
+      const carta = this.players[this.jogadorDaVez].mao[idx];
+      const topo = this.pilha[this.pilha.length - 1];
+      return carta.nome === topo.nome;
+    },
+    descartarCartaDaMao(idx) {
+      if (this.pilha.length === 0) return;
+      const carta = this.players[this.jogadorDaVez].mao[idx];
+      const topo = this.pilha[this.pilha.length - 1];
+      if (carta.nome === topo.nome) {
+        // Descarte correto
+        this.pilha.push(carta);
+        this.players[this.jogadorDaVez].mao.splice(idx, 1);
+        this.mensagemPilha = 'Descarte realizado com sucesso!';
+      } else {
+        // Punição: compra 2 cartas
+        this.mensagemPilha = 'Descarte incorreto! Compre 2 cartas.';
+        for (let i = 0; i < 2; i++) {
+          if (this.baralho.length > 0) {
+            this.players[this.jogadorDaVez].mao.push(this.baralho.pop());
+          }
+        }
+      }
+      setTimeout(() => { this.mensagemPilha = ''; }, 2000);
     },
   },
 };
@@ -502,5 +553,43 @@ ul {
 }
 .carta-btn:focus {
   outline: 2px solid #f6c177;
+}
+.baralho-pilha {
+  display: flex;
+  gap: 2.5rem;
+  margin-bottom: 1.5rem;
+}
+.topo-pilha {
+  color: #f6c177;
+  font-weight: bold;
+  margin-top: 0.3rem;
+}
+.btn-descartar-carta {
+  display: block;
+  margin: 0.3rem auto 0 auto;
+  background: #f25042;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: 0 1px 4px #0003;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-descartar-carta:hover {
+  background: #d7263d;
+  color: #fff;
+}
+.mensagem-pilha {
+  margin-top: 1.2rem;
+  background: #f6c177;
+  color: #232946;
+  border-radius: 8px;
+  padding: 0.7rem 1.2rem;
+  font-weight: bold;
+  text-align: center;
+  box-shadow: 0 1px 8px #0002;
 }
 </style> 
