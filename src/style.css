@@ -23,11 +23,60 @@ a:hover {
 }
 
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
   min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', 'Noto Sans', Arial, sans-serif;
+  background: 
+    linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.7)),
+    url('./assets/bg/seigaiha.png');
+  background-size: cover;
+  background-repeat: repeat;
+  background-attachment: fixed;
+  background-position: center;
+}
+
+.app-layout, .jogo-page, .cunoku-game {
+  background: rgba(30, 20, 40, 0.85);
+  border-radius: 18px;
+  box-shadow: 0 4px 32px #0008, 0 0 0 4px #d4af37;
+  border: 2px solid #d4af37;
+}
+
+h1, h2, h3 {
+  font-family: 'Cinzel', 'Georgia', serif;
+  color: #d4af37;
+  text-shadow: 0 2px 8px #000a;
+}
+
+.btn-principal {
+  background: linear-gradient(90deg, #d4af37 60%, #b8860b 100%);
+  color: #232946;
+  border: none;
+  border-radius: 8px;
+  padding: 0.7rem 1.6rem;
+  font-size: 1.15rem;
+  font-weight: bold;
+  box-shadow: 0 2px 8px #0005;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-principal:hover {
+  background: linear-gradient(90deg, #ffe082 60%, #d4af37 100%);
+  color: #232946;
+}
+
+/* Cartas luxo */
+.carta-btn {
+  border: 2px solid #d4af37 !important;
+  box-shadow: 0 2px 12px #0007, 0 0 0 2px #b8860b;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  transition: box-shadow 0.2s, border 0.2s;
+}
+.carta-btn:hover {
+  box-shadow: 0 4px 24px #d4af37, 0 0 0 2px #ffe082;
+  border-color: #ffe082 !important;
 }
 
 h1 {
