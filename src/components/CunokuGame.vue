@@ -1,147 +1,51 @@
 <template>
   <div class="cunoku-game">
-    <div>
-      <h2>Jogadores</h2>
-      <ul>
-        <li v-for="(player, idx) in players" :key="idx">
-          <b v-if="idx === jogadorDaVez">▶</b>
-          {{ player.nome }} - Cartas: {{ player.mao.length }}
-        </li>
-      </ul>
+    <div v-if="!estado">
+      <p>Aguardando sincronização do jogo...</p>
     </div>
-    <div class="baralho-pilha">
+    <div v-else>
       <div>
-        <h2>Baralho</h2>
-        <p>Cartas restantes: {{ baralho.length }}</p>
+        <h2>Jogadores</h2>
+        <ul>
+          <li v-for="(player, idx) in estado.players" :key="idx">
+            <b v-if="idx === estado.jogadorDaVez">▶</b>
+            {{ player.nome }} - Cartas: {{ player.mao.length }}
+            <span v-if="idx === meuIndice">(Você)</span>
+          </li>
+        </ul>
+      </div>
+      <div class="baralho-pilha">
+        <div>
+          <h2>Baralho</h2>
+          <p>Cartas restantes: {{ estado.baralho.length }}</p>
+        </div>
+        <div>
+          <h2>Pilha de Descarte</h2>
+          <div v-if="estado.pilha.length > 0">
+            <CartaSvg :valor="mapValorSvg(estado.pilha[estado.pilha.length-1].nome)" :naipe="mapNaipeSvg(estado.pilha[estado.pilha.length-1].naipe)" :width="60" :height="90" />
+            <p class="topo-pilha">Topo: {{ estado.pilha[estado.pilha.length-1].nome }} {{ estado.pilha[estado.pilha.length-1].naipe || '' }}</p>
+          </div>
+          <div v-else>
+            <p>Pilha vazia</p>
+          </div>
+        </div>
       </div>
       <div>
-        <h2>Pilha de Descarte</h2>
-        <div v-if="pilha.length > 0">
-          <CartaSvg :valor="mapValorSvg(pilha[pilha.length-1].nome)" :naipe="mapNaipeSvg(pilha[pilha.length-1].naipe)" :width="60" :height="90" />
-          <p class="topo-pilha">Topo: {{ pilha[pilha.length-1].nome }} {{ pilha[pilha.length-1].naipe || '' }}</p>
-        </div>
-        <div v-else>
-          <p>Pilha vazia</p>
-        </div>
-      </div>
-    </div>
-    <div>
-      <h3>Sua mão</h3>
-      <div class="mao">
-        <div v-for="(carta, idx) in players[jogadorDaVez].mao" :key="idx" class="carta-btn animate__animated animate__fadeInUp" :class="{ 'carta-espia': cartaEspiada && cartaEspiada === carta }">
-          <CartaSvg
-            v-if="
-              (habilidadeAtiva === 'espiar_propria' && cartaEspiada && cartaEspiada === carta) ||
-              (habilidadeAtiva === 'troca' && substituindoTrocaSelf) ||
-              (substituindoCarta)
-            "
-            :valor="mapValorSvg(carta.nome)"
-            :naipe="mapNaipeSvg(carta.naipe)"
-            :width="60"
-            :height="90"
-          />
-          <CartaSvg v-else valor="?" :width="60" :height="90" />
-          <!-- Botão de descarte -->
-          <button v-if="podeDescartarCarta(idx)" class="btn-descartar-carta" @click="descartarCartaDaMao(idx)">Descartar</button>
-        </div>
-      </div>
-    </div>
-    <div v-if="!cartaComprada && !turnoFinalizado">
-      <button class="btn-principal" @click="comprarCarta">Comprar carta</button>
-    </div>
-    <div v-else-if="cartaComprada && !turnoFinalizado">
-      <p>Você comprou:
-        <span class="carta-comprada animate__animated animate__bounceIn">
-          <CartaSvg :valor="mapValorSvg(cartaComprada.nome)" :naipe="mapNaipeSvg(cartaComprada.naipe)" :width="60" :height="90" />
-        </span>
-      </p>
-      <div v-if="mensagemHabilidade" class="habilidade-msg animate__animated animate__pulse">{{ mensagemHabilidade }}</div>
-      <!-- Habilidade: Troca de cartas -->
-      <div v-if="habilidadeAtiva === 'troca'">
-        <p>Escolha um jogador para trocar uma carta:</p>
+        <h3>Sua mão</h3>
         <div class="mao">
-          <button v-for="(player, idx) in players" :key="idx" v-if="idx !== jogadorDaVez" @click="selecionarJogadorTroca(idx)" class="btn-acao">
-            {{ player.nome }}
-          </button>
-        </div>
-        <div v-if="jogadorTroca !== null">
-          <p>Escolha uma carta sua para trocar:</p>
-          <div class="mao">
-            <button v-for="(carta, idx) in players[jogadorDaVez].mao" :key="idx" class="carta-btn btn-acao animate__animated animate__pulse" @click="selecionarCartaTroca('self', idx)" :disabled="idxCartaTrocaSelf === idx">
-              <CartaSvg :valor="mapValorSvg(carta.nome)" :naipe="mapNaipeSvg(carta.naipe)" :width="60" :height="90" />
-            </button>
-          </div>
-          <p>Escolha uma carta do oponente para trocar:</p>
-          <div class="mao">
-            <button v-for="(carta, idx) in players[jogadorTroca].mao" :key="idx" class="carta-btn btn-acao animate__animated animate__pulse" @click="selecionarCartaTroca('oponente', idx)">
-              <CartaSvg valor="?" :width="60" :height="90" />
-            </button>
-          </div>
-        </div>
-      </div>
-      <!-- Habilidade: Espiar carta própria -->
-      <div v-else-if="habilidadeAtiva === 'espiar_propria'">
-        <p>Escolha uma carta sua para espiar:</p>
-        <div class="mao">
-          <button v-for="(carta, idx) in players[jogadorDaVez].mao" :key="idx" class="carta-btn btn-acao animate__animated animate__flipInY" @click="espiarCartaPropria(idx)">
-            <CartaSvg v-if="cartaEspiada && cartaEspiada === carta" :valor="mapValorSvg(carta.nome)" :naipe="mapNaipeSvg(carta.naipe)" :width="60" :height="90" />
-            <CartaSvg v-else valor="?" :width="60" :height="90" />
-          </button>
-        </div>
-        <div v-if="cartaEspiada">
-          <p>Você espiou:
-            <span class="carta-espia animate__animated animate__flipInY">
-              <CartaSvg :valor="mapValorSvg(cartaEspiada.nome)" :naipe="mapNaipeSvg(cartaEspiada.naipe)" :width="60" :height="90" />
-            </span>
-          </p>
-          <button class="btn-principal" @click="finalizarHabilidade">OK</button>
-        </div>
-      </div>
-      <!-- Habilidade: Espiar carta do oponente -->
-      <div v-else-if="habilidadeAtiva === 'espiar_oponente'">
-        <p>Escolha um jogador para espiar uma carta:</p>
-        <div class="mao">
-          <button v-for="(player, idx) in players" :key="idx" v-if="idx !== jogadorDaVez" @click="selecionarJogadorEspiar(idx)" class="btn-acao">
-            {{ player.nome }}
-          </button>
-        </div>
-        <div v-if="jogadorEspiar !== null">
-          <p>Escolha uma carta do oponente para espiar:</p>
-          <div class="mao">
-            <button v-for="(carta, idx) in players[jogadorEspiar].mao" :key="idx" class="carta-btn btn-acao animate__animated animate__flipInY" @click="espiarCartaOponente(idx)">
-              <CartaSvg v-if="cartaEspiada && cartaEspiada === carta" :valor="mapValorSvg(carta.nome)" :naipe="mapNaipeSvg(carta.naipe)" :width="60" :height="90" />
-              <CartaSvg v-else valor="?" :width="60" :height="90" />
-            </button>
-          </div>
-        </div>
-        <div v-if="cartaEspiada">
-          <p>Você espiou:
-            <span class="carta-espia animate__animated animate__flipInY">
-              <CartaSvg :valor="mapValorSvg(cartaEspiada.nome)" :naipe="mapNaipeSvg(cartaEspiada.naipe)" :width="60" :height="90" />
-            </span>
-          </p>
-          <button class="btn-principal" @click="finalizarHabilidade">OK</button>
-        </div>
-      </div>
-      <!-- Substituição normal -->
-      <div v-else-if="substituindoCarta">
-        <p>Escolha qual carta da sua mão deseja substituir:</p>
-        <div class="mao">
-          <button v-for="(carta, idx) in players[jogadorDaVez].mao" :key="idx" class="carta-btn btn-acao animate__animated animate__pulse" @click="substituirCarta(idx)">
+          <div v-for="(carta, idx) in estado.players[meuIndice]?.mao || []" :key="idx" class="carta-btn animate__animated animate__fadeInUp">
             <CartaSvg :valor="mapValorSvg(carta.nome)" :naipe="mapNaipeSvg(carta.naipe)" :width="60" :height="90" />
-          </button>
+          </div>
         </div>
+      </div>
+      <div v-if="estado.jogadorDaVez === meuIndice">
+        <button class="btn-principal" @click="comprarCarta">Comprar carta</button>
+        <!-- Adicione outros botões de ação aqui -->
       </div>
       <div v-else>
-        <button v-if="habilidadeAtiva" class="btn-principal" @click="usarHabilidade">Usar habilidade</button>
-        <button class="btn-principal" @click="iniciarSubstituicao">Ficar com a carta (substituir uma da mão)</button>
-        <button class="btn-descartar" @click="descartarCarta">Descartar</button>
+        <p>Aguarde sua vez...</p>
       </div>
     </div>
-    <div v-if="turnoFinalizado">
-      <button class="btn-principal" @click="proximoTurno">Próximo turno</button>
-    </div>
-    <div v-if="mensagemPilha" class="mensagem-pilha animate__animated animate__shakeX">{{ mensagemPilha }}</div>
   </div>
 </template>
 
@@ -185,200 +89,41 @@ function criarBaralho() {
 export default {
   name: 'CunokuGame',
   props: {
-    numJogadores: {
-      type: Number,
-      default: 2
-    }
+    numJogadores: { type: Number, default: 2 },
+    jogador: { type: Object, default: null },
+    socket: { type: Object, default: null },
   },
   data() {
     return {
-      baralho: criarBaralho(),
-      players: [],
-      jogadorDaVez: 0,
-      cartaComprada: null,
-      turnoFinalizado: false,
-      cartasPorJogador: 4,
-      jogoIniciado: false,
-      substituindoCarta: false,
-      mensagemHabilidade: '',
-      habilidadeAtiva: '',
-      jogadorTroca: null,
-      idxCartaTrocaSelf: null,
-      idxCartaTrocaOponente: null,
-      jogadorEspiar: null,
-      cartaEspiada: null,
-      substituindoTrocaSelf: false,
-      pilha: [],
-      mensagemPilha: '',
-    };
+      estado: null,
+      meuIndice: null,
+    }
   },
   watch: {
-    numJogadores: {
+    socket: {
       immediate: true,
-      handler(n) {
-        this.iniciarJogoComJogadores(n)
+      handler(s) {
+        if (s) {
+          s.on('estado_jogo', (estado) => {
+            this.estado = estado
+            // Descobre o índice do jogador local
+            if (this.jogador && estado && estado.players) {
+              this.meuIndice = estado.players.findIndex(p => p.nome === this.jogador.nome)
+            }
+          })
+        }
       }
     }
   },
-  created() {
-    // this.iniciarJogo(); // This line is now handled by the watch hook
-  },
   components: { CartaSvg },
   methods: {
-    iniciarJogoComJogadores(n) {
-      this.baralho = criarBaralho();
-      this.players = [];
-      for (let i = 0; i < n; i++) {
-        this.players.push({ nome: `Jogador ${i + 1}`, mao: [] });
-      }
-      for (let i = 0; i < this.cartasPorJogador; i++) {
-        this.players.forEach(player => {
-          player.mao.push(this.baralho.pop());
-        });
-      }
-      // Inicializa a pilha de descarte
-      this.pilha = [this.baralho.pop()];
-      this.jogadorDaVez = 0;
-      this.cartaComprada = null;
-      this.turnoFinalizado = false;
-      this.jogoIniciado = true;
-      this.substituindoCarta = false;
-      this.mensagemHabilidade = '';
-      this.habilidadeAtiva = '';
-      this.jogadorTroca = null;
-      this.idxCartaTrocaSelf = null;
-      this.idxCartaTrocaOponente = null;
-      this.jogadorEspiar = null;
-      this.cartaEspiada = null;
-      this.substituindoTrocaSelf = false;
-      this.mensagemPilha = '';
-    },
+    // Exemplo: enviar ação para o backend
     comprarCarta() {
-      if (this.baralho.length === 0) return;
-      this.cartaComprada = this.baralho.pop();
-      this.turnoFinalizado = false;
-      this.mensagemHabilidade = this.getMensagemHabilidade(this.cartaComprada);
-      this.substituindoCarta = false;
-      this.habilidadeAtiva = this.getHabilidade(this.cartaComprada);
-      this.jogadorTroca = null;
-      this.idxCartaTrocaSelf = null;
-      this.idxCartaTrocaOponente = null;
-      this.jogadorEspiar = null;
-      this.cartaEspiada = null;
-      this.substituindoTrocaSelf = false;
-    },
-    iniciarSubstituicao() {
-      this.substituindoCarta = true;
-    },
-    substituirCarta(idx) {
-      const cartaSubstituida = this.players[this.jogadorDaVez].mao[idx];
-      this.players[this.jogadorDaVez].mao[idx] = this.cartaComprada;
-      this.cartaComprada = null;
-      this.substituindoCarta = false;
-      this.turnoFinalizado = true;
-      this.mensagemHabilidade = '';
-      this.habilidadeAtiva = '';
-      // Coloca a carta substituída na pilha
-      this.pilha.push(cartaSubstituida);
-    },
-    descartarCarta() {
-      if (this.cartaComprada) {
-        this.pilha.push(this.cartaComprada);
-      }
-      this.cartaComprada = null;
-      this.substituindoCarta = false;
-      this.turnoFinalizado = true;
-      this.mensagemHabilidade = '';
-      this.habilidadeAtiva = '';
-    },
-    proximoTurno() {
-      this.jogadorDaVez = (this.jogadorDaVez + 1) % this.players.length;
-      this.turnoFinalizado = false;
-      this.cartaComprada = null;
-      this.substituindoCarta = false;
-      this.mensagemHabilidade = '';
-      this.habilidadeAtiva = '';
-      this.jogadorTroca = null;
-      this.idxCartaTrocaSelf = null;
-      this.idxCartaTrocaOponente = null;
-      this.jogadorEspiar = null;
-      this.cartaEspiada = null;
-      this.substituindoTrocaSelf = false;
-      this.mensagemPilha = '';
-    },
-    getMensagemHabilidade(carta) {
-      if (!carta) return '';
-      if (['Nove', 'Dez'].includes(carta.nome)) {
-        return 'Troque uma carta com outro jogador!';
-      }
-      if (['Sete', 'Oito'].includes(carta.nome)) {
-        return 'Você pode olhar uma carta sua!';
-      }
-      if (['Cinco', 'Seis'].includes(carta.nome)) {
-        return 'Você pode olhar uma carta de um oponente!';
-      }
-      if (carta.nome === 'Coringa') {
-        return 'Coringa: valor negativo!';
-      }
-      return '';
-    },
-    getHabilidade(carta) {
-      if (!carta) return '';
-      if (['Nove', 'Dez'].includes(carta.nome)) return 'troca';
-      if (['Sete', 'Oito'].includes(carta.nome)) return 'espiar_propria';
-      if (['Cinco', 'Seis'].includes(carta.nome)) return 'espiar_oponente';
-      return '';
-    },
-    usarHabilidade() {
-      // Ativa interface da habilidade
-      // (já está controlado pelo v-if/v-else-if do template)
-    },
-    // Troca de cartas
-    selecionarJogadorTroca(idx) {
-      this.jogadorTroca = idx;
-      this.idxCartaTrocaSelf = null;
-      this.idxCartaTrocaOponente = null;
-      this.substituindoTrocaSelf = true;
-    },
-    selecionarCartaTroca(tipo, idx) {
-      if (tipo === 'self') {
-        this.idxCartaTrocaSelf = idx;
-      } else if (tipo === 'oponente') {
-        this.idxCartaTrocaOponente = idx;
-      }
-      if (this.idxCartaTrocaSelf !== null && this.idxCartaTrocaOponente !== null) {
-        // Troca as cartas
-        const temp = this.players[this.jogadorDaVez].mao[this.idxCartaTrocaSelf];
-        this.players[this.jogadorDaVez].mao[this.idxCartaTrocaSelf] = this.players[this.jogadorTroca].mao[this.idxCartaTrocaOponente];
-        this.players[this.jogadorTroca].mao[this.idxCartaTrocaOponente] = temp;
-        this.finalizarHabilidade();
+      if (this.socket && this.estado) {
+        this.socket.emit('comprar_carta', { sala: this.$parent.sala, jogador: this.jogador.nome })
       }
     },
-    // Espiar carta própria
-    espiarCartaPropria(idx) {
-      this.cartaEspiada = this.players[this.jogadorDaVez].mao[idx];
-    },
-    // Espiar carta do oponente
-    selecionarJogadorEspiar(idx) {
-      this.jogadorEspiar = idx;
-      this.cartaEspiada = null;
-    },
-    espiarCartaOponente(idx) {
-      this.cartaEspiada = this.players[this.jogadorEspiar].mao[idx];
-    },
-    finalizarHabilidade() {
-      this.habilidadeAtiva = '';
-      this.cartaEspiada = null;
-      this.jogadorTroca = null;
-      this.idxCartaTrocaSelf = null;
-      this.idxCartaTrocaOponente = null;
-      this.jogadorEspiar = null;
-      this.turnoFinalizado = true;
-      this.cartaComprada = null;
-      this.mensagemHabilidade = '';
-      this.substituindoCarta = false;
-      this.substituindoTrocaSelf = false;
-    },
+    // Adapte outros métodos para enviar eventos ao backend
     mapValorSvg(nome) {
       switch (nome) {
         case 'Às': return 'A';
@@ -403,33 +148,6 @@ export default {
         case '♣': return 'C';
         default: return null;
       }
-    },
-    podeDescartarCarta(idx) {
-      // Só pode descartar se houver carta na pilha e a carta for igual ao topo
-      if (this.pilha.length === 0) return false;
-      const carta = this.players[this.jogadorDaVez].mao[idx];
-      const topo = this.pilha[this.pilha.length - 1];
-      return carta.nome === topo.nome;
-    },
-    descartarCartaDaMao(idx) {
-      if (this.pilha.length === 0) return;
-      const carta = this.players[this.jogadorDaVez].mao[idx];
-      const topo = this.pilha[this.pilha.length - 1];
-      if (carta.nome === topo.nome) {
-        // Descarte correto
-        this.pilha.push(carta);
-        this.players[this.jogadorDaVez].mao.splice(idx, 1);
-        this.mensagemPilha = 'Descarte realizado com sucesso!';
-      } else {
-        // Punição: compra 2 cartas
-        this.mensagemPilha = 'Descarte incorreto! Compre 2 cartas.';
-        for (let i = 0; i < 2; i++) {
-          if (this.baralho.length > 0) {
-            this.players[this.jogadorDaVez].mao.push(this.baralho.pop());
-          }
-        }
-      }
-      setTimeout(() => { this.mensagemPilha = ''; }, 2000);
     },
   },
 };

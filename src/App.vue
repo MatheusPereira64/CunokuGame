@@ -5,9 +5,15 @@ import JogoPage from './pages/JogoPage.vue'
 
 const pagina = ref('inicio')
 const numJogadores = ref(2)
+const jogador = ref(null)
+const sala = ref('')
+const socket = ref(null)
 
-function iniciarJogo(qtd) {
+function iniciarJogo({ qtd, jogadorInfo, salaInfo, socketInstance }) {
   numJogadores.value = qtd
+  jogador.value = jogadorInfo
+  sala.value = salaInfo
+  socket.value = socketInstance
   pagina.value = 'jogo'
 }
 </script>
@@ -16,11 +22,11 @@ function iniciarJogo(qtd) {
   <div class="app-layout">
     <nav class="menu">
       <button :class="{ ativo: pagina === 'inicio' }" @click="pagina = 'inicio'">Início</button>
-      <button :class="{ ativo: pagina === 'jogo' }" @click="pagina = 'jogo'">Jogar</button>
+      <!-- Removido botão de navegação direta para Jogar -->
     </nav>
     <main>
       <HomePage v-if="pagina === 'inicio'" @iniciar-jogo="iniciarJogo" />
-      <JogoPage v-else-if="pagina === 'jogo'" :num-jogadores="numJogadores" />
+      <JogoPage v-else-if="pagina === 'jogo'" :num-jogadores="numJogadores" :jogador="jogador" :sala="sala" :socket="socket" />
     </main>
   </div>
 </template>
