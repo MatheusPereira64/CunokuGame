@@ -1,135 +1,202 @@
 <template>
-  <div class="home-page">
-    <h1>Bem-vindo ao Cunoku 🔥</h1>
-    <p>Jogo de cartas com poderes e estratégia. Clique em Jogar para começar!</p>
-    <h2>Regras Básicas</h2>
-    <ul>
-      <li><b>Rainha</b>: 12 pontos</li>
-      <li><b>Às</b>: 1 ponto</li>
-      <li><b>Valete</b>: 11 pontos</li>
-      <li><b>Rei</b>: 0 pontos</li>
-      <li><b>Coringa</b>: -1 ponto</li>
-      <li><b>9/10</b>: Troca de cartas entre jogadores</li>
-      <li><b>7/8</b>: Veja uma carta sua</li>
-      <li><b>5/6</b>: Veja uma carta de um oponente</li>
-      <li><b>Descarte</b>: Jogadores podem descartar cartas iguais</li>
-      <li><b>Compra</b>: Compre, veja e use o poder ou troque</li>
-      <li><b>Final</b>: Declare fim, todos revelam e somam pontos</li>
-      <li><b>Punição</b>: Descarte errado, compre 2 cartas</li>
-    </ul>
-    <div class="inicio-jogo">
-      <button v-if="!mostrarSelecao" class="btn-principal animate__animated animate__fadeInUp" @click="mostrarSelecao = true">Começar</button>
-      <div v-else class="selecao-jogadores animate__animated animate__fadeIn">
-        <label for="nomeJogador">Seu nome:</label>
-        <input id="nomeJogador" v-model="nomeJogador" placeholder="Digite seu nome" />
-        <label for="sala">Sala:</label>
-        <input id="sala" v-model="sala" placeholder="Nome da sala" />
-        <label for="numJogadores">Número de jogadores:</label>
-        <select id="numJogadores" v-model.number="numJogadores">
-          <option v-for="n in 7" :key="n" :value="n+1">{{ n+1 }}</option>
-        </select>
-        <button class="btn-principal" @click="entrarSala">Iniciar Jogo</button>
-        <div v-if="erroSala" class="erro-sala">{{ erroSala }}</div>
+  <div class="home-container">
+    <h1>Cunoku Online</h1>
+    <div v-if="!modoEscolhido" class="menu-inicial">
+      <button @click="modoEscolhido = 'host'">Hostear Sala</button>
+      <button @click="modoEscolhido = 'join'">Entrar em Sala</button>
+    </div>
+    <div v-else-if="modoEscolhido === 'host'" class="host-form">
+      <h2>Hostear Sala</h2>
+      <label>Nome do Jogador:
+        <input v-model="nomeJogador" placeholder="Seu nome" />
+      </label>
+      <label>Nome da Sala:
+        <input v-model="nomeSala" placeholder="Ex: minha-sala-123" />
+      </label>
+      <label>Número de Jogadores:
+        <input type="number" v-model.number="qtdJogadores" min="2" max="8" />
+      </label>
+      <button :disabled="!nomeJogador" @click="hostearSala">Criar Sala</button>
+      <button class="voltar" @click="modoEscolhido = null">Voltar</button>
+    </div>
+    <div v-else-if="modoEscolhido === 'join'" class="join-form">
+      <h2>Entrar em Sala</h2>
+      <label>Nome do Jogador:
+        <input v-model="nomeJogador" placeholder="Seu nome" />
+      </label>
+      <label>Nome da Sala:
+        <input v-model="nomeSala" placeholder="Digite o nome da sala" />
+      </label>
+      <button :disabled="!nomeJogador || !nomeSala" @click="entrarSala">Entrar</button>
+      <button class="voltar" @click="modoEscolhido = null">Voltar</button>
+      <div class="lobbys-lista">
+        <h3>Lobbys Disponíveis</h3>
+        <div v-if="carregandoLobbys">Carregando lobbys...</div>
+        <div v-else-if="erroLobbys">{{ erroLobbys }}</div>
+        <ul v-else>
+          <li v-for="lobby in lobbys" :key="lobby.nome">
+            <button class="lobby-btn" @click="selecionarLobby(lobby.nome)">
+              {{ lobby.nome }} ({{ lobby.jogadores }}/8)
+            </button>
+          </li>
+          <li v-if="lobbys.length === 0">Nenhum lobby disponível</li>
+        </ul>
       </div>
     </div>
   </div>
 </template>
 
-<script>
-import { io } from 'socket.io-client'
-let socket
-export default {
-  name: 'HomePage',
-  data() {
-    return {
-      mostrarSelecao: false,
-      numJogadores: 2,
-      nomeJogador: '',
-      sala: '',
-      erroSala: '',
-    }
-  },
-  methods: {
-    entrarSala() {
-      this.erroSala = ''
-      if (!this.nomeJogador || !this.sala) {
-        this.erroSala = 'Preencha seu nome e o nome da sala.'
-        return
-      }
-      if (!socket) {
-        socket = io('http://192.168.0.12:3000')
-      }
-      socket.emit('entrar_sala', { nome: this.nomeJogador, sala: this.sala })
-      socket.on('sala_cheia', () => {
-        this.erroSala = 'Sala cheia! Escolha outra.'
-      })
-      socket.on('entrou_sala', ({ sala, nome }) => {
-        this.$emit('iniciar-jogo', {
-          qtd: this.numJogadores,
-          jogadorInfo: { nome },
-          salaInfo: sala,
-          socketInstance: socket
-        })
-        // Aqui você pode salvar o socket e dados do jogador para o JogoPage
-      })
-    },
-    confirmarJogadores() {
-      this.$emit('iniciar-jogo', this.numJogadores)
+<script setup>
+import { ref, onMounted, watch } from 'vue'
+
+const emit = defineEmits(['iniciar-jogo'])
+const modoEscolhido = ref(null)
+const nomeSala = ref('')
+const qtdJogadores = ref(2)
+const nomeJogador = ref('')
+const lobbys = ref([])
+const carregandoLobbys = ref(false)
+const erroLobbys = ref('')
+let wsLobby = null
+
+function buscarLobbys() {
+  carregandoLobbys.value = true
+  erroLobbys.value = ''
+  lobbys.value = []
+  if (wsLobby) wsLobby.close()
+  wsLobby = new WebSocket('ws://localhost:3001')
+  wsLobby.onopen = () => {
+    wsLobby.send(JSON.stringify({ type: 'listar_lobbys' }))
+  }
+  wsLobby.onmessage = (event) => {
+    const msg = JSON.parse(event.data)
+    if (msg.type === 'lobbys_disponiveis') {
+      lobbys.value = msg.lobbys
+      carregandoLobbys.value = false
     }
   }
+  wsLobby.onerror = () => {
+    erroLobbys.value = 'Erro ao buscar lobbys.'
+    carregandoLobbys.value = false
+  }
 }
+
+function selecionarLobby(nome) {
+  nomeSala.value = nome
+}
+
+function hostearSala() {
+  if (!nomeSala.value) {
+    nomeSala.value = 'sala-' + Math.random().toString(36).substring(2, 8)
+  }
+  if (!nomeJogador.value) return
+  emit('iniciar-jogo', {
+    qtd: qtdJogadores.value,
+    jogadorInfo: { host: true, nome: nomeJogador.value },
+    salaInfo: nomeSala.value
+  })
+}
+
+function entrarSala() {
+  if (!nomeSala.value || !nomeJogador.value) return
+  emit('iniciar-jogo', {
+    qtd: null, // será definido ao conectar
+    jogadorInfo: { host: false, nome: nomeJogador.value },
+    salaInfo: nomeSala.value
+  })
+}
+
+// Buscar lobbys ao escolher modo join
+watch(modoEscolhido, (novo) => {
+  if (novo === 'join') buscarLobbys()
+})
 </script>
 
 <style scoped>
-.home-page {
-  text-align: center;
-  color: #eebbc3;
+.home-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
 }
-.home-page h1, .home-page h2 {
-  color: #f6c177;
+.menu-inicial {
+  display: flex;
+  gap: 2rem;
 }
-.home-page ul {
-  text-align: left;
-  max-width: 400px;
-  margin: 1rem auto;
-  background: #121629;
-  border-radius: 12px;
-  padding: 1.2rem 2rem;
-  box-shadow: 0 1px 8px #0005;
-  color: #eebbc3;
-  border: 2px solid #eebbc3;
-}
-.home-page li b {
-  color: #f6c177;
-}
-.inicio-jogo {
-  margin-top: 2.5rem;
-}
-.selecao-jogadores {
-  margin-top: 1.2rem;
+.host-form, .join-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
   background: #232946;
-  border-radius: 10px;
-  padding: 1.2rem 2rem;
-  display: inline-block;
-  border: 2px solid #eebbc3;
+  padding: 2rem 2.5rem;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px #0005;
+  min-width: 320px;
 }
 label {
-  color: #f6c177;
+  color: #eebbc3;
   font-weight: bold;
-  margin-right: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
-select, input {
+input[type="text"], input[type="number"] {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #eebbc3;
   background: #121629;
+  color: #fff;
+  font-size: 1.1rem;
+}
+button {
+  background: #eebbc3;
+  color: #232946;
+  border: none;
+  border-radius: 8px;
+  padding: 0.7rem 1.5rem;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: background 0.2s, color 0.2s;
+}
+button:disabled {
+  background: #b6a1a9;
+  color: #232946;
+  cursor: not-allowed;
+}
+button.voltar {
+  background: #232946;
   color: #eebbc3;
   border: 2px solid #eebbc3;
-  border-radius: 6px;
-  padding: 0.3rem 1rem;
-  font-size: 1.1rem;
-  margin-right: 1rem;
+  margin-top: 0.2rem;
 }
-.erro-sala {
-  color: #f25042;
-  margin-top: 0.7rem;
+button:hover:enabled {
+  background: #ffe082;
+  color: #232946;
+}
+.lobbys-lista {
+  margin-top: 1.5rem;
+  background: #121629;
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  box-shadow: 0 1px 8px #0005;
+  color: #eebbc3;
+}
+.lobby-btn {
+  background: #ffe082;
+  color: #232946;
+  border: none;
+  border-radius: 8px;
+  padding: 0.4rem 1.1rem;
+  font-size: 1.05rem;
   font-weight: bold;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.lobby-btn:hover {
+  background: #eebbc3;
+  color: #232946;
 }
 </style> 

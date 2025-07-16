@@ -2,19 +2,69 @@
 import { ref, onMounted } from 'vue'
 import HomePage from './pages/HomePage.vue'
 import JogoPage from './pages/JogoPage.vue'
+import P2PService from './p2pService.js'
 
 const pagina = ref('inicio')
 const numJogadores = ref(2)
 const jogador = ref(null)
 const sala = ref('')
 const socket = ref(null)
+const peers = ref([]) // Array de conexões P2P
+const meuIndice = ref(null)
+const totalJogadores = ref(2)
 
-function iniciarJogo({ qtd, jogadorInfo, salaInfo, socketInstance }) {
+function iniciarJogo({ qtd, jogadorInfo, salaInfo }) {
   numJogadores.value = qtd
   jogador.value = jogadorInfo
   sala.value = salaInfo
-  socket.value = socketInstance
   pagina.value = 'jogo'
+  conectarP2P(qtd, salaInfo)
+}
+
+function conectarP2P(qtd, salaId) {
+  totalJogadores.value = qtd
+  peers.value = []
+  const signalingUrl = 'ws://localhost:3001'
+  const tempPeers = []
+  let readyCount = 0
+
+  // Callback para quando receber dados de qualquer peer
+  function onData(data, from) {
+    // Aqui você pode tratar as mensagens recebidas de outros jogadores
+    console.log('Recebido de', from, data)
+  }
+
+  // Conectar ao servidor de sinalização
+  const socket = new WebSocket(signalingUrl)
+  socket.onopen = () => {
+    socket.send(JSON.stringify({ type: 'join', sala: salaId }))
+  }
+  socket.onmessage = (event) => {
+    const msg = JSON.parse(event.data)
+    if (msg.type === 'init') {
+      meuIndice.value = msg.index
+      totalJogadores.value = msg.total
+      // Cria conexões P2P para todos os outros jogadores
+      for (let i = 0; i < msg.total; i++) {
+        if (i !== msg.index) {
+          const peer = new P2PService(
+            signalingUrl,
+            salaId + '-' + Math.min(msg.index, i) + '-' + Math.max(msg.index, i),
+            (data) => onData(data, i),
+            () => { readyCount++; if (readyCount === msg.total - 1) console.log('Todos os canais P2P prontos!') },
+            null,
+            (err) => console.error('Erro P2P', err)
+          )
+          peer.connect()
+          tempPeers[i] = peer
+        } else {
+          tempPeers[i] = null
+        }
+      }
+      peers.value = tempPeers
+    }
+  }
+  socket.onerror = (err) => console.error('Erro sinalização', err)
 }
 
 // Música de fundo
@@ -48,7 +98,7 @@ onMounted(() => {
     </nav>
     <main>
       <HomePage v-if="pagina === 'inicio'" @iniciar-jogo="iniciarJogo" />
-      <JogoPage v-else-if="pagina === 'jogo'" :num-jogadores="numJogadores" :jogador="jogador" :sala="sala" :socket="socket" />
+      <JogoPage v-else-if="pagina === 'jogo'" :num-jogadores="numJogadores" :jogador="jogador" :sala="sala" :socket="socket" :nome-jogador="jogador?.nome" />
     </main>
     <div class="player-musica" style="pointer-events: none; background: none; border: none; box-shadow: none; padding: 0; position: fixed; right: 0; bottom: 0; z-index: 0;">
       <audio ref="audio" src="/src/assets/audio/elevator.mp3" loop />
