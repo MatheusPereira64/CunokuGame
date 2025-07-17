@@ -4,58 +4,67 @@
       <p>Aguardando sincronização do jogo...</p>
     </div>
     <div v-else>
-      <div>
+      <div class="mesa-cartas">
+        <!-- Baralho -->
+        <div class="coluna-cartas">
+          <div class="baralho">
+            <span v-if="estado.baralho.length > 0">
+              <div class="verso-carta" style="width:60px;height:90px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-size:2.2rem;color:#eebbc3;">🂠</span>
+              </div>
+            </span>
+            <span v-else style="color:#d4af37;">Vazio</span>
+          </div>
+          <span class="legenda-area">Baralho<br>({{ estado.baralho.length }})</span>
+        </div>
+        <!-- Pilha de Descarte -->
+        <div class="coluna-cartas">
+          <div class="pilha">
+            <CartaSvg v-if="estado.pilha.length > 0" :valor="mapValorSvg(estado.pilha[estado.pilha.length-1].nome)" :naipe="mapNaipeSvg(estado.pilha[estado.pilha.length-1].naipe)" :width="60" :height="90" />
+            <span v-else style="color:#d4af37;">Vazio</span>
+          </div>
+          <span class="legenda-area">Descarte<br>({{ estado.pilha.length }})</span>
+        </div>
+        <!-- Mão do Jogador -->
+        <div class="coluna-cartas">
+          <span class="legenda-area">Sua mão</span>
+          <div class="mao mesa-mao">
+            <div v-for="(carta, idx) in maoReal" :key="idx" class="carta-btn animate__animated animate__fadeInUp">
+              <CartaSvg v-if="cartaEstaRevelada(idx)" :valor="mapValorSvg(carta.nome)" :naipe="mapNaipeSvg(carta.naipe)" :width="60" :height="90" />
+              <div v-else class="verso-carta" style="width:60px;height:90px;display:flex;align-items:center;justify-content:center;">
+                <span style="font-size:2.2rem;color:#eebbc3;">🂠</span>
+              </div>
+              <button v-if="indiceDescarteTentativa === null" class="btn-descartar-carta" @click="tentarDescarte(idx)">Descartar</button>
+            </div>
+          </div>
+          <!-- Seleção de segunda carta para descarte -->
+          <div v-if="indiceDescarteTentativa !== null" class="mensagem-pilha">
+            <p>Selecione outra carta que você acredita ter o mesmo valor para descartar junto:</p>
+            <div class="mao">
+              <button v-for="(carta, idx2) in maoReal" :key="'descartar-'+idx2" v-if="idx2 !== indiceDescarteTentativa" class="carta-btn" @click="confirmarDescarte(idx2)">
+                <span style="font-size:2.2rem;color:#eebbc3;">🂠</span>
+              </button>
+            </div>
+            <button class="btn-principal" @click="cancelarDescarte">Cancelar</button>
+          </div>
+        </div>
+      </div>
+      <!-- Jogadores -->
+      <div class="jogadores-area">
         <h2>Jogadores</h2>
         <ul>
           <li v-for="(player, idx) in estado.players" :key="idx">
-            <b v-if="idx === estado.jogadorDaVez">▶</b>
+            <b v-if="idx === estado.jogadorDaVez" style="color:#ffe082;">▶</b>
             {{ player.nome }} - Cartas: {{ player.mao.length }}
             <span v-if="idx === meuIndice">(Você)</span>
           </li>
         </ul>
       </div>
-      <div class="baralho-pilha">
-        <div>
-          <h2>Baralho</h2>
-          <p>Cartas restantes: {{ estado.baralho.length }}</p>
-        </div>
-        <div>
-          <h2>Pilha de Descarte</h2>
-          <div v-if="estado.pilha.length > 0">
-            <CartaSvg :valor="mapValorSvg(estado.pilha[estado.pilha.length-1].nome)" :naipe="mapNaipeSvg(estado.pilha[estado.pilha.length-1].naipe)" :width="60" :height="90" />
-            <p class="topo-pilha">Topo: {{ estado.pilha[estado.pilha.length-1].nome }} {{ estado.pilha[estado.pilha.length-1].naipe || '' }}</p>
-          </div>
-          <div v-else>
-            <p>Pilha vazia</p>
-          </div>
-        </div>
-      </div>
-      <div>
-        <h3>Sua mão</h3>
-        <div class="mao">
-          <div v-for="(carta, idx) in maoReal" :key="idx" class="carta-btn animate__animated animate__fadeInUp">
-            <CartaSvg v-if="cartaEstaRevelada(idx)" :valor="mapValorSvg(carta.nome)" :naipe="mapNaipeSvg(carta.naipe)" :width="60" :height="90" />
-            <div v-else class="verso-carta" style="width:60px;height:90px;display:flex;align-items:center;justify-content:center;background:#232946;border-radius:8px;border:2px solid #eebbc3;box-shadow:0 2px 8px #0007;">
-              <span style="font-size:2.2rem;color:#eebbc3;">🂠</span>
-            </div>
-            <button v-if="indiceDescarteTentativa === null" class="btn-descartar-carta" @click="tentarDescarte(idx)">Descartar</button>
-          </div>
-        </div>
-        <!-- Seleção de segunda carta para descarte -->
-        <div v-if="indiceDescarteTentativa !== null" class="mensagem-pilha">
-          <p>Selecione outra carta que você acredita ter o mesmo valor para descartar junto:</p>
-          <div class="mao">
-            <button v-for="(carta, idx2) in maoReal" :key="'descartar-'+idx2" v-if="idx2 !== indiceDescarteTentativa" class="carta-btn" @click="confirmarDescarte(idx2)">
-              <span style="font-size:2.2rem;color:#eebbc3;">🂠</span>
-            </button>
-          </div>
-          <button class="btn-principal" @click="cancelarDescarte">Cancelar</button>
-        </div>
-      </div>
+      <!-- Ações do Jogador -->
       <div v-if="estado.jogadorDaVez === meuIndice">
         <button class="btn-principal" @click="comprarCarta" v-if="!escolhendoAcao && !acaoPendente">Comprar carta</button>
         <!-- Fluxo de escolha de ação ao comprar carta -->
-        <div v-if="escolhendoAcao && cartaComprada" class="acao-compra">
+        <div v-if="escolhendoAcao && cartaComprada" class="acao-compra mesa-acao-compra">
           <h4>Você comprou:</h4>
           <CartaSvg :valor="mapValorSvg(cartaComprada.nome)" :naipe="mapNaipeSvg(cartaComprada.naipe)" :width="60" :height="90" />
           <p>Escolha o que fazer:</p>
@@ -84,7 +93,14 @@
         </div>
       </div>
       <div v-else>
-        <p>Aguarde sua vez...</p>
+        <p style="color:#ffe082;">Aguarde sua vez...</p>
+      </div>
+      <!-- Botão de fim de jogo -->
+      <div v-if="estado && estado.turnoAtual >= 5 && !estado.fimDeclarado">
+        <button class="btn-principal" @click="declararFimDeJogo">Declarar fim de jogo</button>
+      </div>
+      <div v-if="estado && estado.fimDeclarado && estado.turnosRestantesFim !== null">
+        <div class="mensagem-pilha">Fim de jogo declarado! Restam {{ estado.turnosRestantesFim }} turnos até o final.</div>
       </div>
     </div>
     <div v-if="escolhendoCartaPropria">
@@ -135,7 +151,7 @@
     </div>
     <div v-if="aguardandoEscolhaTroca">
       <div class="habilidade-msg">
-        <p>Escolha a carta para trocar:</p>
+        <p>Escolha a carta para trocar do jogador {{ estado.players[jogadoresSelecionadosTroca[ordemTroca]]?.nome }}:</p>
         <div class="mao">
           <button v-for="i in qtdCartasTroca" :key="'troca-carta-'+i" class="carta-btn" @click="escolherCartaParaTroca(i-1)">
             <span>Carta {{ i }}</span>
@@ -143,7 +159,6 @@
         </div>
       </div>
     </div>
-    <div v-if="mensagemStatus" class="mensagem-pilha">{{ mensagemStatus }}</div>
     <div v-if="fimDeJogo && resultadoFinal">
       <h2>Fim de Jogo!</h2>
       <div>
@@ -238,6 +253,7 @@ export default {
       escolhendoJogadoresTroca: false, // Se está escolhendo jogadores para troca
       jogadoresDisponiveisTroca: [], // Lista de jogadores para troca
       jogadoresSelecionadosTroca: [], // Índices dos jogadores selecionados
+      cartasSelecionadasTroca: [], // NOVO: índices das cartas selecionadas para troca
       aguardandoEscolhaTroca: false, // Se está aguardando escolher carta para troca
       ordemTroca: null, // 0 ou 1, ordem da escolha da carta para troca
       qtdCartasTroca: 0, // Quantidade de cartas do jogador para troca
@@ -356,8 +372,10 @@ export default {
         this.escolhendoAcao = false;
         this.indiceSubstituir = null;
         // Mensagem temporária para o jogador
-        this.mensagemStatus = `Você descartou a carta ${cartaDescartada?.nome || '?'}${cartaDescartada?.naipe ? ' ' + cartaDescartada.naipe : ''} e comprou a carta ${this.cartaComprada?.nome || '?'}${this.cartaComprada?.naipe ? ' ' + this.cartaComprada.naipe : ''}`;
-        setTimeout(() => { this.mensagemStatus = ''; }, 4000);
+        setTimeout(() => {
+          this.mensagemStatus = `Você descartou a carta ${cartaDescartada?.nome || '?'}${cartaDescartada?.naipe ? ' ' + cartaDescartada.naipe : ''} e comprou a carta ${this.cartaComprada?.nome || '?'}${this.cartaComprada?.naipe ? ' ' + this.cartaComprada.naipe : ''}`;
+          setTimeout(() => { this.mensagemStatus = ''; }, 4000);
+        }, 200); // Pequeno delay para garantir atualização do estado
         this.cartaComprada = null;
       }
     },
@@ -417,25 +435,40 @@ export default {
       }
     },
     confirmarJogadoresTroca() {
-      this.socket.emit('usar_habilidade', {
-        sala: this.sala,
-        jogador: this.jogador.nome,
-        carta: this.cartaComprada,
-        alvos: this.jogadoresSelecionadosTroca
-      });
-      this.escolhendoJogadoresTroca = false;
+      // Após escolher dois jogadores, começa a escolher as cartas
+      this.cartasSelecionadasTroca = [];
+      this.ordemTroca = 0;
+      this.aguardandoEscolhaTroca = true;
+      // Solicita a quantidade de cartas do primeiro jogador
+      const idx = this.jogadoresSelecionadosTroca[0];
+      this.qtdCartasTroca = this.estado.players[idx]?.mao.length || 0;
     },
     escolherCartaParaTroca(idxCarta) {
-      // Envia para o backend o índice da carta escolhida para troca
-      this.socket.emit('usar_habilidade', {
-        sala: this.sala,
-        jogador: this.jogador.nome,
-        carta: this.cartaComprada,
-        indicesAlvo: [idxCarta]
-      });
-      this.aguardandoEscolhaTroca = false;
-      this.ordemTroca = null;
-      this.qtdCartasTroca = 0;
+      // Salva a carta escolhida para o jogador da vez
+      this.cartasSelecionadasTroca.push(idxCarta);
+      if (this.ordemTroca === 0) {
+        // Agora escolher a carta do segundo jogador
+        this.ordemTroca = 1;
+        const idx = this.jogadoresSelecionadosTroca[1];
+        this.qtdCartasTroca = this.estado.players[idx]?.mao.length || 0;
+      } else {
+        // Já escolheu as duas cartas, envia para o backend
+        this.socket.emit('usar_habilidade', {
+          sala: this.sala,
+          jogador: this.jogador.nome,
+          carta: this.cartaComprada,
+          alvos: this.jogadoresSelecionadosTroca,
+          indicesAlvo: this.cartasSelecionadasTroca
+        });
+        // Limpa estados
+        this.escolhendoJogadoresTroca = false;
+        this.jogadoresSelecionadosTroca = [];
+        this.cartasSelecionadasTroca = [];
+        this.aguardandoEscolhaTroca = false;
+        this.ordemTroca = null;
+        this.qtdCartasTroca = 0;
+        this.cartaComprada = null;
+      }
     },
     // NOVO: tentativa de descarte a qualquer momento
     tentarDescarte(idx) {
@@ -501,13 +534,63 @@ export default {
 
 <style scoped>
 .cunoku-game {
+  background: linear-gradient(135deg, #14532d 80%, #0a1a0a 100%);
+  border-radius: 18px;
+  box-shadow: 0 4px 32px #0008, 0 0 0 4px #d4af37;
+  border: 2px solid #d4af37;
+  padding: 32px 24px;
+  min-height: 600px;
+  max-width: 900px;
   margin: 0 auto;
+  position: relative;
+}
+.mesa-cartas {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 2.5rem;
+  margin-bottom: 2rem;
+}
+.coluna-cartas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+  gap: 0.7rem;
+}
+.pilha, .baralho {
+  border: 2px solid #d4af37;
+  border-radius: 10px;
   background: #232946;
-  border-radius: 12px;
-  padding: 28px;
-  box-shadow: 0 2px 16px #0005;
-  color: #f4f4f4;
-  max-width: 600px;
+  box-shadow: 0 2px 12px #0007;
+  padding: 8px;
+  min-width: 60px;
+  min-height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.legenda-area {
+  color: #ffe082;
+  font-size: 0.95rem;
+  text-align: center;
+  margin-top: 0.3rem;
+  font-weight: bold;
+  text-shadow: 0 1px 4px #000a;
+}
+.mesa-mao {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  gap: 0.5rem;
+}
+.jogadores-area {
+  margin-bottom: 1.2rem;
+  background: rgba(20, 20, 30, 0.85);
+  border-radius: 10px;
+  padding: 1rem 2rem;
+  color: #eebbc3;
+  box-shadow: 0 1px 8px #0003;
+  border: 1.5px solid #d4af37;
 }
 h2, h3 {
   color: #eebbc3;
