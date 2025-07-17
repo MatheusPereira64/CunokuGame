@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import HomePage from './pages/HomePage.vue'
 import JogoPage from './pages/JogoPage.vue'
 import P2PService from './p2pService.js'
+import { io } from 'socket.io-client'
 
 const pagina = ref('inicio')
 const numJogadores = ref(2)
@@ -18,6 +19,9 @@ function iniciarJogo({ qtd, jogadorInfo, salaInfo }) {
   jogador.value = jogadorInfo
   sala.value = salaInfo
   pagina.value = 'jogo'
+  // Conectar ao backend via Socket.IO
+  socket.value = io('http://localhost:3000')
+  socket.value.emit('entrar_sala', { nome: jogadorInfo.nome, sala: salaInfo })
   conectarP2P(qtd, salaInfo)
 }
 
