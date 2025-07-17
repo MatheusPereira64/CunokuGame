@@ -295,6 +295,15 @@ io.on('connection', (socket) => {
       estado.players[idxA].mao[indicesAlvo[0]] = cartaB;
       estado.players[idxB].mao[indicesAlvo[1]] = cartaA;
       estado.pilha.push(cartaUsada);
+      // Notificação detalhada da troca
+      io.to(sala).emit('mensagem', {
+        tipo: 'troca_cartas',
+        jogador: estado.players[idx].nome,
+        jogadorA: estado.players[idxA].nome,
+        cartaA: indicesAlvo[0]+1,
+        jogadorB: estado.players[idxB].nome,
+        cartaB: indicesAlvo[1]+1
+      });
       avancarTurno(estado, sala);
       io.to(sala).emit('estado_jogo', estado);
       delete estado.aguardandoAcao;
@@ -309,48 +318,73 @@ io.on('connection', (socket) => {
     delete estado.aguardandoAcao;
   });
 
-  socket.on('tentar_descarte', ({ sala, jogador, indice1, indice2 }) => {
+  socket.on('tentar_descarte', ({ sala, jogador, indice, indice1, indice2 }) => {
     const estado = estadoJogo[sala];
     if (!estado || !estado.jogoIniciado) return;
     const idx = estado.players.findIndex(p => p.nome === jogador);
     if (idx === -1) return;
     const mao = estado.players[idx].mao;
-    if (
-      typeof indice1 !== 'number' || typeof indice2 !== 'number' ||
-      indice1 === indice2 ||
-      indice1 < 0 || indice2 < 0 ||
-      indice1 >= mao.length || indice2 >= mao.length
-    ) return;
-    const carta1 = mao[indice1];
-    const carta2 = mao[indice2];
-    if (carta1 && carta2 && carta1.nome === carta2.nome) {
-      // Acertou: remove ambas e coloca na pilha
-      // Remover o índice maior primeiro para não bagunçar os índices
-      if (indice1 > indice2) {
-        mao.splice(indice1, 1);
-        mao.splice(indice2, 1);
+    // Descarte simples: uma carta igual ao topo da pilha
+    if (typeof indice === 'number' && indice >= 0 && indice < mao.length) {
+      const carta = mao[indice];
+      const topo = estado.pilha[estado.pilha.length-1];
+      if (carta && topo && carta.nome === topo.nome) {
+        // Descarte correto
+        mao.splice(indice, 1);
+        estado.pilha.push(carta);
+        io.to(sala).emit('mensagem', { tipo: 'descarte_correto', jogador, carta: carta.nome });
+        io.to(sala).emit('estado_jogo', estado);
+        return;
       } else {
-        mao.splice(indice2, 1);
-        mao.splice(indice1, 1);
-      }
-      estado.pilha.push(carta1, carta2);
-      io.to(sala).emit('mensagem', { tipo: 'descarte_correto', jogador, carta: carta1.nome });
-    } else {
-      // Errou: compra 2 cartas se houver
-      for (let i = 0; i < 2; i++) {
-        if (estado.baralho.length > 0) {
-          mao.push(estado.baralho.pop());
+        // Punição: compra 2 cartas
+        for (let i = 0; i < 2; i++) {
+          if (estado.baralho.length > 0) {
+            mao.push(estado.baralho.pop());
+          }
         }
+        io.to(sala).emit('mensagem', { tipo: 'descarte_errado', jogador });
+        io.to(sala).emit('estado_jogo', estado);
+        return;
       }
-      io.to(sala).emit('mensagem', { tipo: 'descarte_errado', jogador });
     }
-    io.to(sala).emit('estado_jogo', estado);
+    // Descarte de dupla (mantém funcionalidade antiga)
+    if (
+      typeof indice1 === 'number' && typeof indice2 === 'number' &&
+      indice1 !== indice2 &&
+      indice1 >= 0 && indice2 >= 0 &&
+      indice1 < mao.length && indice2 < mao.length
+    ) {
+      const carta1 = mao[indice1];
+      const carta2 = mao[indice2];
+      if (carta1 && carta2 && carta1.nome === carta2.nome) {
+        // Acertou: remove ambas e coloca na pilha
+        if (indice1 > indice2) {
+          mao.splice(indice1, 1);
+          mao.splice(indice2, 1);
+        } else {
+          mao.splice(indice2, 1);
+          mao.splice(indice1, 1);
+        }
+        estado.pilha.push(carta1, carta2);
+        io.to(sala).emit('mensagem', { tipo: 'descarte_correto', jogador, carta: carta1.nome });
+      } else {
+        // Errou: compra 2 cartas se houver
+        for (let i = 0; i < 2; i++) {
+          if (estado.baralho.length > 0) {
+            mao.push(estado.baralho.pop());
+          }
+        }
+        io.to(sala).emit('mensagem', { tipo: 'descarte_errado', jogador });
+      }
+      io.to(sala).emit('estado_jogo', estado);
+    }
   });
 
   // NOVO: evento para declarar fim de jogo
   socket.on('declarar_fim_de_jogo', ({ sala, jogador }) => {
     const estado = estadoJogo[sala];
     if (!estado || !estado.jogoIniciado) return;
+    // REGRA: Só pode declarar a partir do 5º turno, independente do número de jogadores
     if (estado.turnoAtual < 5) return; // Só pode declarar a partir do 5º turno
     if (estado.fimDeclarado) return; // Só pode declarar uma vez
     estado.fimDeclarado = true;

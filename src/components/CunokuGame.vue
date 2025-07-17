@@ -1,5 +1,11 @@
 <template>
   <div class="cunoku-game">
+    <!-- Notificação pop-up -->
+    <transition name="fade">
+      <div v-if="mensagemStatus" class="popup-notificacao">
+        {{ mensagemStatus }}
+      </div>
+    </transition>
     <div v-if="!estado">
       <p>Aguardando sincronização do jogo...</p>
     </div>
@@ -178,7 +184,7 @@
       </div>
     </div>
     <div v-else>
-      <div v-if="estado && estado.turnoAtual >= (5 + (estado.players?.length || 0)) && !estado.fimDeclarado">
+      <div v-if="estado && estado.turnoAtual >= 5 && !estado.fimDeclarado">
         <button class="btn-principal" @click="declararFimDeJogo">Declarar fim de jogo</button>
       </div>
       <div v-if="estado && estado.fimDeclarado && estado.turnosRestantesFim !== null">
@@ -344,6 +350,9 @@ export default {
               this.mensagemStatus = `${msg.jogador} descartou duas cartas de valor ${msg.carta}!`;
             } else if (msg.tipo === 'descarte_errado') {
               this.mensagemStatus = `${msg.jogador} errou o descarte e comprou 2 cartas!`;
+            } else if (msg.tipo === 'troca_cartas') {
+              this.mensagemStatus = `O jogador ${msg.jogador} trocou a carta ${msg.cartaA} com a carta ${msg.cartaB} do Jogador ${msg.jogadorB}`;
+              setTimeout(() => { this.mensagemStatus = ''; }, 4000);
             }
             setTimeout(() => { this.mensagemStatus = ''; }, 4000);
           });
@@ -595,6 +604,9 @@ export default {
           this.estado.players[idxA].mao[this.cartasSelecionadasTroca[0]] = cartaB
           this.estado.players[idxB].mao[this.cartasSelecionadasTroca[1]] = cartaA
           this.estado.pilha.push(this.cartaComprada)
+          // Mensagem detalhada da troca
+          this.mensagemStatus = `O jogador ${this.estado.players[this.meuIndice].nome} trocou a carta ${this.cartasSelecionadasTroca[0]+1} de ${this.estado.players[idxA].nome} pela carta ${this.cartasSelecionadasTroca[1]+1} de ${this.estado.players[idxB].nome}.`
+          setTimeout(() => { this.mensagemStatus = '' }, 4000)
           // Limpa estados
           this.escolhendoJogadoresTroca = false
           this.jogadoresSelecionadosTroca = []
@@ -636,11 +648,38 @@ export default {
     // NOVO: tentativa de descarte a qualquer momento
     tentarDescarte(idx) {
       if (this.modoOffline) {
-        this.indiceDescarteTentativa = idx
+        // Descarte simples: uma carta igual ao topo da pilha
+        const cartaMao = this.estado.players[this.meuIndice].mao[idx]
+        const topoPilha = this.estado.pilha[this.estado.pilha.length-1]
+        if (cartaMao && topoPilha && cartaMao.nome === topoPilha.nome) {
+          // Descarte correto
+          this.estado.pilha.push(cartaMao)
+          this.estado.players[this.meuIndice].mao.splice(idx, 1)
+          this.mensagemStatus = `Você descartou corretamente uma carta de valor ${cartaMao.nome}!`
+          this.$forceUpdate()
+          setTimeout(() => { this.mensagemStatus = '' }, 4000)
+          this.avancarTurnoLocal()
+        } else {
+          // Punição: compra 2 cartas
+          for (let i = 0; i < 2; i++) {
+            if (this.estado.baralho.length > 0) {
+              this.estado.players[this.meuIndice].mao.push(this.estado.baralho.pop())
+            }
+          }
+          this.mensagemStatus = `Descarte inválido! Você comprou 2 cartas.`
+          this.$forceUpdate()
+          setTimeout(() => { this.mensagemStatus = '' }, 4000)
+        }
         return
       }
-      // Abre seleção de segunda carta para comparar
-      this.indiceDescarteTentativa = idx;
+      // Online: envia para o backend o índice da carta a ser descartada
+      if (this.socket && this.estado) {
+        this.socket.emit('tentar_descarte', {
+          sala: this.sala,
+          jogador: this.jogador.nome,
+          indice: idx
+        });
+      }
     },
     confirmarDescarte(idx2) {
       if (this.modoOffline) {
@@ -699,7 +738,7 @@ export default {
     },
     declararFimDeJogo() {
       if (this.modoOffline) {
-        const minTurnos = 5 + (this.estado?.players?.length || 0)
+        const minTurnos = 5
         if (this.estado && !this.estado.fimDeclarado && this.estado.turnoAtual >= minTurnos) {
           this.estado.fimDeclarado = true
           this.estado.jogadorDeclarouFim = this.jogador.nome
@@ -775,7 +814,7 @@ export default {
     },
     usarHabilidadeBot(idx, carta) {
       // Lógica simples: bot sempre usa habilidade de forma aleatória
-      const minTurnos = 5 + (this.estado?.players?.length || 0)
+      const minTurnos = 5
       if (carta.nome === 'Sete' || carta.nome === 'Oito') {
         // Ver carta própria (escolhe aleatória)
         this.estado.pilha.push(carta)
@@ -806,6 +845,9 @@ export default {
         this.estado.players[j1].mao[i1] = cartaB
         this.estado.players[j2].mao[i2] = cartaA
         this.estado.pilha.push(carta)
+        // Mensagem detalhada da troca (exibe para todos localmente)
+        this.mensagemStatus = `O jogador ${this.estado.players[idx].nome} trocou a carta ${i1+1} com a carta ${i2+1} do Jogador ${this.estado.players[j2].nome}`
+        setTimeout(() => { this.mensagemStatus = '' }, 4000)
         delete this.estado.aguardandoAcao
         this.avancarTurnoLocal()
         return
@@ -1067,5 +1109,31 @@ ul {
   justify-content: center;
   width: 60px;
   height: 90px;
+}
+.popup-notificacao {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #ffe082;
+  color: #232946;
+  padding: 2rem 3rem;
+  border-radius: 18px;
+  box-shadow: 0 4px 32px #0008, 0 0 0 4px #d4af37;
+  font-size: 1.5rem;
+  font-weight: bold;
+  z-index: 9999;
+  text-align: center;
+  animation: popup-fadein 0.3s;
+}
+@keyframes popup-fadein {
+  from { opacity: 0; transform: translate(-50%, -60%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.5s;
+}
+.fade-enter, .fade-leave-to {
+  opacity: 0;
 }
 </style> 
