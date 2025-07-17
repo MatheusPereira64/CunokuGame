@@ -178,7 +178,7 @@
       </div>
     </div>
     <div v-else>
-      <div v-if="estado && estado.turnoAtual >= 5 && !estado.fimDeclarado">
+      <div v-if="estado && estado.turnoAtual >= (5 + (estado.players?.length || 0)) && !estado.fimDeclarado">
         <button class="btn-principal" @click="declararFimDeJogo">Declarar fim de jogo</button>
       </div>
       <div v-if="estado && estado.fimDeclarado && estado.turnosRestantesFim !== null">
@@ -232,10 +232,12 @@ export default {
     jogador: { type: Object, default: null },
     socket: { type: Object, default: null },
     sala: { type: String, default: '' },
+    estadoInicial: { type: Object, default: null },
+    modoBots: { type: Boolean, default: false }
   },
   data() {
     return {
-      estado: null,
+      estado: this.estadoInicial || null,
       meuIndice: null,
       cartaComprada: null, // Nova carta comprada
       escolhendoAcao: false, // Se está escolhendo o que fazer com a carta
@@ -253,12 +255,22 @@ export default {
       aguardandoEscolhaTroca: false, // Se está aguardando escolher carta para troca
       ordemTroca: null, // 0 ou 1, ordem da escolha da carta para troca
       qtdCartasTroca: 0, // Quantidade de cartas do jogador para troca
-      // NOVO: controle de cartas reveladas temporariamente
       cartasReveladas: [], // [{idx: 0, carta: {...}}]
       indiceDescarteTentativa: null, // NOVO: controle de descarte a qualquer momento
       mensagemStatus: '', // NOVO: mensagem de status
       fimDeJogo: false, // NOVO: controle de fim de jogo
       resultadoFinal: null, // NOVO: resultado do fim de jogo
+      modoOffline: this.modoBots // Facilita checagem interna
+    }
+  },
+  mounted() {
+    if (this.modoOffline) {
+      // Descobre o índice do jogador local
+      this.meuIndice = this.estado.players.findIndex(p => p.nome === this.jogador.nome)
+      // Se for vez de bot, já aciona
+      this.$nextTick(() => {
+        this.checarBotEVez()
+      })
     }
   },
   computed: {
@@ -348,6 +360,16 @@ export default {
   methods: {
     // Exemplo: enviar ação para o backend
     comprarCarta() {
+      if (this.modoOffline) {
+        if (this.estado && this.estado.jogadorDaVez === this.meuIndice && !this.estado.aguardandoAcao) {
+          const cartaComprada = this.estado.baralho.pop()
+          this.cartaComprada = cartaComprada
+          this.estado.aguardandoAcao = { jogador: this.meuIndice, carta: cartaComprada }
+          this.escolhendoAcao = true
+          this.$forceUpdate()
+        }
+        return
+      }
       if (this.socket && this.estado && this.estado.jogadorDaVez === this.meuIndice) {
         this.socket.emit('comprar_carta', { sala: this.sala, jogador: this.jogador.nome })
         // Espera o backend responder com o novo estado para mostrar a carta comprada
@@ -355,7 +377,24 @@ export default {
       }
     },
     substituirCarta(idx) {
-      // Envia para o backend qual carta da mão será substituída pela carta comprada
+      if (this.modoOffline) {
+        if (this.cartaComprada && this.estado && this.indiceSubstituir !== null) {
+          const cartaDescartada = this.estado.players[this.meuIndice]?.mao[idx]
+          this.estado.players[this.meuIndice].mao[idx] = this.cartaComprada
+          this.estado.pilha.push(cartaDescartada)
+          this.escolhendoAcao = false
+          this.indiceSubstituir = null
+          this.cartaComprada = null
+          this.estado.aguardandoAcao = null
+          this.$forceUpdate()
+          setTimeout(() => {
+            this.mensagemStatus = `Você descartou a carta ${cartaDescartada?.nome || '?'}${cartaDescartada?.naipe ? ' ' + cartaDescartada.naipe : ''} e comprou a carta ${this.cartaComprada?.nome || '?'}${this.cartaComprada?.naipe ? ' ' + this.cartaComprada.naipe : ''}`
+            setTimeout(() => { this.mensagemStatus = '' }, 4000)
+          }, 200)
+          this.avancarTurnoLocal()
+        }
+        return
+      }
       if (this.socket && this.cartaComprada && this.estado && this.indiceSubstituir !== null) {
         // Salva a carta que será descartada para mostrar na mensagem
         const cartaDescartada = this.estado.players[this.meuIndice]?.mao[idx];
@@ -376,7 +415,18 @@ export default {
       }
     },
     descartarCartaComprada() {
-      // Envia para o backend o pedido de descarte da carta comprada
+      if (this.modoOffline) {
+        if (this.cartaComprada && this.estado) {
+          this.estado.pilha.push(this.cartaComprada)
+          this.escolhendoAcao = false
+          this.cartaComprada = null
+          this.indiceSubstituir = null
+          this.estado.aguardandoAcao = null
+          this.$forceUpdate()
+          this.avancarTurnoLocal()
+        }
+        return
+      }
       if (this.socket && this.cartaComprada && this.estado) {
         this.socket.emit('descartar_carta', {
           sala: this.sala,
@@ -389,7 +439,42 @@ export default {
       }
     },
     usarHabilidade() {
-      // Envia para o backend o pedido de usar a habilidade da carta comprada
+      if (this.modoOffline) {
+        if (!this.cartaComprada || !this.estado) return
+        // Sete/Oito: ver carta própria
+        if (this.cartaComprada.nome === 'Sete' || this.cartaComprada.nome === 'Oito') {
+          this.escolhendoCartaPropria = true
+          this.maxCartasProprias = this.estado.players[this.meuIndice].mao.length
+          return
+        }
+        // Cinco/Seis: ver carta de oponente
+        if (this.cartaComprada.nome === 'Cinco' || this.cartaComprada.nome === 'Seis') {
+          this.escolhendoCartaOponente = true
+          this.oponentesDisponiveis = this.estado.players.map((p, i) => ({ nome: p.nome, idx: i, qtd: p.mao.length })).filter((p, i) => i !== this.meuIndice)
+          this.oponenteSelecionado = null
+          return
+        }
+        // Nove/Dez: trocar cartas entre dois jogadores
+        if (this.cartaComprada.nome === 'Nove' || this.cartaComprada.nome === 'Dez') {
+          this.escolhendoJogadoresTroca = true
+          this.jogadoresDisponiveisTroca = this.estado.players.map((p, i) => ({ nome: p.nome, idx: i, qtd: p.mao.length }))
+          this.jogadoresSelecionadosTroca = []
+          this.cartasSelecionadasTroca = []
+          this.aguardandoEscolhaTroca = false
+          this.ordemTroca = null
+          this.qtdCartasTroca = 0
+          return
+        }
+        // Outras habilidades podem ser implementadas aqui
+        // Por padrão, descarta a carta
+        this.estado.pilha.push(this.cartaComprada)
+        this.escolhendoAcao = false
+        this.cartaComprada = null
+        this.estado.aguardandoAcao = null
+        this.$forceUpdate()
+        this.avancarTurnoLocal()
+        return
+      }
       if (this.socket && this.cartaComprada && this.estado) {
         this.socket.emit('usar_habilidade', {
           sala: this.sala,
@@ -402,7 +487,23 @@ export default {
       }
     },
     escolherCartaPropria(idx) {
-      // Envia para o backend o índice da carta da própria mão que o jogador quer ver
+      if (this.modoOffline) {
+        const carta = this.estado.players[this.meuIndice].mao[idx]
+        this.cartasReveladas.push({ idx, carta })
+        this.cartaRevelada = { carta, indice: idx }
+        setTimeout(() => {
+          this.cartasReveladas = this.cartasReveladas.filter(c => c.idx !== idx)
+          this.cartaRevelada = null
+        }, 5000)
+        this.escolhendoCartaPropria = false
+        this.estado.pilha.push(this.cartaComprada)
+        this.cartaComprada = null
+        this.estado.aguardandoAcao = null
+        this.escolhendoAcao = false
+        this.$forceUpdate()
+        this.avancarTurnoLocal()
+        return
+      }
       this.socket.emit('usar_habilidade', {
         sala: this.sala,
         jogador: this.jogador.nome,
@@ -412,9 +513,30 @@ export default {
       this.escolhendoCartaPropria = false;
     },
     escolherCartaOponente(idxOponente) {
+      if (this.modoOffline) {
+        this.oponenteSelecionado = idxOponente
+        return
+      }
       this.oponenteSelecionado = idxOponente;
     },
     escolherCartaDoOponente(idxCarta) {
+      if (this.modoOffline) {
+        const idxOponente = this.oponenteSelecionado
+        const carta = this.estado.players[idxOponente].mao[idxCarta]
+        this.cartaRevelada = { carta, indice: idxCarta, oponente: this.estado.players[idxOponente].nome }
+        setTimeout(() => {
+          this.cartaRevelada = null
+        }, 5000)
+        this.escolhendoCartaOponente = false
+        this.oponenteSelecionado = null
+        this.estado.pilha.push(this.cartaComprada)
+        this.cartaComprada = null
+        this.estado.aguardandoAcao = null
+        this.escolhendoAcao = false
+        this.$forceUpdate()
+        this.avancarTurnoLocal()
+        return
+      }
       this.socket.emit('usar_habilidade', {
         sala: this.sala,
         jogador: this.jogador.nome,
@@ -426,29 +548,74 @@ export default {
       this.oponenteSelecionado = null;
     },
     escolherJogadorTroca(idxJogador) {
+      if (this.modoOffline) {
+        if (!this.jogadoresSelecionadosTroca.includes(idxJogador) && this.jogadoresSelecionadosTroca.length < 2) {
+          this.jogadoresSelecionadosTroca.push(idxJogador)
+        }
+        if (this.jogadoresSelecionadosTroca.length === 2) {
+          this.aguardandoEscolhaTroca = true
+          this.ordemTroca = 0
+          const idx = this.jogadoresSelecionadosTroca[0]
+          this.qtdCartasTroca = this.estado.players[idx]?.mao.length || 0
+        }
+        return
+      }
       if (!this.jogadoresSelecionadosTroca.includes(idxJogador) && this.jogadoresSelecionadosTroca.length < 2) {
-        this.jogadoresSelecionadosTroca.push(idxJogador);
+        this.jogadoresSelecionadosTroca.push(idxJogador)
       }
     },
     confirmarJogadoresTroca() {
-      // Após escolher dois jogadores, começa a escolher as cartas
-      this.cartasSelecionadasTroca = [];
-      this.ordemTroca = 0;
-      this.aguardandoEscolhaTroca = true;
-      // Solicita a quantidade de cartas do primeiro jogador
-      const idx = this.jogadoresSelecionadosTroca[0];
-      this.qtdCartasTroca = this.estado.players[idx]?.mao.length || 0;
+      if (this.modoOffline) {
+        this.cartasSelecionadasTroca = []
+        this.ordemTroca = 0
+        this.aguardandoEscolhaTroca = true
+        const idx = this.jogadoresSelecionadosTroca[0]
+        this.qtdCartasTroca = this.estado.players[idx]?.mao.length || 0
+        return
+      }
+      this.cartasSelecionadasTroca = []
+      this.ordemTroca = 0
+      this.aguardandoEscolhaTroca = true
+      const idx = this.jogadoresSelecionadosTroca[0]
+      this.qtdCartasTroca = this.estado.players[idx]?.mao.length || 0
     },
     escolherCartaParaTroca(idxCarta) {
-      // Salva a carta escolhida para o jogador da vez
-      this.cartasSelecionadasTroca.push(idxCarta);
+      if (this.modoOffline) {
+        this.cartasSelecionadasTroca.push(idxCarta)
+        if (this.ordemTroca === 0) {
+          this.ordemTroca = 1
+          const idx = this.jogadoresSelecionadosTroca[1]
+          this.qtdCartasTroca = this.estado.players[idx]?.mao.length || 0
+        } else {
+          // Realiza a troca
+          const idxA = this.jogadoresSelecionadosTroca[0]
+          const idxB = this.jogadoresSelecionadosTroca[1]
+          const cartaA = this.estado.players[idxA].mao[this.cartasSelecionadasTroca[0]]
+          const cartaB = this.estado.players[idxB].mao[this.cartasSelecionadasTroca[1]]
+          this.estado.players[idxA].mao[this.cartasSelecionadasTroca[0]] = cartaB
+          this.estado.players[idxB].mao[this.cartasSelecionadasTroca[1]] = cartaA
+          this.estado.pilha.push(this.cartaComprada)
+          // Limpa estados
+          this.escolhendoJogadoresTroca = false
+          this.jogadoresSelecionadosTroca = []
+          this.cartasSelecionadasTroca = []
+          this.aguardandoEscolhaTroca = false
+          this.ordemTroca = null
+          this.qtdCartasTroca = 0
+          this.cartaComprada = null
+          this.estado.aguardandoAcao = null
+          this.escolhendoAcao = false
+          this.$forceUpdate()
+          this.avancarTurnoLocal()
+        }
+        return
+      }
+      this.cartasSelecionadasTroca.push(idxCarta)
       if (this.ordemTroca === 0) {
-        // Agora escolher a carta do segundo jogador
-        this.ordemTroca = 1;
-        const idx = this.jogadoresSelecionadosTroca[1];
-        this.qtdCartasTroca = this.estado.players[idx]?.mao.length || 0;
+        this.ordemTroca = 1
+        const idx = this.jogadoresSelecionadosTroca[1]
+        this.qtdCartasTroca = this.estado.players[idx]?.mao.length || 0
       } else {
-        // Já escolheu as duas cartas, envia para o backend
         this.socket.emit('usar_habilidade', {
           sala: this.sala,
           jogador: this.jogador.nome,
@@ -468,10 +635,54 @@ export default {
     },
     // NOVO: tentativa de descarte a qualquer momento
     tentarDescarte(idx) {
+      if (this.modoOffline) {
+        this.indiceDescarteTentativa = idx
+        return
+      }
       // Abre seleção de segunda carta para comparar
       this.indiceDescarteTentativa = idx;
     },
     confirmarDescarte(idx2) {
+      if (this.modoOffline) {
+        if (!this.estado) return
+        const mao = this.estado.players[this.meuIndice].mao
+        const idx1 = this.indiceDescarteTentativa
+        if (
+          typeof idx1 !== 'number' || typeof idx2 !== 'number' ||
+          idx1 === idx2 ||
+          idx1 < 0 || idx2 < 0 ||
+          idx1 >= mao.length || idx2 >= mao.length
+        ) {
+          this.indiceDescarteTentativa = null
+          return
+        }
+        const carta1 = mao[idx1]
+        const carta2 = mao[idx2]
+        if (carta1 && carta2 && carta1.nome === carta2.nome) {
+          // Acertou: remove ambas e coloca na pilha
+          if (idx1 > idx2) {
+            mao.splice(idx1, 1)
+            mao.splice(idx2, 1)
+          } else {
+            mao.splice(idx2, 1)
+            mao.splice(idx1, 1)
+          }
+          this.estado.pilha.push(carta1, carta2)
+          this.mensagemStatus = `Você descartou duas cartas de valor ${carta1.nome}!`
+        } else {
+          // Errou: compra 2 cartas se houver
+          for (let i = 0; i < 2; i++) {
+            if (this.estado.baralho.length > 0) {
+              mao.push(this.estado.baralho.pop())
+            }
+          }
+          this.mensagemStatus = `Você errou o descarte e comprou 2 cartas!`
+        }
+        this.indiceDescarteTentativa = null
+        this.$forceUpdate()
+        setTimeout(() => { this.mensagemStatus = '' }, 4000)
+        return
+      }
       // Envia para o backend a tentativa de descarte
       if (this.socket && this.estado) {
         this.socket.emit('tentar_descarte', {
@@ -487,6 +698,16 @@ export default {
       this.indiceDescarteTentativa = null;
     },
     declararFimDeJogo() {
+      if (this.modoOffline) {
+        const minTurnos = 5 + (this.estado?.players?.length || 0)
+        if (this.estado && !this.estado.fimDeclarado && this.estado.turnoAtual >= minTurnos) {
+          this.estado.fimDeclarado = true
+          this.estado.jogadorDeclarouFim = this.jogador.nome
+          this.estado.turnosRestantesFim = 2 * this.estado.players.length
+          this.$forceUpdate()
+        }
+        return
+      }
       if (this.socket && this.estado && !this.estado.fimDeclarado && this.estado.turnoAtual >= 5) {
         this.socket.emit('declarar_fim_de_jogo', {
           sala: this.sala,
@@ -523,6 +744,107 @@ export default {
     // NOVO: verifica se a carta está revelada
     cartaEstaRevelada(idx) {
       return this.cartasReveladas.some(c => c.idx === idx);
+    },
+    // --- MODO OFFLINE ---
+    checarBotEVez() {
+      if (!this.modoOffline || !this.estado || !this.estado.jogoIniciado) return
+      const idx = this.estado.jogadorDaVez
+      const player = this.estado.players[idx]
+      if (player && player.humano === false) {
+        setTimeout(() => this.jogarBot(idx), 800)
+      }
+    },
+    jogarBot(idx) {
+      if (!this.estado.jogoIniciado) return
+      if (!this.estado.aguardandoAcao) {
+        const cartaComprada = this.estado.baralho.pop()
+        this.estado.aguardandoAcao = { jogador: idx, carta: cartaComprada }
+        this.$forceUpdate()
+        setTimeout(() => {
+          // Se for carta de habilidade, bot usa habilidade
+          if (['Cinco','Seis','Sete','Oito','Nove','Dez'].includes(cartaComprada.nome)) {
+            this.usarHabilidadeBot(idx, cartaComprada)
+            return
+          }
+          // Bot sempre descarta carta comprada se não for habilidade
+          this.estado.pilha.push(this.estado.aguardandoAcao.carta)
+          delete this.estado.aguardandoAcao
+          this.avancarTurnoLocal()
+        }, 900)
+      }
+    },
+    usarHabilidadeBot(idx, carta) {
+      // Lógica simples: bot sempre usa habilidade de forma aleatória
+      const minTurnos = 5 + (this.estado?.players?.length || 0)
+      if (carta.nome === 'Sete' || carta.nome === 'Oito') {
+        // Ver carta própria (escolhe aleatória)
+        this.estado.pilha.push(carta)
+        delete this.estado.aguardandoAcao
+        this.avancarTurnoLocal()
+        return
+      }
+      if (carta.nome === 'Cinco' || carta.nome === 'Seis') {
+        // Ver carta de oponente (escolhe aleatório)
+        const oponentes = this.estado.players.map((p, i) => i).filter(i => i !== idx)
+        const alvo = oponentes[Math.floor(Math.random() * oponentes.length)]
+        this.estado.pilha.push(carta)
+        delete this.estado.aguardandoAcao
+        this.avancarTurnoLocal()
+        return
+      }
+      if (carta.nome === 'Nove' || carta.nome === 'Dez') {
+        // Troca cartas entre dois jogadores aleatórios
+        const indices = this.estado.players.map((p, i) => i)
+        let j1 = idx
+        while (j1 === idx) j1 = indices[Math.floor(Math.random() * indices.length)]
+        let j2 = idx
+        while (j2 === idx || j2 === j1) j2 = indices[Math.floor(Math.random() * indices.length)]
+        const i1 = Math.floor(Math.random() * this.estado.players[j1].mao.length)
+        const i2 = Math.floor(Math.random() * this.estado.players[j2].mao.length)
+        const cartaA = this.estado.players[j1].mao[i1]
+        const cartaB = this.estado.players[j2].mao[i2]
+        this.estado.players[j1].mao[i1] = cartaB
+        this.estado.players[j2].mao[i2] = cartaA
+        this.estado.pilha.push(carta)
+        delete this.estado.aguardandoAcao
+        this.avancarTurnoLocal()
+        return
+      }
+      // Fim de jogo: só pode declarar após minTurnos
+      const soma = this.estado.players[idx].mao.reduce((acc, c) => acc + (typeof c.valor === 'number' ? c.valor : 0), 0)
+      if (this.estado.turnoAtual >= minTurnos && soma < 15 && Math.random() < 0.8 && !this.estado.fimDeclarado) {
+        this.estado.fimDeclarado = true
+        this.estado.jogadorDeclarouFim = this.estado.players[idx].nome
+        this.estado.turnosRestantesFim = 2 * this.estado.players.length
+        this.$forceUpdate()
+      }
+      this.estado.pilha.push(carta)
+      delete this.estado.aguardandoAcao
+      this.avancarTurnoLocal()
+    },
+    avancarTurnoLocal() {
+      // Avança o jogador da vez
+      this.estado.jogadorDaVez = (this.estado.jogadorDaVez + 1) % this.estado.players.length
+      if (this.estado.jogadorDaVez === 0) {
+        this.estado.turnoAtual = (this.estado.turnoAtual || 1) + 1
+      }
+      // Se fim foi declarado, decrementa turnos restantes
+      if (this.estado.fimDeclarado && this.estado.turnosRestantesFim !== null) {
+        this.estado.turnosRestantesFim--
+        if (this.estado.turnosRestantesFim <= 0) {
+          this.estado.jogoIniciado = false
+          // Calcula soma das cartas de cada jogador
+          const somas = this.estado.players.map(p => ({ nome: p.nome, soma: p.mao.reduce((acc, c) => acc + (typeof c.valor === 'number' ? c.valor : 0), 0) }))
+          const menor = Math.min(...somas.map(s => s.soma))
+          const vencedores = somas.filter(s => s.soma === menor).map(s => s.nome)
+          this.resultadoFinal = { somas, vencedores, jogadores: this.estado.players }
+          this.fimDeJogo = true
+          this.$emit('fim-de-jogo', this.resultadoFinal)
+          return
+        }
+      }
+      this.$forceUpdate()
+      this.checarBotEVez()
     },
   },
 };

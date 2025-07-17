@@ -16,8 +16,12 @@ const PORT = 3000;
 const salas = {};
 // Estrutura para armazenar o estado do jogo por sala
 const estadoJogo = {};
+// Estrutura para armazenar informações de bots e dificuldade por sala
+const infoBots = {};
+// Estrutura para memória dos bots por sala
+const memoriaBots = {};
 
-function criarBaralho() {
+function criarBaralho(numJogadores = 4) {
   const VALORES_CARTAS = [
     { nome: 'Rei', valor: 0 },
     { nome: 'Às', valor: 1 },
@@ -32,16 +36,22 @@ function criarBaralho() {
     { nome: 'Coringa', valor: -1 },
   ];
   const NAIPES = ['♠', '♥', '♦', '♣'];
-  const baralho = [];
+  let baralho = [];
+  const cartasNecessarias = numJogadores * 10 * 4;
+  const baralhoBase = [];
   for (const carta of VALORES_CARTAS) {
     if (carta.nome === 'Coringa') {
-      baralho.push({ ...carta, naipe: null });
-      baralho.push({ ...carta, naipe: null });
+      baralhoBase.push({ ...carta, naipe: null });
+      baralhoBase.push({ ...carta, naipe: null });
     } else {
       for (const naipe of NAIPES) {
-        baralho.push({ ...carta, naipe });
+        baralhoBase.push({ ...carta, naipe });
       }
     }
+  }
+  const multiplicador = Math.ceil(cartasNecessarias / baralhoBase.length);
+  for (let m = 0; m < multiplicador; m++) {
+    baralho = baralho.concat(baralhoBase.map(c => ({ ...c })));
   }
   for (let i = baralho.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -78,12 +88,28 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('iniciar_jogo', ({ sala }) => {
+  socket.on('iniciar_jogo', ({ sala, bots, dificuldade }) => {
     // Cria o estado inicial do jogo para a sala
     const jogadores = salas[sala] || [];
-    const baralho = criarBaralho();
+    const numJogadores = jogadores.length + (bots && Array.isArray(bots) ? bots.length : 0);
+    const baralho = criarBaralho(numJogadores);
     const cartasPorJogador = 4;
-    const players = jogadores.map(j => ({ nome: j.nome, mao: [] }));
+    // Adiciona bots como jogadores
+    let players = jogadores.map(j => ({ nome: j.nome, mao: [], humano: true }));
+    if (bots && Array.isArray(bots)) {
+      bots.forEach(nome => {
+        players.push({ nome, mao: [], humano: false });
+      });
+      infoBots[sala] = { nomes: bots, dificuldade: dificuldade || 'facil' };
+      // Inicializa memória dos bots
+      memoriaBots[sala] = {};
+      bots.forEach(nome => {
+        memoriaBots[sala][nome] = { cartasOponentes: {} };
+      });
+    } else {
+      infoBots[sala] = null;
+      memoriaBots[sala] = null;
+    }
     for (let i = 0; i < cartasPorJogador; i++) {
       players.forEach(player => {
         player.mao.push(baralho.pop());
@@ -106,6 +132,8 @@ io.on('connection', (socket) => {
     };
     io.to(sala).emit('jogo_iniciado');
     io.to(sala).emit('estado_jogo', estadoJogo[sala]);
+    // Se o primeiro jogador for bot, já aciona o bot (REMOVIDO)
+    // setTimeout(() => checarBotEVez(sala), 500);
   });
 
   // Função auxiliar para avançar turno e lidar com fim de jogo
@@ -130,6 +158,8 @@ io.on('connection', (socket) => {
         io.to(sala).emit('fim_de_jogo', estado.resultadoFinal);
       }
     }
+    // Checa se é vez de bot após avançar (REMOVIDO)
+    // setTimeout(() => checarBotEVez(sala), 500);
   }
 
   socket.on('comprar_carta', ({ sala, jogador }) => {
@@ -157,6 +187,15 @@ io.on('connection', (socket) => {
       const cartaDescartada = estado.players[idx].mao[indice];
       estado.players[idx].mao[indice] = estado.aguardandoAcao.carta;
       estado.pilha.push(cartaDescartada);
+      // Memorizar carta descartada para todos bots médios/difíceis
+      if (memoriaBots[sala]) {
+        Object.keys(memoriaBots[sala]).forEach(bot => {
+          if (infoBots[sala]?.dificuldade === 'medio' || infoBots[sala]?.dificuldade === 'dificil') {
+            memoriaBots[sala][bot].cartasOponentes[estado.players[idx].nome] = memoriaBots[sala][bot].cartasOponentes[estado.players[idx].nome] || {};
+            memoriaBots[sala][bot].cartasOponentes[estado.players[idx].nome][indice] = { ...cartaDescartada };
+          }
+        });
+      }
       delete estado.aguardandoAcao;
       avancarTurno(estado, sala);
       io.to(sala).emit('estado_jogo', estado);
@@ -170,6 +209,16 @@ io.on('connection', (socket) => {
     if (!estado.aguardandoAcao || estado.aguardandoAcao.jogador !== idx) return;
     // Descarta a carta comprada (não adiciona à mão)
     estado.pilha.push(estado.aguardandoAcao.carta);
+    // Memorizar carta descartada para todos bots médios/difíceis
+    if (memoriaBots[sala]) {
+      Object.keys(memoriaBots[sala]).forEach(bot => {
+        if (infoBots[sala]?.dificuldade === 'medio' || infoBots[sala]?.dificuldade === 'dificil') {
+          memoriaBots[sala][bot].cartasOponentes[estado.players[idx].nome] = memoriaBots[sala][bot].cartasOponentes[estado.players[idx].nome] || {};
+          memoriaBots[sala][bot].cartasOponentes[estado.players[idx].nome]['descartes'] = memoriaBots[sala][bot].cartasOponentes[estado.players[idx].nome]['descartes'] || [];
+          memoriaBots[sala][bot].cartasOponentes[estado.players[idx].nome]['descartes'].push({ ...estado.aguardandoAcao.carta });
+        }
+      });
+    }
     delete estado.aguardandoAcao;
     avancarTurno(estado, sala);
     io.to(sala).emit('estado_jogo', estado);
@@ -211,6 +260,13 @@ io.on('connection', (socket) => {
       }
       const cartaVista = estado.players[alvo].mao[indiceAlvo];
       socket.emit('carta_revelada', { carta: cartaVista, indice: indiceAlvo, oponente: estado.players[alvo].nome });
+      // Se for bot médio ou difícil, memoriza carta do oponente
+      const botNome = estado.players[idx].nome;
+      const salaMem = memoriaBots[sala];
+      if (salaMem && salaMem[botNome] && (infoBots[sala]?.dificuldade === 'medio' || infoBots[sala]?.dificuldade === 'dificil')) {
+        salaMem[botNome].cartasOponentes[estado.players[alvo].nome] = salaMem[botNome].cartasOponentes[estado.players[alvo].nome] || {};
+        salaMem[botNome].cartasOponentes[estado.players[alvo].nome][indiceAlvo] = { ...cartaVista };
+      }
       estado.pilha.push(cartaUsada);
       avancarTurno(estado, sala);
       io.to(sala).emit('estado_jogo', estado);

@@ -13,16 +13,26 @@ const socket = ref(null)
 const peers = ref([]) // Array de conexões P2P
 const meuIndice = ref(null)
 const totalJogadores = ref(2)
+const modoBots = ref(false)
+const nomesBots = ref([])
+const dificuldadeBots = ref('facil')
 
-function iniciarJogo({ qtd, jogadorInfo, salaInfo }) {
+function iniciarJogo({ qtd, jogadorInfo, salaInfo, bots, dificuldade, modoBots: isBots }) {
   numJogadores.value = qtd
   jogador.value = jogadorInfo
   sala.value = salaInfo
+  modoBots.value = !!isBots
+  nomesBots.value = bots || []
+  dificuldadeBots.value = dificuldade || 'facil'
   pagina.value = 'jogo'
-  // Conectar ao backend via Socket.IO
-  socket.value = io('http://localhost:3000')
-  socket.value.emit('entrar_sala', { nome: jogadorInfo.nome, sala: salaInfo })
-  conectarP2P(qtd, salaInfo)
+  if (!isBots) {
+    // Conectar ao backend via Socket.IO
+    socket.value = io('http://localhost:3000')
+    socket.value.emit('entrar_sala', { nome: jogadorInfo.nome, sala: salaInfo })
+    conectarP2P(qtd, salaInfo)
+  } else {
+    socket.value = null
+  }
 }
 
 function conectarP2P(qtd, salaId) {
@@ -102,7 +112,16 @@ onMounted(() => {
     </nav>
     <main>
       <HomePage v-if="pagina === 'inicio'" @iniciar-jogo="iniciarJogo" />
-      <JogoPage v-else-if="pagina === 'jogo'" :num-jogadores="numJogadores" :jogador="jogador" :sala="sala" :socket="socket" :nome-jogador="jogador?.nome" />
+      <JogoPage v-else-if="pagina === 'jogo'"
+        :num-jogadores="numJogadores"
+        :jogador="jogador"
+        :sala="sala"
+        :socket="socket"
+        :nome-jogador="jogador?.nome"
+        :modo-bots="modoBots"
+        :nomes-bots="nomesBots"
+        :dificuldade-bots="dificuldadeBots"
+      />
     </main>
     <div class="player-musica" style="pointer-events: none; background: none; border: none; box-shadow: none; padding: 0; position: fixed; right: 0; bottom: 0; z-index: 0;">
       <audio ref="audio" src="/src/assets/audio/elevator.mp3" loop />

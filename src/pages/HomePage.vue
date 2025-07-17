@@ -4,6 +4,7 @@
     <div v-if="!modoEscolhido" class="menu-inicial">
       <button @click="modoEscolhido = 'host'">Hostear Sala</button>
       <button @click="modoEscolhido = 'join'">Entrar em Sala</button>
+      <button @click="modoEscolhido = 'bots'">Jogar contra Bots</button>
     </div>
     <div v-else-if="modoEscolhido === 'host'" class="host-form">
       <h2>Hostear Sala</h2>
@@ -43,6 +44,24 @@
         </ul>
       </div>
     </div>
+    <div v-else-if="modoEscolhido === 'bots'" class="bots-form">
+      <h2>Jogar contra Bots</h2>
+      <label>Seu nome:
+        <input v-model="nomeJogador" placeholder="Seu nome" />
+      </label>
+      <label>Número de Bots:
+        <input type="number" v-model.number="qtdBots" min="1" max="7" />
+      </label>
+      <label>Dificuldade:
+        <select v-model="dificuldadeBot">
+          <option value="facil">Fácil</option>
+          <option value="medio">Médio</option>
+          <option value="dificil">Difícil</option>
+        </select>
+      </label>
+      <button :disabled="!nomeJogador || qtdBots < 1" @click="iniciarContraBots">Iniciar Contra Bots</button>
+      <button class="voltar" @click="modoEscolhido = null">Voltar</button>
+    </div>
   </div>
 </template>
 
@@ -58,6 +77,8 @@ const lobbys = ref([])
 const carregandoLobbys = ref(false)
 const erroLobbys = ref('')
 let wsLobby = null
+const qtdBots = ref(3)
+const dificuldadeBot = ref('facil')
 
 function buscarLobbys() {
   carregandoLobbys.value = true
@@ -103,6 +124,21 @@ function entrarSala() {
     qtd: null, // será definido ao conectar
     jogadorInfo: { host: false, nome: nomeJogador.value },
     salaInfo: nomeSala.value
+  })
+}
+
+function iniciarContraBots() {
+  // Gera nomes de bots
+  const nomesBots = [
+    'Naldo', 'Hulk', 'Sanfona', 'Superlombra', 'Rufus', 'Marcelo fantasma', 'Zé Bolacha'
+  ].slice(0, qtdBots.value)
+  emit('iniciar-jogo', {
+    qtd: qtdBots.value + 1,
+    jogadorInfo: { host: true, nome: nomeJogador.value },
+    salaInfo: 'bots-' + Math.random().toString(36).substring(2, 8),
+    bots: nomesBots,
+    dificuldade: dificuldadeBot.value,
+    modoBots: true
   })
 }
 
@@ -198,5 +234,15 @@ button:hover:enabled {
 .lobby-btn:hover {
   background: #eebbc3;
   color: #232946;
+}
+.bots-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  background: #232946;
+  padding: 2rem 2.5rem;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px #0005;
+  min-width: 320px;
 }
 </style> 

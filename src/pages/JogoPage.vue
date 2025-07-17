@@ -1,7 +1,7 @@
 <template>
   <div class="jogo-container">
-    <template v-if="!jogoIniciado">
-      <!-- LOBBY -->
+    <template v-if="!jogoIniciado && !props.modoBots">
+      <!-- LOBBY ONLINE -->
       <div class="info-jogador">
         <span>Você é: <b>{{ nomeJogador }}</b></span>
       </div>
@@ -20,7 +20,7 @@
     </template>
     <template v-else>
       <!-- TELA DE JOGO -->
-      <CunokuGame v-if="!fimDeJogo" :socket="props.socket" :jogador="props.jogador" :num-jogadores="props.numJogadores" :sala="props.sala" :estado-inicial="estadoJogo" @fim-de-jogo="mostrarFimDeJogo" />
+      <CunokuGame v-if="!fimDeJogo" :socket="props.socket" :jogador="props.jogador" :num-jogadores="props.numJogadores" :sala="props.sala" :estado-inicial="estadoJogo" @fim-de-jogo="mostrarFimDeJogo" :modo-bots="props.modoBots" />
       <FimDeJogo v-else :resultado="resultadoFinal" @voltar-inicio="voltarInicio" />
     </template>
   </div>
@@ -35,7 +35,10 @@ const props = defineProps({
   jogador: Object,
   sala: String,
   socket: Object,
-  nomeJogador: String
+  nomeJogador: String,
+  modoBots: Boolean,
+  nomesBots: Array,
+  dificuldadeBots: String
 })
 
 const jogadoresConectados = ref([])
@@ -43,6 +46,39 @@ const estadoJogo = ref(null)
 const jogoIniciado = ref(false)
 const fimDeJogo = ref(false)
 const resultadoFinal = ref(null)
+
+// --- MODO BOTS OFFLINE ---
+if (props.modoBots) {
+  // Inicializa estado do jogo localmente
+  const players = [
+    { nome: props.jogador.nome, mao: [], humano: true },
+    ...props.nomesBots.map(nome => ({ nome, mao: [], humano: false }))
+  ]
+  const baralho = criarBaralhoLocal()
+  const cartasPorJogador = 4
+  for (let i = 0; i < cartasPorJogador; i++) {
+    players.forEach(player => {
+      player.mao.push(baralho.pop())
+    })
+  }
+  const pilha = [baralho.pop()]
+  estadoJogo.value = {
+    players,
+    baralho,
+    pilha,
+    jogadorDaVez: 0,
+    cartasPorJogador,
+    jogoIniciado: true,
+    aguardandoAcao: null,
+    turnoAtual: 1,
+    fimDeclarado: false,
+    jogadorDeclarouFim: null,
+    turnosRestantesFim: null,
+    resultadoFinal: null
+  }
+  jogoIniciado.value = true
+  // TODO: Gerenciar turnos e ações dos bots localmente
+}
 
 function mostrarFimDeJogo(resultado) {
   fimDeJogo.value = true
@@ -73,6 +109,10 @@ onMounted(() => {
     })
     // Solicita a lista ao entrar
     props.socket.emit('pedir_jogadores', { sala: props.sala })
+    // Se for sala de bots, inicia automaticamente
+    if (props.sala && props.sala.startsWith('bots-')) {
+      setTimeout(() => iniciarJogo(), 300)
+    }
   }
 })
 
@@ -84,6 +124,47 @@ function iniciarJogo() {
   if (props.socket && props.sala) {
     props.socket.emit('iniciar_jogo', { sala: props.sala })
   }
+}
+
+function criarBaralhoLocal() {
+  const VALORES_CARTAS = [
+    { nome: 'Rei', valor: 0 },
+    { nome: 'Às', valor: 1 },
+    { nome: 'Cinco', valor: 5 },
+    { nome: 'Seis', valor: 6 },
+    { nome: 'Sete', valor: 7 },
+    { nome: 'Oito', valor: 8 },
+    { nome: 'Nove', valor: 9 },
+    { nome: 'Dez', valor: 10 },
+    { nome: 'Valete', valor: 11 },
+    { nome: 'Rainha', valor: 12 },
+    { nome: 'Coringa', valor: -1 },
+  ]
+  const NAIPES = ['♠', '♥', '♦', '♣']
+  let baralho = []
+  // Multiplicador para garantir pelo menos 10 rodadas completas
+  const numJogadores = typeof props === 'object' && props.numJogadores ? props.numJogadores : 4
+  const cartasNecessarias = numJogadores * 10 * 4 // 10 rodadas, 4 cartas por jogador
+  const baralhoBase = []
+  for (const carta of VALORES_CARTAS) {
+    if (carta.nome === 'Coringa') {
+      baralhoBase.push({ ...carta, naipe: null })
+      baralhoBase.push({ ...carta, naipe: null })
+    } else {
+      for (const naipe of NAIPES) {
+        baralhoBase.push({ ...carta, naipe })
+      }
+    }
+  }
+  const multiplicador = Math.ceil(cartasNecessarias / baralhoBase.length)
+  for (let m = 0; m < multiplicador; m++) {
+    baralho = baralho.concat(baralhoBase.map(c => ({ ...c })))
+  }
+  for (let i = baralho.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[baralho[i], baralho[j]] = [baralho[j], baralho[i]]
+  }
+  return baralho
 }
 </script>
 
