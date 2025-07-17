@@ -149,7 +149,28 @@ watch(modoEscolhido, (novo) => {
 </script>
 
 <style scoped>
+.home-bg {
+  min-height: 100vh;
+  min-width: 100vw;
+  position: relative;
+  background: url('@/assets/bg/samurais.png') no-repeat center center fixed;
+  background-size: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.home-bg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(20, 20, 40, 0.75);
+  z-index: 1;
+}
 .home-container {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
