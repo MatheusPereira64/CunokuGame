@@ -96,19 +96,15 @@
         <p style="color:#ffe082;">Aguarde sua vez...</p>
       </div>
       <!-- Botão de fim de jogo -->
-      <div v-if="estado && estado.turnoAtual >= 5 && !estado.fimDeclarado">
-        <button class="btn-principal" @click="declararFimDeJogo">Declarar fim de jogo</button>
-      </div>
-      <div v-if="estado && estado.fimDeclarado && estado.turnosRestantesFim !== null">
-        <div class="mensagem-pilha">Fim de jogo declarado! Restam {{ estado.turnosRestantesFim }} turnos até o final.</div>
-      </div>
     </div>
     <div v-if="escolhendoCartaPropria">
       <div class="habilidade-msg">
         <p>Escolha uma carta da sua mão para ver:</p>
         <div class="mao">
           <button v-for="(carta, idx) in estado.players[meuIndice]?.mao || []" :key="'ver-'+idx" class="carta-btn" @click="escolherCartaPropria(idx)">
-            <CartaSvg :valor="mapValorSvg(carta.nome)" :naipe="mapNaipeSvg(carta.naipe)" :width="60" :height="90" />
+            <div class="verso-carta" style="width:60px;height:90px;display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:2.2rem;color:#eebbc3;">🂠</span>
+            </div>
           </button>
         </div>
       </div>
@@ -302,15 +298,14 @@ export default {
           });
           s.on('carta_revelada', ({ carta, indice, oponente }) => {
             this.cartaRevelada = { carta, indice, oponente };
-            // NOVO: Revela a carta temporariamente na mão
-            if (typeof oponente === 'undefined') {
-              // Revela carta da própria mão
+            // Revela apenas a carta escolhida da própria mão por 5 segundos
+            if (typeof oponente === 'undefined' && typeof indice === 'number') {
               this.cartasReveladas.push({ idx: indice, carta });
               setTimeout(() => {
                 this.cartasReveladas = this.cartasReveladas.filter(c => c.idx !== indice);
-              }, 4000);
+              }, 5000);
             }
-            setTimeout(() => { this.cartaRevelada = null; }, 4000);
+            setTimeout(() => { this.cartaRevelada = null; }, 5000);
             this.escolhendoCartaPropria = false;
             this.escolhendoCartaOponente = false;
             this.oponenteSelecionado = null;
@@ -343,6 +338,7 @@ export default {
           s.on('fim_de_jogo', (resultado) => {
             this.fimDeJogo = true;
             this.resultadoFinal = resultado;
+            this.$emit && this.$emit('fim-de-jogo', resultado); // EMITIR EVENTO PARA O PAI
           });
         }
       }

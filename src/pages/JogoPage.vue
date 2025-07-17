@@ -20,7 +20,8 @@
     </template>
     <template v-else>
       <!-- TELA DE JOGO -->
-      <CunokuGame :socket="props.socket" :jogador="props.jogador" :num-jogadores="props.numJogadores" :sala="props.sala" :estado-inicial="estadoJogo" />
+      <CunokuGame v-if="!fimDeJogo" :socket="props.socket" :jogador="props.jogador" :num-jogadores="props.numJogadores" :sala="props.sala" :estado-inicial="estadoJogo" @fim-de-jogo="mostrarFimDeJogo" />
+      <FimDeJogo v-else :resultado="resultadoFinal" @voltar-inicio="voltarInicio" />
     </template>
   </div>
 </template>
@@ -28,6 +29,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import CunokuGame from '../components/CunokuGame.vue'
+import FimDeJogo from '../components/FimDeJogo.vue'
 const props = defineProps({
   numJogadores: Number,
   jogador: Object,
@@ -39,6 +41,21 @@ const props = defineProps({
 const jogadoresConectados = ref([])
 const estadoJogo = ref(null)
 const jogoIniciado = ref(false)
+const fimDeJogo = ref(false)
+const resultadoFinal = ref(null)
+
+function mostrarFimDeJogo(resultado) {
+  fimDeJogo.value = true
+  resultadoFinal.value = resultado
+}
+
+function voltarInicio() {
+  fimDeJogo.value = false
+  resultadoFinal.value = null
+  jogoIniciado.value = false
+  estadoJogo.value = null
+  // Opcional: pode emitir evento para App.vue se quiser resetar socket
+}
 
 // Ouve atualizações de jogadores conectados e estado do jogo
 onMounted(() => {
