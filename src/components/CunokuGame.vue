@@ -34,8 +34,22 @@
         <h3>Sua mão</h3>
         <div class="mao">
           <div v-for="(carta, idx) in maoReal" :key="idx" class="carta-btn animate__animated animate__fadeInUp">
-            <CartaSvg :valor="mapValorSvg(carta.nome)" :naipe="mapNaipeSvg(carta.naipe)" :width="60" :height="90" />
+            <CartaSvg v-if="cartaEstaRevelada(idx)" :valor="mapValorSvg(carta.nome)" :naipe="mapNaipeSvg(carta.naipe)" :width="60" :height="90" />
+            <div v-else class="verso-carta" style="width:60px;height:90px;display:flex;align-items:center;justify-content:center;background:#232946;border-radius:8px;border:2px solid #eebbc3;box-shadow:0 2px 8px #0007;">
+              <span style="font-size:2.2rem;color:#eebbc3;">🂠</span>
+            </div>
+            <button v-if="indiceDescarteTentativa === null" class="btn-descartar-carta" @click="tentarDescarte(idx)">Descartar</button>
           </div>
+        </div>
+        <!-- Seleção de segunda carta para descarte -->
+        <div v-if="indiceDescarteTentativa !== null" class="mensagem-pilha">
+          <p>Selecione outra carta que você acredita ter o mesmo valor para descartar junto:</p>
+          <div class="mao">
+            <button v-for="(carta, idx2) in maoReal" :key="'descartar-'+idx2" v-if="idx2 !== indiceDescarteTentativa" class="carta-btn" @click="confirmarDescarte(idx2)">
+              <span style="font-size:2.2rem;color:#eebbc3;">🂠</span>
+            </button>
+          </div>
+          <button class="btn-principal" @click="cancelarDescarte">Cancelar</button>
         </div>
       </div>
       <div v-if="estado.jogadorDaVez === meuIndice">
@@ -47,14 +61,17 @@
           <p>Escolha o que fazer:</p>
           <ul>
             <li>
-              <button class="btn-acao" @click="indiceSubstituir = null">Substituir uma carta da mão</button>
-              <div v-if="indiceSubstituir === null">
+              <button class="btn-acao" @click="indiceSubstituir = indiceSubstituir === null ? 0 : null" :disabled="indiceSubstituir !== null">Substituir uma carta da mão</button>
+              <div v-if="indiceSubstituir !== null">
                 <span>Selecione a carta da mão para substituir:</span>
                 <div class="mao">
                   <button v-for="(carta, idx) in estado.players[meuIndice]?.mao || []" :key="'sub-'+idx" class="carta-btn" @click="substituirCarta(idx)">
-                    <CartaSvg :valor="mapValorSvg(carta.nome)" :naipe="mapNaipeSvg(carta.naipe)" :width="60" :height="90" />
+                    <div class="verso-carta" style="width:60px;height:90px;display:flex;align-items:center;justify-content:center;">
+                      <span style="font-size:2.2rem;color:#eebbc3;">🂠</span>
+                    </div>
                   </button>
                 </div>
+                <button class="btn-principal" @click="indiceSubstituir = null">Cancelar</button>
               </div>
             </li>
             <li>
@@ -126,6 +143,37 @@
         </div>
       </div>
     </div>
+    <div v-if="mensagemStatus" class="mensagem-pilha">{{ mensagemStatus }}</div>
+    <div v-if="fimDeJogo && resultadoFinal">
+      <h2>Fim de Jogo!</h2>
+      <div>
+        <h3>Cartas de todos os jogadores:</h3>
+        <ul>
+          <li v-for="(player, idx) in estado.players" :key="idx">
+            <b>{{ player.nome }}</b>:
+            <span v-for="(carta, cidx) in player.mao" :key="cidx">
+              {{ carta.nome }}{{ carta.naipe ? ' ' + carta.naipe : '' }}
+            </span>
+            <span> | Soma: {{ resultadoFinal.somas.find(s => s.nome === player.nome)?.soma }}</span>
+            <span v-if="resultadoFinal.vencedores.includes(player.nome)" style="color:#ffe082;font-weight:bold;"> ← Vencedor</span>
+          </li>
+        </ul>
+      </div>
+      <div>
+        <h3>Vencedor{{ resultadoFinal.vencedores.length > 1 ? 'es' : '' }}:</h3>
+        <ul>
+          <li v-for="v in resultadoFinal.vencedores" :key="v">🏆 {{ v }}</li>
+        </ul>
+      </div>
+    </div>
+    <div v-else>
+      <div v-if="estado && estado.turnoAtual >= 5 && !estado.fimDeclarado">
+        <button class="btn-principal" @click="declararFimDeJogo">Declarar fim de jogo</button>
+      </div>
+      <div v-if="estado && estado.fimDeclarado && estado.turnosRestantesFim !== null">
+        <div class="mensagem-pilha">Fim de jogo declarado! Restam {{ estado.turnosRestantesFim }} turnos até o final.</div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -193,6 +241,12 @@ export default {
       aguardandoEscolhaTroca: false, // Se está aguardando escolher carta para troca
       ordemTroca: null, // 0 ou 1, ordem da escolha da carta para troca
       qtdCartasTroca: 0, // Quantidade de cartas do jogador para troca
+      // NOVO: controle de cartas reveladas temporariamente
+      cartasReveladas: [], // [{idx: 0, carta: {...}}]
+      indiceDescarteTentativa: null, // NOVO: controle de descarte a qualquer momento
+      mensagemStatus: '', // NOVO: mensagem de status
+      fimDeJogo: false, // NOVO: controle de fim de jogo
+      resultadoFinal: null, // NOVO: resultado do fim de jogo
     }
   },
   computed: {
@@ -232,7 +286,15 @@ export default {
           });
           s.on('carta_revelada', ({ carta, indice, oponente }) => {
             this.cartaRevelada = { carta, indice, oponente };
-            setTimeout(() => { this.cartaRevelada = null; }, 5000);
+            // NOVO: Revela a carta temporariamente na mão
+            if (typeof oponente === 'undefined') {
+              // Revela carta da própria mão
+              this.cartasReveladas.push({ idx: indice, carta });
+              setTimeout(() => {
+                this.cartasReveladas = this.cartasReveladas.filter(c => c.idx !== indice);
+              }, 4000);
+            }
+            setTimeout(() => { this.cartaRevelada = null; }, 4000);
             this.escolhendoCartaPropria = false;
             this.escolhendoCartaOponente = false;
             this.oponenteSelecionado = null;
@@ -252,6 +314,20 @@ export default {
             this.ordemTroca = ordem;
             this.qtdCartasTroca = qtd;
           });
+          s.on('mensagem', (msg) => {
+            if (msg.tipo === 'fim_declarado') {
+              this.mensagemStatus = `Fim de jogo declarado por ${msg.jogador}. O jogo terminará em 2 turnos completos!`;
+            } else if (msg.tipo === 'descarte_correto') {
+              this.mensagemStatus = `${msg.jogador} descartou duas cartas de valor ${msg.carta}!`;
+            } else if (msg.tipo === 'descarte_errado') {
+              this.mensagemStatus = `${msg.jogador} errou o descarte e comprou 2 cartas!`;
+            }
+            setTimeout(() => { this.mensagemStatus = ''; }, 4000);
+          });
+          s.on('fim_de_jogo', (resultado) => {
+            this.fimDeJogo = true;
+            this.resultadoFinal = resultado;
+          });
         }
       }
     }
@@ -268,7 +344,9 @@ export default {
     },
     substituirCarta(idx) {
       // Envia para o backend qual carta da mão será substituída pela carta comprada
-      if (this.socket && this.cartaComprada && this.estado) {
+      if (this.socket && this.cartaComprada && this.estado && this.indiceSubstituir !== null) {
+        // Salva a carta que será descartada para mostrar na mensagem
+        const cartaDescartada = this.estado.players[this.meuIndice]?.mao[idx];
         this.socket.emit('substituir_carta', {
           sala: this.sala,
           jogador: this.jogador.nome,
@@ -276,8 +354,11 @@ export default {
           carta: this.cartaComprada
         })
         this.escolhendoAcao = false;
-        this.cartaComprada = null;
         this.indiceSubstituir = null;
+        // Mensagem temporária para o jogador
+        this.mensagemStatus = `Você descartou a carta ${cartaDescartada?.nome || '?'}${cartaDescartada?.naipe ? ' ' + cartaDescartada.naipe : ''} e comprou a carta ${this.cartaComprada?.nome || '?'}${this.cartaComprada?.naipe ? ' ' + this.cartaComprada.naipe : ''}`;
+        setTimeout(() => { this.mensagemStatus = ''; }, 4000);
+        this.cartaComprada = null;
       }
     },
     descartarCartaComprada() {
@@ -356,6 +437,34 @@ export default {
       this.ordemTroca = null;
       this.qtdCartasTroca = 0;
     },
+    // NOVO: tentativa de descarte a qualquer momento
+    tentarDescarte(idx) {
+      // Abre seleção de segunda carta para comparar
+      this.indiceDescarteTentativa = idx;
+    },
+    confirmarDescarte(idx2) {
+      // Envia para o backend a tentativa de descarte
+      if (this.socket && this.estado) {
+        this.socket.emit('tentar_descarte', {
+          sala: this.sala,
+          jogador: this.jogador.nome,
+          indice1: this.indiceDescarteTentativa,
+          indice2: idx2
+        });
+        this.indiceDescarteTentativa = null;
+      }
+    },
+    cancelarDescarte() {
+      this.indiceDescarteTentativa = null;
+    },
+    declararFimDeJogo() {
+      if (this.socket && this.estado && !this.estado.fimDeclarado && this.estado.turnoAtual >= 5) {
+        this.socket.emit('declarar_fim_de_jogo', {
+          sala: this.sala,
+          jogador: this.jogador.nome
+        });
+      }
+    },
     // Adapte outros métodos para enviar eventos ao backend
     mapValorSvg(nome) {
       switch (nome) {
@@ -381,6 +490,10 @@ export default {
         case '♣': return 'C';
         default: return null;
       }
+    },
+    // NOVO: verifica se a carta está revelada
+    cartaEstaRevelada(idx) {
+      return this.cartasReveladas.some(c => c.idx === idx);
     },
   },
 };
@@ -542,5 +655,16 @@ ul {
   font-weight: bold;
   text-align: center;
   box-shadow: 0 1px 8px #0002;
+}
+.verso-carta {
+  background: #232946;
+  border-radius: 8px;
+  border: 2px solid #eebbc3;
+  box-shadow: 0 2px 8px #0007;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 90px;
 }
 </style> 

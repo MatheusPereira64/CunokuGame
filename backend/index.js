@@ -98,10 +98,39 @@ io.on('connection', (socket) => {
       cartasPorJogador,
       jogoIniciado: true,
       aguardandoAcao: null, // Adicionado para controlar ações pendentes
+      turnoAtual: 1, // NOVO: contador de turnos
+      fimDeclarado: false, // NOVO: se o fim foi declarado
+      jogadorDeclarouFim: null, // NOVO: quem declarou
+      turnosRestantesFim: null, // NOVO: turnos extras após declaração
+      resultadoFinal: null // NOVO: resultado do jogo
     };
     io.to(sala).emit('jogo_iniciado');
     io.to(sala).emit('estado_jogo', estadoJogo[sala]);
   });
+
+  // Função auxiliar para avançar turno e lidar com fim de jogo
+  function avancarTurno(estado, sala) {
+    // Avança o jogador da vez
+    estado.jogadorDaVez = (estado.jogadorDaVez + 1) % estado.players.length;
+    // Só conta turno quando o ciclo completa
+    if (estado.jogadorDaVez === 0) {
+      estado.turnoAtual = (estado.turnoAtual || 1) + 1;
+    }
+    // Se fim foi declarado, decrementa turnos restantes
+    if (estado.fimDeclarado && estado.turnosRestantesFim !== null) {
+      estado.turnosRestantesFim--;
+      if (estado.turnosRestantesFim <= 0) {
+        // Fim do jogo: revelar cartas e calcular vencedor
+        estado.jogoIniciado = false;
+        // Calcula soma das cartas de cada jogador
+        const somas = estado.players.map(p => ({ nome: p.nome, soma: p.mao.reduce((acc, c) => acc + (typeof c.valor === 'number' ? c.valor : 0), 0) }));
+        const menor = Math.min(...somas.map(s => s.soma));
+        const vencedores = somas.filter(s => s.soma === menor).map(s => s.nome);
+        estado.resultadoFinal = { somas, vencedores };
+        io.to(sala).emit('fim_de_jogo', estado.resultadoFinal);
+      }
+    }
+  }
 
   socket.on('comprar_carta', ({ sala, jogador }) => {
     const estado = estadoJogo[sala];
@@ -116,6 +145,7 @@ io.on('connection', (socket) => {
     io.to(sala).emit('estado_jogo', estado);
   });
 
+  // Atualizar todos os pontos que avançam turno para usar avancarTurno
   socket.on('substituir_carta', ({ sala, jogador, indice, carta }) => {
     const estado = estadoJogo[sala];
     if (!estado || !estado.jogoIniciado) return;
@@ -128,12 +158,10 @@ io.on('connection', (socket) => {
       estado.players[idx].mao[indice] = estado.aguardandoAcao.carta;
       estado.pilha.push(cartaDescartada);
       delete estado.aguardandoAcao;
-      // Avança o turno
-      estado.jogadorDaVez = (estado.jogadorDaVez + 1) % estado.players.length;
+      avancarTurno(estado, sala);
       io.to(sala).emit('estado_jogo', estado);
     }
   });
-
   socket.on('descartar_carta', ({ sala, jogador, carta }) => {
     const estado = estadoJogo[sala];
     if (!estado || !estado.jogoIniciado) return;
@@ -143,11 +171,9 @@ io.on('connection', (socket) => {
     // Descarta a carta comprada (não adiciona à mão)
     estado.pilha.push(estado.aguardandoAcao.carta);
     delete estado.aguardandoAcao;
-    // Avança o turno
-    estado.jogadorDaVez = (estado.jogadorDaVez + 1) % estado.players.length;
+    avancarTurno(estado, sala);
     io.to(sala).emit('estado_jogo', estado);
   });
-
   socket.on('usar_habilidade', async ({ sala, jogador, carta, alvo, indiceAlvo, alvos, indicesAlvo }) => {
     const estado = estadoJogo[sala];
     if (!estado || !estado.jogoIniciado) return;
@@ -155,10 +181,12 @@ io.on('connection', (socket) => {
     if (idx !== estado.jogadorDaVez) return;
     if (!estado.aguardandoAcao || estado.aguardandoAcao.jogador !== idx) return;
 
+    // Sempre use a carta comprada do backend
+    const cartaUsada = estado.aguardandoAcao.carta;
+
     // Habilidade: Sete/Oito permite ver carta própria
-    if (carta.nome === 'Sete' || carta.nome === 'Oito') {
+    if (cartaUsada.nome === 'Sete' || cartaUsada.nome === 'Oito') {
       if (typeof indicesAlvo !== 'undefined' && Array.isArray(indicesAlvo)) {
-        // fallback para compatibilidade
         indiceAlvo = indicesAlvo[0];
       }
       if (typeof indiceAlvo !== 'number') {
@@ -167,15 +195,15 @@ io.on('connection', (socket) => {
       }
       const cartaVista = estado.players[idx].mao[indiceAlvo];
       socket.emit('carta_revelada', { carta: cartaVista, indice: indiceAlvo });
-      estado.pilha.push(carta);
-      estado.jogadorDaVez = (estado.jogadorDaVez + 1) % estado.players.length;
+      estado.pilha.push(cartaUsada);
+      avancarTurno(estado, sala);
       io.to(sala).emit('estado_jogo', estado);
       delete estado.aguardandoAcao;
       return;
     }
 
     // Habilidade: Cinco/Seis permite ver carta de um oponente
-    if (carta.nome === 'Cinco' || carta.nome === 'Seis') {
+    if (cartaUsada.nome === 'Cinco' || cartaUsada.nome === 'Seis') {
       if (typeof alvo !== 'number' || typeof indiceAlvo !== 'number') {
         const oponentes = estado.players.map((p, i) => ({ nome: p.nome, idx: i, qtd: p.mao.length })).filter((p, i) => i !== idx);
         socket.emit('escolher_carta_oponente', { oponentes });
@@ -183,40 +211,35 @@ io.on('connection', (socket) => {
       }
       const cartaVista = estado.players[alvo].mao[indiceAlvo];
       socket.emit('carta_revelada', { carta: cartaVista, indice: indiceAlvo, oponente: estado.players[alvo].nome });
-      estado.pilha.push(carta);
-      estado.jogadorDaVez = (estado.jogadorDaVez + 1) % estado.players.length;
+      estado.pilha.push(cartaUsada);
+      avancarTurno(estado, sala);
       io.to(sala).emit('estado_jogo', estado);
       delete estado.aguardandoAcao;
       return;
     }
 
     // Habilidade: Nove/Dez permite trocar cartas entre dois jogadores
-    if (carta.nome === 'Nove' || carta.nome === 'Dez') {
-      // Se não vieram os alvos, pedir ao frontend
+    if (cartaUsada.nome === 'Nove' || cartaUsada.nome === 'Dez') {
       if (!alvos || !Array.isArray(alvos) || alvos.length !== 2) {
-        // Envia lista de jogadores para escolher dois
         const jogadoresDisponiveis = estado.players.map((p, i) => ({ nome: p.nome, idx: i, qtd: p.mao.length }));
         socket.emit('escolher_jogadores_troca', { jogadores: jogadoresDisponiveis });
         return;
       }
-      // Se não vieram os índices das cartas, pedir ao frontend
       if (!indicesAlvo || !Array.isArray(indicesAlvo) || indicesAlvo.length !== 2) {
-        // Para cada jogador, pedir para escolher a carta
         for (let i = 0; i < 2; i++) {
           const jogadorAlvo = estado.players[alvos[i]];
           io.to(salas[sala].find(j => j.nome === jogadorAlvo.nome).id).emit('escolher_carta_para_troca', { idx: alvos[i], qtd: jogadorAlvo.mao.length, ordem: i });
         }
         return;
       }
-      // Realiza a troca
       const idxA = alvos[0];
       const idxB = alvos[1];
       const cartaA = estado.players[idxA].mao[indicesAlvo[0]];
       const cartaB = estado.players[idxB].mao[indicesAlvo[1]];
       estado.players[idxA].mao[indicesAlvo[0]] = cartaB;
       estado.players[idxB].mao[indicesAlvo[1]] = cartaA;
-      estado.pilha.push(carta);
-      estado.jogadorDaVez = (estado.jogadorDaVez + 1) % estado.players.length;
+      estado.pilha.push(cartaUsada);
+      avancarTurno(estado, sala);
       io.to(sala).emit('estado_jogo', estado);
       delete estado.aguardandoAcao;
       return;
@@ -224,10 +247,61 @@ io.on('connection', (socket) => {
 
     // Outras habilidades serão implementadas aqui...
 
-    estado.pilha.push(carta);
-    estado.jogadorDaVez = (estado.jogadorDaVez + 1) % estado.players.length;
+    estado.pilha.push(cartaUsada);
+    avancarTurno(estado, sala);
     io.to(sala).emit('estado_jogo', estado);
     delete estado.aguardandoAcao;
+  });
+
+  socket.on('tentar_descarte', ({ sala, jogador, indice1, indice2 }) => {
+    const estado = estadoJogo[sala];
+    if (!estado || !estado.jogoIniciado) return;
+    const idx = estado.players.findIndex(p => p.nome === jogador);
+    if (idx === -1) return;
+    const mao = estado.players[idx].mao;
+    if (
+      typeof indice1 !== 'number' || typeof indice2 !== 'number' ||
+      indice1 === indice2 ||
+      indice1 < 0 || indice2 < 0 ||
+      indice1 >= mao.length || indice2 >= mao.length
+    ) return;
+    const carta1 = mao[indice1];
+    const carta2 = mao[indice2];
+    if (carta1 && carta2 && carta1.nome === carta2.nome) {
+      // Acertou: remove ambas e coloca na pilha
+      // Remover o índice maior primeiro para não bagunçar os índices
+      if (indice1 > indice2) {
+        mao.splice(indice1, 1);
+        mao.splice(indice2, 1);
+      } else {
+        mao.splice(indice2, 1);
+        mao.splice(indice1, 1);
+      }
+      estado.pilha.push(carta1, carta2);
+      io.to(sala).emit('mensagem', { tipo: 'descarte_correto', jogador, carta: carta1.nome });
+    } else {
+      // Errou: compra 2 cartas se houver
+      for (let i = 0; i < 2; i++) {
+        if (estado.baralho.length > 0) {
+          mao.push(estado.baralho.pop());
+        }
+      }
+      io.to(sala).emit('mensagem', { tipo: 'descarte_errado', jogador });
+    }
+    io.to(sala).emit('estado_jogo', estado);
+  });
+
+  // NOVO: evento para declarar fim de jogo
+  socket.on('declarar_fim_de_jogo', ({ sala, jogador }) => {
+    const estado = estadoJogo[sala];
+    if (!estado || !estado.jogoIniciado) return;
+    if (estado.turnoAtual < 5) return; // Só pode declarar a partir do 5º turno
+    if (estado.fimDeclarado) return; // Só pode declarar uma vez
+    estado.fimDeclarado = true;
+    estado.jogadorDeclarouFim = jogador;
+    estado.turnosRestantesFim = 2 * estado.players.length; // 2 turnos completos
+    io.to(sala).emit('mensagem', { tipo: 'fim_declarado', jogador });
+    io.to(sala).emit('estado_jogo', estado);
   });
 
   socket.on('disconnect', () => {
