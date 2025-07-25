@@ -1,128 +1,408 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  /* Paleta de cores japonesa + cassino */
+  --primary-gold: #D4AF37;
+  --secondary-gold: #FFD700;
+  --accent-red: #DC143C;
+  --deep-red: #8B0000;
+  --japanese-black: #1C1C1C;
+  --dark-navy: #0F1419;
+  --pearl-white: #F8F8FF;
+  --jade-green: #00A86B;
+  --sakura-pink: #FFB7C5;
+  --midnight-blue: #191970;
+  
+  /* Gradientes temáticos */
+  --casino-gradient: linear-gradient(135deg, var(--deep-red) 0%, var(--japanese-black) 50%, var(--dark-navy) 100%);
+  --gold-gradient: linear-gradient(135deg, var(--primary-gold) 0%, var(--secondary-gold) 50%, #B8860B 100%);
+  --card-gradient: linear-gradient(145deg, #2A2A2A 0%, #1A1A1A 100%);
+  
+  /* Tipografia */
+  font-family: 'Noto Sans JP', 'Segoe UI', system-ui, sans-serif;
+  line-height: 1.6;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
+  color: var(--pearl-white);
+  
+  /* Otimizações */
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 a {
   font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+  color: var(--secondary-gold);
+  text-decoration: none;
+  transition: color 0.3s ease;
 }
 a:hover {
-  color: #535bf2;
+  color: var(--primary-gold);
+  text-shadow: 0 0 8px rgba(212, 175, 55, 0.5);
 }
 
 body {
   min-height: 100vh;
   margin: 0;
   padding: 0;
-  font-family: 'Segoe UI', 'Noto Sans', Arial, sans-serif;
+  font-family: 'Noto Sans JP', system-ui, sans-serif;
   background: 
-    linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.7)),
-    url('./assets/bg/seigaiha.png');
-  background-size: cover;
-  background-repeat: repeat;
+    var(--casino-gradient),
+    radial-gradient(circle at 20% 80%, rgba(220, 20, 60, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(212, 175, 55, 0.1) 0%, transparent 50%),
+    url('./assets/bg/seigaiha.svg');
+  background-size: cover, 400px, 400px, 200px;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
   background-attachment: fixed;
-  background-position: center;
+  background-position: center, top left, top right, center;
+  position: relative;
+  overflow-x: hidden;
 }
 
+/* Efeito de padrão japonês sobreposto */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 2px,
+      rgba(212, 175, 55, 0.03) 2px,
+      rgba(212, 175, 55, 0.03) 4px
+    );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Layouts principais com tema cassino japonês */
 .app-layout, .jogo-page, .cunoku-game {
-  background: rgba(30, 20, 40, 0.85);
-  border-radius: 18px;
-  box-shadow: 0 4px 32px #0008, 0 0 0 4px #d4af37;
-  border: 2px solid #d4af37;
+  background: 
+    linear-gradient(135deg, rgba(25, 25, 112, 0.95) 0%, rgba(28, 28, 28, 0.95) 50%, rgba(15, 20, 25, 0.95) 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 24px;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    0 0 0 2px var(--primary-gold),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  position: relative;
+  z-index: 2;
 }
 
+/* Efeito de borda dourada animada */
+.app-layout::before, .jogo-page::before, .cunoku-game::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  background: var(--gold-gradient);
+  border-radius: 24px;
+  z-index: -1;
+  animation: goldenGlow 3s ease-in-out infinite alternate;
+}
+
+@keyframes goldenGlow {
+  0% { filter: brightness(1) saturate(1); }
+  100% { filter: brightness(1.2) saturate(1.3); }
+}
+
+/* Tipografia com estilo japonês/cassino */
 h1, h2, h3 {
-  font-family: 'Cinzel', 'Georgia', serif;
-  color: #d4af37;
-  text-shadow: 0 2px 8px #000a;
-}
-
-.btn-principal {
-  background: linear-gradient(90deg, #d4af37 60%, #b8860b 100%);
-  color: #232946;
-  border: none;
-  border-radius: 8px;
-  padding: 0.7rem 1.6rem;
-  font-size: 1.15rem;
-  font-weight: bold;
-  box-shadow: 0 2px 8px #0005;
-  transition: background 0.2s, color 0.2s;
-}
-
-.btn-principal:hover {
-  background: linear-gradient(90deg, #ffe082 60%, #d4af37 100%);
-  color: #232946;
-}
-
-/* Cartas luxo */
-.carta-btn {
-  border: 2px solid #d4af37 !important;
-  box-shadow: 0 2px 12px #0007, 0 0 0 2px #b8860b;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.04);
-  transition: box-shadow 0.2s, border 0.2s;
-}
-.carta-btn:hover {
-  box-shadow: 0 4px 24px #d4af37, 0 0 0 2px #ffe082;
-  border-color: #ffe082 !important;
+  font-family: 'Cinzel', 'Noto Sans JP', serif;
+  color: var(--secondary-gold);
+  text-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.8),
+    0 0 20px rgba(212, 175, 55, 0.3);
+  position: relative;
 }
 
 h1 {
-  font-size: 3.2em;
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 700;
   line-height: 1.1;
+  margin: 0 0 1.5rem 0;
+  background: var(--gold-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+h2 {
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  font-weight: 600;
+}
+
+h3 {
+  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
   font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+}
+
+/* Botões com estilo cassino luxuoso */
+.btn-principal {
+  background: var(--gold-gradient);
+  color: var(--japanese-black);
+  border: none;
+  border-radius: 12px;
+  padding: 0.8rem 2rem;
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  text-transform: uppercase;
+  letter-spacing: 1px;
   cursor: pointer;
-  transition: border-color 0.25s;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 4px 16px rgba(212, 175, 55, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
+
+.btn-principal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-principal:hover {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 32px rgba(212, 175, 55, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-principal:hover::before {
+  left: 100%;
+}
+
+.btn-principal:active {
+  transform: translateY(0);
+}
+
+/* Cards de jogo luxuosos */
+.carta-btn {
+  border: 2px solid var(--primary-gold) !important;
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(212, 175, 55, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: var(--card-gradient);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.carta-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, rgba(212, 175, 55, 0.1) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.carta-btn:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 
+    0 8px 32px rgba(212, 175, 55, 0.4),
+    0 0 0 2px var(--secondary-gold),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  border-color: var(--secondary-gold) !important;
+}
+
+.carta-btn:hover::before {
+  opacity: 1;
+}
+
+/* Botões gerais com tema refinado */
+button {
+  border-radius: 12px;
+  border: 2px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+  font-weight: 500;
+  font-family: 'Noto Sans JP', inherit;
+  background: var(--card-gradient);
+  color: var(--pearl-white);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
 button:hover {
-  border-color: #646cff;
+  border-color: var(--primary-gold);
+  background: linear-gradient(135deg, #333 0%, #222 100%);
+  transform: translateY(-1px);
+  box-shadow: 
+    0 4px 16px rgba(212, 175, 55, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
+
 button:focus,
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 2px solid var(--secondary-gold);
+  outline-offset: 2px;
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+/* Container principal responsivo */
+#app {
+  max-width: min(1400px, 98vw);
+  margin: 0 auto;
+  padding: clamp(0.5rem, 2vw, 1.5rem);
+  text-align: center;
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .card {
-  padding: 2em;
+  padding: clamp(1rem, 3vw, 2rem);
+  background: var(--card-gradient);
+  border-radius: 16px;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.3);
 }
 
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+/* Responsividade móvel */
+@media (max-width: 768px) {
+  body::before {
+    background-size: 150px;
   }
-  a:hover {
-    color: #747bff;
+  
+  .app-layout, .jogo-page, .cunoku-game {
+    border-radius: 16px;
+    margin: 0.5rem;
   }
+  
+  .app-layout::before, .jogo-page::before, .cunoku-game::before {
+    border-radius: 16px;
+  }
+  
+  h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .btn-principal {
+    padding: 0.7rem 1.5rem;
+    font-size: 1rem;
+    width: 100%;
+    max-width: 300px;
+  }
+  
   button {
-    background-color: #f9f9f9;
+    min-height: 48px; /* Área de toque adequada */
   }
+}
+
+@media (max-width: 480px) {
+  #app {
+    padding: 0.5rem;
+  }
+  
+  .card {
+    padding: 1rem;
+  }
+  
+  h1 {
+    font-size: 2rem;
+  }
+  
+  .btn-principal {
+    font-size: 0.9rem;
+    padding: 0.6rem 1.2rem;
+  }
+}
+
+/* Tema claro (desabilitado para manter atmosfera de cassino) */
+@media (prefers-color-scheme: light) {
+  /* Mantém o tema escuro mesmo em preferência clara */
+  :root {
+    color: var(--pearl-white);
+  }
+}
+
+/* Animações e efeitos especiais */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+.floating {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--japanese-black);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-gold);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary-gold);
+}
+
+/* Utilitários */
+.text-gold {
+  color: var(--primary-gold);
+}
+
+.text-accent {
+  color: var(--accent-red);
+}
+
+.gradient-text {
+  background: var(--gold-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }

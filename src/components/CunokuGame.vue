@@ -7,7 +7,7 @@
       </div>
     </transition>
     <div v-if="!estado">
-      <p>Aguardando sincronização do jogo...</p>
+      <p>{{ t('waitingPlayers') }}</p>
     </div>
     <div v-else>
       <div class="mesa-cartas">
@@ -196,6 +196,7 @@
 
 <script>
 import CartaSvg from './CartaSvg.vue'
+import { t } from '../i18n/index.js'
 const VALORES_CARTAS = [
   { nome: 'Rei', valor: 0 },
   { nome: 'Às', valor: 1 },
@@ -367,6 +368,11 @@ export default {
   },
   components: { CartaSvg },
   methods: {
+    // Função de tradução
+    t(key, params = {}) {
+      return t(key, params)
+    },
+    
     // Exemplo: enviar ação para o backend
     comprarCarta() {
       if (this.modoOffline) {
@@ -893,247 +899,737 @@ export default {
 </script>
 
 <style scoped>
+/* Container principal do jogo com tema cassino japonês */
 .cunoku-game {
-  background: linear-gradient(135deg, #14532d 80%, #0a1a0a 100%);
-  border-radius: 18px;
-  box-shadow: 0 4px 32px #0008, 0 0 0 4px #d4af37;
-  border: 2px solid #d4af37;
-  padding: 32px 24px;
-  min-height: 600px;
-  max-width: 900px;
+  background: 
+    linear-gradient(135deg, rgba(25, 25, 112, 0.95) 0%, rgba(28, 28, 28, 0.95) 50%, rgba(15, 20, 25, 0.95) 100%),
+    radial-gradient(circle at 30% 70%, rgba(220, 20, 60, 0.1) 0%, transparent 60%);
+  backdrop-filter: blur(15px);
+  border-radius: 24px;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  min-height: auto;
+  max-height: 90vh;
+  overflow-y: auto;
+  max-width: min(1200px, 95vw);
   margin: 0 auto;
   position: relative;
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 2px var(--primary-gold),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
+
+/* Efeito de padrão tradicional japonês */
+.cunoku-game::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 25% 25%, rgba(212, 175, 55, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(220, 20, 60, 0.05) 0%, transparent 50%);
+  border-radius: 24px;
+  pointer-events: none;
+}
+
+/* Mesa de cartas com layout responsivo */
 .mesa-cartas {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  gap: 2.5rem;
-  margin-bottom: 2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: clamp(0.8rem, 2vw, 1.5rem);
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: 
+    linear-gradient(145deg, rgba(0, 0, 0, 0.3) 0%, rgba(25, 25, 112, 0.2) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  position: relative;
+  z-index: 1;
 }
+
+@media (min-width: 768px) {
+  .mesa-cartas {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Colunas de cartas estilizadas */
 .coluna-cartas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 80px;
-  gap: 0.7rem;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  transition: all 0.3s ease;
 }
+
+.coluna-cartas:hover {
+  background: rgba(212, 175, 55, 0.05);
+  border-color: rgba(212, 175, 55, 0.4);
+  transform: translateY(-1px);
+}
+
+/* Pilhas de baralho e descarte luxuosas */
 .pilha, .baralho {
-  border: 2px solid #d4af37;
-  border-radius: 10px;
-  background: #232946;
-  box-shadow: 0 2px 12px #0007;
+  border: 2px solid var(--primary-gold);
+  border-radius: 12px;
+  background: 
+    linear-gradient(145deg, #2A2A2A 0%, #1A1A1A 100%);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 10px rgba(212, 175, 55, 0.2);
   padding: 8px;
-  min-width: 60px;
-  min-height: 90px;
+  min-width: 70px;
+  min-height: 95px;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+.pilha:hover, .baralho:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 
+    0 8px 20px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 0 15px rgba(212, 175, 55, 0.3);
+}
+
+/* Legendas elegantes */
 .legenda-area {
-  color: #ffe082;
-  font-size: 0.95rem;
+  color: var(--secondary-gold);
+  font-size: clamp(0.8rem, 1.5vw, 1rem);
+  font-weight: 600;
   text-align: center;
-  margin-top: 0.3rem;
-  font-weight: bold;
-  text-shadow: 0 1px 4px #000a;
+  font-family: 'Cinzel', serif;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.8),
+    0 0 10px rgba(212, 175, 55, 0.3);
+  background: linear-gradient(135deg, var(--primary-gold), var(--secondary-gold));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
+
+/* Mão do jogador com layout flexível */
 .mesa-mao {
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
-  gap: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(0.3rem, 1vw, 0.8rem);
+  justify-content: center;
+  align-items: center;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
 }
+
+/* Área de informações dos jogadores */
 .jogadores-area {
-  margin-bottom: 1.2rem;
-  background: rgba(20, 20, 30, 0.85);
-  border-radius: 10px;
-  padding: 1rem 2rem;
-  color: #eebbc3;
-  box-shadow: 0 1px 8px #0003;
-  border: 1.5px solid #d4af37;
+  margin-bottom: 1rem;
+  background: 
+    linear-gradient(135deg, rgba(25, 25, 112, 0.8) 0%, rgba(0, 0, 0, 0.8) 100%);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  color: var(--pearl-white);
+  box-shadow: 
+    0 2px 12px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  position: relative;
 }
+
+.jogadores-area::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    linear-gradient(45deg, transparent 30%, rgba(212, 175, 55, 0.05) 50%, transparent 70%);
+  border-radius: 11px;
+  pointer-events: none;
+}
+
+/* Tipografia refinada */
 h2, h3 {
-  color: #eebbc3;
+  color: var(--secondary-gold);
+  font-family: 'Cinzel', serif;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
+
 ul {
-  color: #eebbc3;
+  color: var(--pearl-white);
+  list-style: none;
+  padding: 0;
 }
+
+ul li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+ul li:last-child {
+  border-bottom: none;
+}
+
+/* Mão de cartas responsiva */
 .mao {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: clamp(0.3rem, 1vw, 0.6rem);
+  justify-content: center;
   margin-bottom: 1rem;
+  padding: 0.5rem;
 }
+
+@media (max-width: 768px) {
+  .mao {
+    gap: 0.2rem;
+  }
+}
+/* Cartas individuais com estilo premium */
 .carta {
-  background: #121629;
-  border: 2px solid #eebbc3;
-  border-radius: 8px;
-  padding: 0.7rem 1.2rem;
-  font-size: 1.1rem;
-  color: #eebbc3;
+  background: var(--card-gradient);
+  border: 2px solid var(--primary-gold);
+  border-radius: 12px;
+  padding: 0.8rem 1.4rem;
+  font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+  font-weight: 600;
+  color: var(--pearl-white);
   cursor: pointer;
-  min-width: 60px;
-  box-shadow: 0 2px 8px #0007;
-  transition: background 0.2s, border 0.2s, color 0.2s;
+  min-width: 70px;
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
-.carta:hover, .btn-acao:hover {
-  background: #eebbc3;
-  color: #232946;
-  border-color: #232946;
+
+.carta::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s;
 }
+
+.carta:hover {
+  background: linear-gradient(145deg, var(--primary-gold) 0%, var(--secondary-gold) 100%);
+  color: var(--japanese-black);
+  border-color: var(--secondary-gold);
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 
+    0 8px 24px rgba(212, 175, 55, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.carta:hover::before {
+  left: 100%;
+}
+
+.carta:active {
+  transform: translateY(-2px) scale(1.02);
+}
+
+/* Estados especiais das cartas */
 .carta-espia {
-  background: #f6c177 !important;
-  color: #232946 !important;
-  border-color: #f6c177 !important;
+  background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%) !important;
+  color: var(--pearl-white) !important;
+  border-color: #FF6B35 !important;
+  animation: espiaGlow 2s ease-in-out infinite alternate;
 }
+
+@keyframes espiaGlow {
+  0% { box-shadow: 0 4px 16px rgba(255, 107, 53, 0.4); }
+  100% { box-shadow: 0 8px 32px rgba(255, 107, 53, 0.8); }
+}
+
 .carta-comprada {
-  color: #f6c177;
-  font-size: 1.2rem;
+  color: var(--secondary-gold);
+  font-size: clamp(1rem, 2vw, 1.3rem);
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
+
+/* Botões de ação refinados */
 .btn-principal {
-  background: #eebbc3;
-  color: #232946;
+  background: var(--gold-gradient);
+  color: var(--japanese-black);
   border: none;
-  border-radius: 6px;
-  padding: 0.6rem 1.4rem;
-  font-size: 1.1rem;
-  margin: 0.2rem 0.5rem 0.2rem 0;
+  border-radius: 12px;
+  padding: 0.8rem 1.6rem;
+  font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   cursor: pointer;
-  font-weight: bold;
-  box-shadow: 0 1px 4px #0003;
-  transition: background 0.2s, color 0.2s;
+  margin: 0.3rem 0.6rem;
+  box-shadow: 
+    0 4px 16px rgba(212, 175, 55, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
+
+.btn-principal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
 .btn-principal:hover {
-  background: #f6c177;
-  color: #232946;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 24px rgba(212, 175, 55, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
+
+.btn-principal:hover::before {
+  left: 100%;
+}
+
+/* Botão de descarte com tema de perigo elegante */
 .btn-descartar {
-  background: #f25042;
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent-red) 0%, var(--deep-red) 100%);
+  color: var(--pearl-white);
   border: none;
-  border-radius: 6px;
-  padding: 0.6rem 1.4rem;
-  font-size: 1.1rem;
-  margin: 0.2rem 0.5rem 0.2rem 0;
+  border-radius: 12px;
+  padding: 0.8rem 1.6rem;
+  font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   cursor: pointer;
-  font-weight: bold;
-  box-shadow: 0 1px 4px #0003;
-  transition: background 0.2s, color 0.2s;
+  margin: 0.3rem 0.6rem;
+  box-shadow: 
+    0 4px 16px rgba(220, 20, 60, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 .btn-descartar:hover {
-  background: #d7263d;
-  color: #fff;
+  background: linear-gradient(135deg, #FF1744 0%, #C62828 100%);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 24px rgba(220, 20, 60, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
+
+/* Botões de ação secundários */
 .btn-acao {
-  background: #232946;
-  color: #eebbc3;
-  border: 2px solid #eebbc3;
-  border-radius: 8px;
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
+  background: var(--card-gradient);
+  color: var(--pearl-white);
+  border: 2px solid var(--primary-gold);
+  border-radius: 10px;
+  padding: 0.6rem 1.2rem;
+  font-size: clamp(0.8rem, 1.5vw, 1rem);
+  font-weight: 600;
   cursor: pointer;
-  min-width: 60px;
-  margin: 0.1rem 0.2rem;
-  box-shadow: 0 1px 4px #0003;
-  transition: background 0.2s, color 0.2s, border 0.2s;
+  margin: 0.2rem 0.3rem;
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+.btn-acao:hover {
+  background: var(--gold-gradient);
+  color: var(--japanese-black);
+  border-color: var(--secondary-gold);
+  transform: translateY(-1px);
+}
+
 .btn-acao:active, .btn-acao:focus {
-  background: #eebbc3;
-  color: #232946;
-  border-color: #232946;
+  background: var(--gold-gradient);
+  color: var(--japanese-black);
+  border-color: var(--secondary-gold);
+  transform: translateY(0);
 }
+
+/* Mensagem de habilidade destacada */
 .habilidade-msg {
-  background: #f6c177;
-  color: #232946;
-  border-radius: 6px;
-  padding: 0.5rem 1rem;
-  margin: 0.5rem 0 1rem 0;
-  font-weight: bold;
-  box-shadow: 0 1px 4px #0002;
+  background: linear-gradient(135deg, var(--secondary-gold) 0%, var(--primary-gold) 100%);
+  color: var(--japanese-black);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  margin: 1rem 0;
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 
+    0 4px 16px rgba(212, 175, 55, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  text-align: center;
+  animation: habilidadePulse 2s ease-in-out infinite alternate;
 }
+
+@keyframes habilidadePulse {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.02); }
+}
+
+/* Estilo refinado para cartas clicáveis */
 .carta-btn {
-  background: none;
+  background: transparent;
   border: none;
   padding: 0;
-  margin: 0 2px;
-  box-shadow: none;
+  margin: 0 clamp(2px, 0.5vw, 4px);
   cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
+
 .carta-btn:focus {
-  outline: 2px solid #f6c177;
+  outline: 3px solid var(--secondary-gold);
+  outline-offset: 3px;
+  border-radius: 8px;
 }
+
+.carta-btn:hover {
+  transform: translateY(-6px) scale(1.05);
+  filter: drop-shadow(0 8px 16px rgba(212, 175, 55, 0.4));
+}
+/* Layout de baralho e pilha elegante */
 .baralho-pilha {
   display: flex;
-  gap: 2.5rem;
-  margin-bottom: 1.5rem;
+  gap: clamp(1.5rem, 4vw, 3rem);
+  justify-content: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
 }
+
 .topo-pilha {
-  color: #f6c177;
-  font-weight: bold;
-  margin-top: 0.3rem;
+  color: var(--secondary-gold);
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  margin-top: 0.5rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
+
+/* Botão de descarte de carta individual */
 .btn-descartar-carta {
   display: block;
-  margin: 0.3rem auto 0 auto;
-  background: #f25042;
-  color: #fff;
+  margin: 0.5rem auto 0 auto;
+  background: linear-gradient(135deg, var(--accent-red) 0%, var(--deep-red) 100%);
+  color: var(--pearl-white);
   border: none;
-  border-radius: 6px;
-  padding: 0.2rem 0.7rem;
-  font-size: 0.95rem;
+  border-radius: 8px;
+  padding: 0.4rem 0.8rem;
+  font-size: clamp(0.7rem, 1.2vw, 0.9rem);
+  font-weight: 600;
   cursor: pointer;
-  font-weight: bold;
-  box-shadow: 0 1px 4px #0003;
-  transition: background 0.2s, color 0.2s;
+  box-shadow: 
+    0 2px 8px rgba(220, 20, 60, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
+
 .btn-descartar-carta:hover {
-  background: #d7263d;
-  color: #fff;
+  background: linear-gradient(135deg, #FF1744 0%, #C62828 100%);
+  transform: translateY(-1px);
+  box-shadow: 
+    0 4px 12px rgba(220, 20, 60, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
+
+/* Mensagem da pilha com estilo cassino */
 .mensagem-pilha {
-  margin-top: 1.2rem;
-  background: #f6c177;
-  color: #232946;
-  border-radius: 8px;
-  padding: 0.7rem 1.2rem;
-  font-weight: bold;
+  margin-top: 1.5rem;
+  background: linear-gradient(135deg, var(--secondary-gold) 0%, var(--primary-gold) 100%);
+  color: var(--japanese-black);
+  border-radius: 16px;
+  padding: 1.2rem 2rem;
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
   text-align: center;
-  box-shadow: 0 1px 8px #0002;
+  box-shadow: 
+    0 4px 16px rgba(212, 175, 55, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  animation: mensagemGlow 3s ease-in-out infinite alternate;
 }
+
+@keyframes mensagemGlow {
+  0% { 
+    box-shadow: 0 4px 16px rgba(212, 175, 55, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  100% { 
+    box-shadow: 0 8px 32px rgba(212, 175, 55, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Verso das cartas com padrão japonês */
 .verso-carta {
-  background: #232946;
-  border-radius: 8px;
-  border: 2px solid #eebbc3;
-  box-shadow: 0 2px 8px #0007;
+  background: 
+    var(--card-gradient),
+    radial-gradient(circle at center, rgba(212, 175, 55, 0.1) 0%, transparent 70%);
+  border-radius: 12px;
+  border: 2px solid var(--primary-gold);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 60px;
-  height: 90px;
+  width: clamp(60px, 10vw, 80px);
+  height: clamp(90px, 15vw, 120px);
+  position: relative;
+  transition: all 0.3s ease;
 }
+
+.verso-carta::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  height: 80%;
+  background: 
+    repeating-conic-gradient(
+      from 0deg at center,
+      transparent 0deg,
+      rgba(212, 175, 55, 0.1) 45deg,
+      transparent 90deg
+    );
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.verso-carta:hover {
+  transform: scale(1.05);
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 0 20px rgba(212, 175, 55, 0.3);
+}
+
+/* Popup de notificação luxuoso */
 .popup-notificacao {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: #ffe082;
-  color: #232946;
-  padding: 2rem 3rem;
-  border-radius: 18px;
-  box-shadow: 0 4px 32px #0008, 0 0 0 4px #d4af37;
-  font-size: 1.5rem;
-  font-weight: bold;
+  background: 
+    linear-gradient(135deg, var(--secondary-gold) 0%, var(--primary-gold) 100%);
+  color: var(--japanese-black);
+  padding: 2.5rem 3.5rem;
+  border-radius: 24px;
+  box-shadow: 
+    0 16px 64px rgba(0, 0, 0, 0.8),
+    0 0 0 3px var(--primary-gold),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3);
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
   z-index: 9999;
   text-align: center;
-  animation: popup-fadein 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  animation: popup-entrada 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  max-width: 90vw;
 }
-@keyframes popup-fadein {
-  from { opacity: 0; transform: translate(-50%, -60%); }
-  to { opacity: 1; transform: translate(-50%, -50%); }
+
+@keyframes popup-entrada {
+  0% { 
+    opacity: 0; 
+    transform: translate(-50%, -60%) scale(0.8) rotateY(20deg);
+  }
+  100% { 
+    opacity: 1; 
+    transform: translate(-50%, -50%) scale(1) rotateY(0deg);
+  }
 }
+
+/* Transições suaves */
 .fade-enter-active, .fade-leave-active {
-  transition: opacity 0.5s;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.fade-enter, .fade-leave-to {
+
+.fade-enter-from, .fade-leave-to {
   opacity: 0;
+  transform: scale(0.9);
+}
+
+/* Responsividade móvel aprimorada */
+@media (max-width: 768px) {
+  .cunoku-game {
+    padding: 0.8rem;
+    margin: 0.5rem;
+    border-radius: 16px;
+    max-height: 85vh;
+  }
+  
+  .mesa-cartas {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+    padding: 0.8rem;
+    margin-bottom: 0.8rem;
+  }
+  
+  .baralho-pilha {
+    gap: 1rem;
+  }
+  
+  .pilha, .baralho {
+    min-width: 60px;
+    min-height: 80px;
+    padding: 6px;
+  }
+  
+  .verso-carta {
+    width: 50px !important;
+    height: 70px !important;
+  }
+  
+  .btn-principal, .btn-descartar {
+    padding: 0.5rem 1rem;
+    margin: 0.2rem 0.3rem;
+    font-size: 0.8rem;
+  }
+  
+  .popup-notificacao {
+    padding: 1.5rem 2rem;
+    font-size: 1.2rem;
+  }
+  
+  .mensagem-pilha {
+    padding: 0.8rem 1.2rem;
+    margin-top: 0.8rem;
+  }
+  
+  .jogadores-area {
+    padding: 0.8rem 1rem;
+    margin-bottom: 0.8rem;
+  }
+  
+  .legenda-area {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .cunoku-game {
+    padding: 0.5rem;
+    max-height: 90vh;
+  }
+  
+  .carta {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
+    min-width: 45px;
+  }
+  
+  .mao {
+    gap: 0.1rem;
+  }
+  
+  .mesa-mao {
+    gap: 0.2rem;
+    padding: 0.4rem;
+  }
+  
+  .btn-acao {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.7rem;
+    margin: 0.1rem;
+  }
+  
+  .verso-carta {
+    width: 45px !important;
+    height: 65px !important;
+  }
+  
+  .verso-carta span {
+    font-size: 1.5rem !important;
+  }
+  
+  .pilha, .baralho {
+    min-width: 50px;
+    min-height: 70px;
+  }
+}
+
+/* Ajustes específicos para altura da tela */
+@media (max-height: 700px) {
+  .cunoku-game {
+    max-height: 95vh;
+    padding: 0.5rem;
+  }
+  
+  .mesa-cartas {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+  }
+  
+  .jogadores-area {
+    margin-bottom: 0.5rem;
+    padding: 0.8rem 1rem;
+  }
+  
+  h2, h3 {
+    margin: 0.5rem 0;
+  }
+}
+
+/* Animações de entrada para elementos */
+.animate__fadeInUp {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Efeitos especiais para atmosfera de cassino */
+.cunoku-game::after {
+  content: '';
+  position: absolute;
+  top: 10%;
+  left: 10%;
+  right: 10%;
+  bottom: 10%;
+  background: 
+    radial-gradient(ellipse at top left, rgba(212, 175, 55, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at bottom right, rgba(220, 20, 60, 0.03) 0%, transparent 50%);
+  border-radius: 20px;
+  pointer-events: none;
+  z-index: 0;
 }
 </style> 

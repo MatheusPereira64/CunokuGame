@@ -1,8 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { t } from './i18n/index.js'
 import HomePage from './pages/HomePage.vue'
 import JogoPage from './pages/JogoPage.vue'
 import P2PService from './p2pService.js'
+import LanguageSelector from './components/LanguageSelector.vue'
 import { io } from 'socket.io-client'
 
 const pagina = ref('inicio')
@@ -104,11 +106,13 @@ onMounted(() => {
 <template>
   <div class="app-layout">
     <div v-if="aguardandoInteracao" class="overlay-musica" @click="iniciarMusica">
-      <div class="msg-musica">Clique para entrar no jogo e ativar o som 🎵</div>
+      <div class="msg-musica">{{ t('gameStart') }} 🎵</div>
     </div>
     <nav class="menu">
-      <button :class="{ ativo: pagina === 'inicio' }" @click="pagina = 'inicio'">Início</button>
-      <!-- Removido botão de navegação direta para Jogar -->
+      <button :class="{ ativo: pagina === 'inicio' }" @click="pagina = 'inicio'">{{ t('gameStart') }}</button>
+      <div class="language-selector-nav">
+        <LanguageSelector />
+      </div>
     </nav>
     <main>
       <HomePage v-if="pagina === 'inicio'" @iniciar-jogo="iniciarJogo" />
@@ -130,98 +134,334 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* Layout principal do aplicativo com tema cassino japonês */
 .app-layout {
   min-height: 100vh;
-  background: #232946;
+  background: var(--casino-gradient);
+  position: relative;
 }
+
+/* Overlay para ativação de música */
+.overlay-musica {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+}
+
+.msg-musica {
+  background: var(--gold-gradient);
+  color: var(--japanese-black);
+  padding: 2rem 3rem;
+  border-radius: 20px;
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  text-align: center;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: pulseGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes pulseGlow {
+  0% { transform: scale(1); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+  100% { transform: scale(1.02); box-shadow: 0 12px 40px rgba(212, 175, 55, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+}
+
+/* Menu de navegação elegante */
 .menu {
   display: flex;
-  gap: 1rem;
-  background: #121629;
-  padding: 1.2rem 2rem 1.2rem 2rem;
-  border-radius: 0 0 16px 16px;
-  box-shadow: 0 2px 16px #0005;
-  justify-content: center;
+  gap: 1.5rem;
+  background: 
+    linear-gradient(135deg, rgba(25, 25, 112, 0.95) 0%, rgba(28, 28, 28, 0.95) 100%);
+  backdrop-filter: blur(10px);
+  padding: 1.5rem 2rem;
+  border-radius: 0 0 24px 24px;
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(212, 175, 55, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  justify-content: space-between;
+  align-items: center;
+  border-top: 3px solid var(--primary-gold);
 }
+
+.language-selector-nav {
+  display: flex;
+  align-items: center;
+}
+
 .menu button {
-  background: #232946;
-  border: 2px solid #eebbc3;
-  color: #eebbc3;
+  background: var(--card-gradient);
+  border: 2px solid var(--primary-gold);
+  color: var(--pearl-white);
   font-size: 1.15rem;
-  padding: 0.7rem 2.2rem;
-  border-radius: 8px;
+  font-family: 'Cinzel', serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.8rem 2.5rem;
+  border-radius: 12px;
   cursor: pointer;
-  font-weight: bold;
-  transition: background 0.2s, color 0.2s, border 0.2s;
-  margin: 0 0.2rem;
-  box-shadow: 0 1px 4px #0003;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0 0.3rem;
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
 }
+
+.menu button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s;
+}
+
 .menu button.ativo,
 .menu button:hover {
-  background: #eebbc3;
-  color: #232946;
-  border-color: #232946;
+  background: var(--gold-gradient);
+  color: var(--japanese-black);
+  border-color: var(--secondary-gold);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 4px 16px rgba(212, 175, 55, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
+
+.menu button:hover::before {
+  left: 100%;
+}
+
+.menu button:active {
+  transform: translateY(0);
+}
+
+/* Container principal */
 main {
-  max-width: 700px;
-  margin: 2rem auto;
-  background: #232946;
-  border-radius: 16px;
-  box-shadow: 0 2px 16px #0005;
-  padding: 2.5rem 2rem;
+  max-width: min(1200px, 98vw);
+  margin: 1rem auto;
+  background: 
+    linear-gradient(135deg, rgba(25, 25, 112, 0.9) 0%, rgba(28, 28, 28, 0.9) 100%);
+  backdrop-filter: blur(15px);
+  border-radius: 24px;
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 2px var(--primary-gold),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  padding: clamp(1rem, 3vw, 2rem);
+  position: relative;
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(100vh - 120px);
 }
+
+main::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 25% 25%, rgba(212, 175, 55, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(220, 20, 60, 0.05) 0%, transparent 50%);
+  border-radius: 24px;
+  pointer-events: none;
+}
+
+/* Player de música elegante */
 .player-musica {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  background: rgba(30,20,40,0.92);
-  border: 2px solid #d4af37;
-  border-radius: 16px;
-  box-shadow: 0 2px 12px #0007;
-  padding: 0.7rem 1.2rem 0.7rem 1.2rem;
+  background: 
+    linear-gradient(135deg, rgba(25, 25, 112, 0.95) 0%, rgba(28, 28, 28, 0.95) 100%);
+  backdrop-filter: blur(10px);
+  border: 2px solid var(--primary-gold);
+  border-radius: 20px;
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  padding: 1rem 1.5rem;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 1rem;
   z-index: 1000;
+  transition: all 0.3s ease;
 }
+
+.player-musica:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 12px 32px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 0 20px rgba(212, 175, 55, 0.3);
+}
+
 .btn-musica {
-  background: linear-gradient(90deg, #d4af37 60%, #b8860b 100%);
-  color: #232946;
+  background: var(--gold-gradient);
+  color: var(--japanese-black);
   border: none;
-  border-radius: 8px;
-  padding: 0.4rem 1.1rem;
-  font-size: 1.1rem;
-  font-weight: bold;
-  box-shadow: 0 1px 4px #0003;
+  border-radius: 10px;
+  padding: 0.5rem 1.3rem;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: 'Cinzel', serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 
+    0 2px 8px rgba(212, 175, 55, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
+
+.btn-musica::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
 .btn-musica:hover {
-  background: linear-gradient(90deg, #ffe082 60%, #d4af37 100%);
-  color: #232946;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  transform: translateY(-1px);
+  box-shadow: 
+    0 4px 12px rgba(212, 175, 55, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
-input[type="range"] {
-  accent-color: #d4af37;
-  width: 90px;
+
+.btn-musica:hover::before {
+  left: 100%;
 }
-.overlay-musica {
-  position: fixed;
-  inset: 0;
-  background: rgba(20, 10, 30, 0.92);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+
+/* Responsividade móvel */
+@media (max-width: 768px) {
+  .menu {
+    padding: 1rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .language-selector-nav {
+    order: -1;
+    width: 100%;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+  
+  .menu button {
+    padding: 0.6rem 1.5rem;
+    font-size: 1rem;
+    margin: 0.2rem;
+  }
+  
+  main {
+    margin: 1rem auto;
+    padding: 1.5rem;
+  }
+  
+  .player-musica {
+    right: 16px;
+    bottom: 16px;
+    padding: 0.8rem 1rem;
+  }
+  
+  .btn-musica {
+    padding: 0.4rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .msg-musica {
+    padding: 1.5rem 2rem;
+    font-size: 1.1rem;
+    margin: 1rem;
+  }
 }
-.msg-musica {
-  color: #ffe082;
-  font-size: 1.5rem;
-  background: #232946;
-  padding: 2rem 3rem;
-  border-radius: 18px;
-  border: 2px solid #d4af37;
-  box-shadow: 0 2px 16px #000a;
-  text-align: center;
+
+@media (max-width: 480px) {
+  .menu {
+    padding: 0.8rem;
+    border-radius: 0 0 16px 16px;
+    gap: 0.5rem;
+  }
+  
+  .language-selector-nav {
+    margin-bottom: 0.3rem;
+  }
+  
+  .menu button {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    width: 100%;
+    max-width: 200px;
+  }
+  
+  main {
+    margin: 0.5rem auto;
+    padding: 1rem;
+    border-radius: 16px;
+  }
+  
+  .player-musica {
+    right: 8px;
+    bottom: 8px;
+    padding: 0.6rem 0.8rem;
+  }
+}
+
+/* Animações de entrada */
+.menu button {
+  animation: slideInFromTop 0.6s ease-out;
+  animation-fill-mode: both;
+  animation-delay: calc(var(--index, 0) * 0.1s);
+}
+
+@keyframes slideInFromTop {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+main {
+  animation: fadeInScale 0.8s ease-out;
+}
+
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 </style>
