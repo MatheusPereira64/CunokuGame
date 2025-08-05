@@ -28,7 +28,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
-import CunokuGame from '../components/CunokuGame.vue'
+import CunokuGame from '../components/Game/CunokuGameRefactored.vue'
 import FimDeJogo from '../components/FimDeJogo.vue'
 const props = defineProps({
   numJogadores: Number,
