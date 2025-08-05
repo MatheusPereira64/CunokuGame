@@ -157,7 +157,7 @@ export default {
   z-index: 3;
 }
 
-/* Posicionamento específico para cada posição */
+/* Posições otimizadas para 2-6 jogadores */
 .position-bottom {
   bottom: -120px;
   left: 50%;
@@ -188,25 +188,25 @@ export default {
 
 .position-top-left {
   top: -100px;
-  left: 10%;
+  left: 15%;
   flex-direction: column-reverse;
 }
 
 .position-top-right {
   top: -100px;
-  right: 10%;
+  right: 15%;
   flex-direction: column-reverse;
 }
 
 .position-bottom-left {
   bottom: -100px;
-  left: 10%;
+  left: 15%;
   flex-direction: column;
 }
 
 .position-bottom-right {
   bottom: -100px;
-  right: 10%;
+  right: 15%;
   flex-direction: column;
 }
 
@@ -459,5 +459,54 @@ export default {
     font-size: 0.5rem;
     letter-spacing: 0.2px;
   }
+}
+
+/* Ajustes específicos para número de jogadores */
+@media (max-width: 768px) {
+  /* Para 5-6 jogadores em mobile, compactar posições */
+  .position-top-left,
+  .position-bottom-left {
+    left: 8%;
+  }
+  
+  .position-top-right,
+  .position-bottom-right {
+    right: 8%;
+  }
+  
+  .position-left {
+    left: -140px;
+  }
+  
+  .position-right {
+    right: -140px;
+  }
+}
+
+/* Otimização para 6 jogadores */
+[data-player-count="6"] .position-top-left {
+  left: 12%;
+  top: -90px;
+}
+
+[data-player-count="6"] .position-top-right {
+  right: 12%;
+  top: -90px;
+}
+
+[data-player-count="6"] .position-bottom-right {
+  right: 12%;
+  bottom: -90px;
+}
+
+/* Otimização para 5 jogadores */
+[data-player-count="5"] .position-bottom-left {
+  left: 20%;
+  bottom: -80px;
+}
+
+[data-player-count="5"] .position-bottom-right {
+  right: 20%;
+  bottom: -80px;
 }
 </style>

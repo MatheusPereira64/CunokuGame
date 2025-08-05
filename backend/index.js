@@ -71,7 +71,7 @@ io.on('connection', (socket) => {
     if (!salas[sala]) {
       salas[sala] = [];
     }
-    if (salas[sala].length >= 8) {
+    if (salas[sala].length >= 6) {
       socket.emit('sala_cheia');
       return;
     }

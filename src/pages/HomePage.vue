@@ -15,7 +15,7 @@
         <input v-model="nomeSala" :placeholder="t('roomNamePlaceholder')" />
       </label>
       <label>{{ t('numberOfPlayers') }}:
-        <input type="number" v-model.number="qtdJogadores" min="2" max="8" />
+        <input type="number" v-model.number="qtdJogadores" min="2" max="6" />
       </label>
       <button :disabled="!nomeJogador" @click="hostearSala">{{ t('createRoom') }}</button>
       <button class="voltar" @click="modoEscolhido = null">{{ t('back') }}</button>
@@ -50,7 +50,7 @@
         <input v-model="nomeJogador" :placeholder="t('playerNamePlaceholder')" />
       </label>
       <label>{{ t('numberOfBots') }}:
-        <input type="number" v-model.number="qtdBots" min="1" max="7" />
+        <input type="number" v-model.number="qtdBots" min="1" max="5" />
       </label>
       <label>{{ t('difficulty') }}:
         <select v-model="dificuldadeBot">

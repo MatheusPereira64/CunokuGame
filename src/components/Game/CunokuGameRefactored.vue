@@ -256,9 +256,83 @@ export default defineComponent({
     }
     
     const handleAbilityAction = (action) => {
-      // Implementar ações de habilidade
-      console.log('Ability action:', action)
-      gameLogic.resetGameState()
+      const carta = gameLogic.cartaComprada.value
+      if (!carta) return
+      
+      if (gameLogic.modoOffline.value) {
+        // Lógica offline para habilidades
+        if (action.type === 'own-card') {
+          // Ver carta própria (cartas 7 e 8)
+          const player = gameLogic.estado.value.players[gameLogic.meuIndice.value]
+          const cartaVista = player.mao[action.cardIndex]
+          gameLogic.cartasReveladas.value.push({ idx: action.cardIndex, carta: cartaVista })
+          gameLogic.showMessage(`Carta revelada: ${cartaVista.nome} de ${cartaVista.naipe}`, 5000)
+          
+          // Remove após 5 segundos
+          setTimeout(() => {
+            gameLogic.cartasReveladas.value = gameLogic.cartasReveladas.value.filter(c => c.idx !== action.cardIndex)
+          }, 5000)
+          
+          gameLogic.estado.value.pilha.push(carta)
+          gameLogic.resetGameState()
+          gameLogic.avancarTurnoLocal()
+          
+        } else if (action.type === 'opponent-card') {
+          // Ver carta de oponente (cartas 5 e 6)
+          const player = gameLogic.estado.value.players[action.playerIndex]
+          const cartaVista = player.mao[action.cardIndex]
+          gameLogic.showMessage(`Carta do ${player.nome}: ${cartaVista.nome} de ${cartaVista.naipe}`, 5000)
+          
+          gameLogic.estado.value.pilha.push(carta)
+          gameLogic.resetGameState()
+          gameLogic.avancarTurnoLocal()
+          
+        } else if (action.type === 'swap-cards') {
+          // Trocar cartas (cartas 9 e 10)
+          const player1 = gameLogic.estado.value.players[action.player1]
+          const player2 = gameLogic.estado.value.players[action.player2]
+          
+          const cartaA = player1.mao[action.card1]
+          const cartaB = player2.mao[action.card2]
+          
+          // Efetua a troca
+          player1.mao[action.card1] = cartaB
+          player2.mao[action.card2] = cartaA
+          
+          gameLogic.showMessage(`Trocou carta ${action.card1 + 1} de ${player1.nome} com carta ${action.card2 + 1} de ${player2.nome}`, 4000)
+          
+          gameLogic.estado.value.pilha.push(carta)
+          gameLogic.resetGameState()
+          gameLogic.avancarTurnoLocal()
+        }
+      } else {
+        // Lógica online - emitir eventos para o servidor
+        if (action.type === 'own-card') {
+          props.socket?.emit('usar_habilidade', {
+            sala: props.sala,
+            jogador: props.jogador.nome,
+            carta: carta,
+            indiceAlvo: action.cardIndex
+          })
+        } else if (action.type === 'opponent-card') {
+          props.socket?.emit('usar_habilidade', {
+            sala: props.sala,
+            jogador: props.jogador.nome,
+            carta: carta,
+            alvo: action.playerIndex,
+            indiceAlvo: action.cardIndex
+          })
+        } else if (action.type === 'swap-cards') {
+          props.socket?.emit('usar_habilidade', {
+            sala: props.sala,
+            jogador: props.jogador.nome,
+            carta: carta,
+            alvos: [action.player1, action.player2],
+            indicesAlvo: [action.card1, action.card2]
+          })
+        }
+        gameLogic.resetGameState()
+      }
     }
     
     const cancelarHabilidade = () => {

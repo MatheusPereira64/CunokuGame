@@ -20,15 +20,15 @@
       <!-- Interface para ver carta de oponente -->
       <div v-if="type === 'opponent-card'" class="ability-content">
         <div class="players-selection">
-          <div v-for="(player, playerIdx) in opponents" :key="`player-${playerIdx}`" 
-               class="player-option" @click="selectPlayer(playerIdx)">
+          <div v-for="player in opponents" :key="`player-${player.originalIndex}`" 
+               class="player-option" @click="selectPlayer(player.originalIndex)">
             <div class="player-info">
               <span class="player-name">{{ player.nome }}</span>
               <span class="card-count">{{ player.mao.length }} cartas</span>
             </div>
             <div class="player-cards">
               <div v-for="(carta, cardIdx) in player.mao" :key="`card-${cardIdx}`" 
-                   class="card-option" @click.stop="selectOpponentCard(playerIdx, cardIdx)">
+                   class="card-option" @click.stop="selectOpponentCard(player.originalIndex, cardIdx)">
                 <div class="card-back small">
                   <span>🂠</span>
                 </div>
@@ -45,8 +45,8 @@
           <div class="swap-step" v-if="swapStep === 1">
             <h5>Escolha o primeiro jogador:</h5>
             <div class="players-grid">
-              <button v-for="(player, idx) in allPlayers" :key="`p1-${idx}`"
-                      class="player-btn" @click="selectFirstPlayer(idx)">
+              <button v-for="player in allPlayers" :key="`p1-${player.originalIndex}`"
+                      class="player-btn" @click="selectFirstPlayer(player.originalIndex)">
                 {{ player.nome }} ({{ player.mao.length }} cartas)
               </button>
             </div>
@@ -68,8 +68,8 @@
           <div class="swap-step" v-if="swapStep === 3">
             <h5>Escolha o segundo jogador:</h5>
             <div class="players-grid">
-              <button v-for="(player, idx) in otherPlayers" :key="`p2-${idx}`"
-                      class="player-btn" @click="selectSecondPlayer(idx)">
+              <button v-for="player in otherPlayers" :key="`p2-${player.originalIndex}`"
+                      class="player-btn" @click="selectSecondPlayer(player.originalIndex)">
                 {{ player.nome }} ({{ player.mao.length }} cartas)
               </button>
             </div>
@@ -124,19 +124,39 @@ export default {
       selectedCard2: null
     }
   },
+  watch: {
+    type: {
+      immediate: true,
+      handler(newType) {
+        // Reset state when type changes
+        this.swapStep = 1
+        this.selectedPlayer1 = null
+        this.selectedCard1 = null
+        this.selectedPlayer2 = null
+        this.selectedCard2 = null
+      }
+    }
+  },
   computed: {
     opponents() {
       return this.gameState.players
-        .map((player, index) => ({ ...player, originalIndex: index }))
         .filter((_, index) => index !== this.currentPlayerIndex)
+        .map((player, filteredIndex) => {
+          // Mapear de volta para o índice original
+          const originalIndex = this.gameState.players.findIndex(p => p === player)
+          return { ...player, originalIndex }
+        })
     },
     allPlayers() {
-      return this.gameState.players
+      return this.gameState.players.map((player, index) => ({ ...player, originalIndex: index }))
     },
     otherPlayers() {
       return this.gameState.players
-        .map((player, index) => ({ ...player, originalIndex: index }))
         .filter((_, index) => index !== this.selectedPlayer1)
+        .map((player, filteredIndex) => {
+          const originalIndex = this.gameState.players.findIndex(p => p === player)
+          return { ...player, originalIndex }
+        })
     },
     selectedPlayer1Name() {
       return this.selectedPlayer1 !== null ? this.gameState.players[this.selectedPlayer1]?.nome : ''

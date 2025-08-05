@@ -1,5 +1,5 @@
 <template>
-  <div class="poker-table-container">
+  <div class="poker-table-container" :data-player-count="gameState.players.length">
     <!-- Mesa de Poker Oval -->
     <div class="poker-table">
       <!-- Centro da mesa com baralho e descarte -->
@@ -119,7 +119,7 @@ export default {
   overflow-y: auto;
 }
 
-/* Mesa oval de poker */
+/* Mesa oval de poker - tamanho adaptativo */
 .poker-table {
   position: relative;
   width: clamp(600px, 70vw, 900px);
@@ -136,6 +136,32 @@ export default {
   align-items: center;
   justify-content: center;
   margin: 2rem auto;
+}
+
+/* Tamanhos específicos baseados no número de jogadores */
+[data-player-count="2"] .poker-table {
+  width: clamp(500px, 60vw, 700px);
+  height: clamp(350px, 40vh, 500px);
+}
+
+[data-player-count="3"] .poker-table {
+  width: clamp(550px, 65vw, 800px);
+  height: clamp(375px, 45vh, 550px);
+}
+
+[data-player-count="4"] .poker-table {
+  width: clamp(600px, 70vw, 850px);
+  height: clamp(400px, 50vh, 575px);
+}
+
+[data-player-count="5"] .poker-table {
+  width: clamp(650px, 75vw, 900px);
+  height: clamp(425px, 52vh, 600px);
+}
+
+[data-player-count="6"] .poker-table {
+  width: clamp(700px, 80vw, 950px);
+  height: clamp(450px, 55vh, 625px);
 }
 
 /* Padrão de feltro na mesa */
@@ -291,32 +317,53 @@ export default {
   50% { opacity: 0.7; }
 }
 
-/* Responsividade */
+/* Responsividade baseada no número de jogadores */
 @media (max-width: 1024px) {
   .poker-table {
+    width: clamp(450px, 80vw, 650px);
+    height: clamp(300px, 45vh, 450px);
+  }
+  
+  [data-player-count="5"] .poker-table,
+  [data-player-count="6"] .poker-table {
     width: clamp(500px, 85vw, 700px);
-    height: clamp(350px, 50vh, 500px);
+    height: clamp(325px, 48vh, 475px);
   }
   
   .table-center {
-    width: 200px;
-    height: 140px;
+    width: 180px;
+    height: 120px;
     gap: 0.8rem;
   }
 }
 
 @media (max-width: 768px) {
   .poker-table {
-    width: clamp(400px, 90vw, 600px);
-    height: clamp(300px, 45vh, 450px);
+    width: clamp(350px, 85vw, 500px);
+    height: clamp(250px, 40vh, 350px);
     border: 4px solid var(--gold-accent);
   }
   
+  [data-player-count="4"] .poker-table,
+  [data-player-count="5"] .poker-table,
+  [data-player-count="6"] .poker-table {
+    width: clamp(380px, 90vw, 520px);
+    height: clamp(270px, 42vh, 370px);
+  }
+  
   .table-center {
-    width: 160px;
-    height: 100px;
+    width: 140px;
+    height: 90px;
     gap: 0.5rem;
     padding: 0.6rem;
+  }
+}
+
+@media (max-width: 480px) {
+  [data-player-count="5"] .poker-table,
+  [data-player-count="6"] .poker-table {
+    width: clamp(320px, 95vw, 450px);
+    height: clamp(220px, 38vh, 320px);
   }
 }
 </style>
