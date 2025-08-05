@@ -201,24 +201,29 @@ export function useGameLogic() {
   const avancarTurnoLocal = () => {
     // Avança o jogador da vez
     estado.value.jogadorDaVez = (estado.value.jogadorDaVez + 1) % estado.value.players.length
+    
+    // Incrementa turno apenas quando volta para o jogador 0 (um ciclo completo)
     if (estado.value.jogadorDaVez === 0) {
       estado.value.turnoAtual = (estado.value.turnoAtual || 1) + 1
-    }
-    // Se fim foi declarado, decrementa turnos restantes
-    if (estado.value.fimDeclarado && estado.value.turnosRestantesFim !== null) {
-      estado.value.turnosRestantesFim--
-      if (estado.value.turnosRestantesFim <= 0) {
-        estado.value.jogoIniciado = false
-        // Calcula soma das cartas de cada jogador
-        const somas = estado.value.players.map(p => ({ 
-          nome: p.nome, 
-          soma: p.mao.reduce((acc, c) => acc + (typeof c.valor === 'number' ? c.valor : 0), 0) 
-        }))
-        const menor = Math.min(...somas.map(s => s.soma))
-        const vencedores = somas.filter(s => s.soma === menor).map(s => s.nome)
-        resultadoFinal.value = { somas, vencedores, jogadores: estado.value.players }
-        fimDeJogo.value = true
-        return
+      
+      // Se fim foi declarado, decrementa turnos restantes apenas quando completar um ciclo
+      if (estado.value.fimDeclarado && estado.value.turnosRestantesFim !== null) {
+        estado.value.turnosRestantesFim--
+        console.log(`Turno completo! Turnos restantes: ${estado.value.turnosRestantesFim}`)
+        
+        if (estado.value.turnosRestantesFim <= 0) {
+          estado.value.jogoIniciado = false
+          // Calcula soma das cartas de cada jogador
+          const somas = estado.value.players.map(p => ({ 
+            nome: p.nome, 
+            soma: p.mao.reduce((acc, c) => acc + (typeof c.valor === 'number' ? c.valor : 0), 0) 
+          }))
+          const menor = Math.min(...somas.map(s => s.soma))
+          const vencedores = somas.filter(s => s.soma === menor).map(s => s.nome)
+          resultadoFinal.value = { somas, vencedores, jogadores: estado.value.players }
+          fimDeJogo.value = true
+          return
+        }
       }
     }
     // Continua verificando se é vez de bot

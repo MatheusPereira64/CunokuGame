@@ -36,7 +36,7 @@
           <div class="turn-indicator">
             <span class="turn-text">Turno {{ gameState.turnoAtual || 1 }}</span>
             <div v-if="gameState.fimDeclarado" class="endgame-warning">
-              ⚠️ Fim declarado! {{ gameState.turnosRestantesFim }} turnos restantes
+              ⚠️ Fim declarado! {{ gameState.turnosRestantesFim }} {{ gameState.turnosRestantesFim === 1 ? 'turno completo restante' : 'turnos completos restantes' }}
             </div>
           </div>
         </div>

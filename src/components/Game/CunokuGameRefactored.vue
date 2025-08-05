@@ -240,8 +240,9 @@ export default defineComponent({
         // Lógica offline
         gameLogic.estado.value.fimDeclarado = true
         gameLogic.estado.value.jogadorDeclarouFim = gameLogic.estado.value.players[gameLogic.meuIndice.value].nome
-        gameLogic.estado.value.turnosRestantesFim = 2 * gameLogic.estado.value.players.length
-        gameLogic.showMessage('Fim de jogo declarado!')
+        // 2 turnos completos após declarar fim
+        gameLogic.estado.value.turnosRestantesFim = 2
+        gameLogic.showMessage('Fim de jogo declarado! Restam 2 turnos completos.')
       } else {
         // Lógica online
         props.socket?.emit('declarar-fim', { roomId: props.roomId })

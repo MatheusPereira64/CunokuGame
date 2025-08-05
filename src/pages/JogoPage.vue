@@ -20,8 +20,8 @@
     </template>
     <template v-else>
       <!-- TELA DE JOGO -->
-      <CunokuGame v-if="!fimDeJogo" :socket="props.socket" :jogador="props.jogador" :num-jogadores="props.numJogadores" :sala="props.sala" :estado-inicial="estadoJogo" @fim-de-jogo="mostrarFimDeJogo" :modo-bots="props.modoBots" />
-      <FimDeJogo v-else :resultado="resultadoFinal" @voltar-inicio="voltarInicio" />
+      <CunokuGame v-if="!fimDeJogo" :socket="props.socket" :jogador="props.jogador" :num-jogadores="props.numJogadores" :sala="props.sala" :estado-inicial="estadoJogo" @fim-de-jogo="mostrarFimDeJogo" @novo-jogo="iniciarNovoJogo" :modo-bots="props.modoBots" />
+      <FimDeJogo v-else :resultado="resultadoFinal" @voltar-inicio="voltarInicio" @novo-jogo="iniciarNovoJogo" />
     </template>
   </div>
 </template>
@@ -83,6 +83,61 @@ if (props.modoBots) {
 function mostrarFimDeJogo(resultado) {
   fimDeJogo.value = true
   resultadoFinal.value = resultado
+}
+
+function iniciarNovoJogo() {
+  console.log('Iniciando novo jogo...')
+  
+  // Reset do estado para nova partida
+  fimDeJogo.value = false
+  resultadoFinal.value = null
+  
+  if (props.modoBots) {
+    console.log('Modo bots - criando novo estado')
+    
+    // Modo offline - cria novo estado com os mesmos jogadores
+    const players = estadoJogo.value.players.map(player => ({
+      ...player,
+      mao: [],
+      points: 0 // Reset pontos se existir
+    }))
+    
+    const baralho = criarBaralhoLocal()
+    const cartasPorJogador = 4
+    
+    // Distribui cartas para todos os jogadores
+    for (let i = 0; i < cartasPorJogador; i++) {
+      players.forEach(player => {
+        player.mao.push(baralho.pop())
+      })
+    }
+    
+    const pilha = [baralho.pop()]
+    
+    // Cria novo estado de jogo completamente limpo
+    estadoJogo.value = {
+      players,
+      baralho,
+      pilha,
+      jogadorDaVez: 0,
+      cartasPorJogador,
+      jogoIniciado: true,
+      aguardandoAcao: null,
+      turnoAtual: 1,
+      fimDeclarado: false,
+      jogadorDeclarouFim: null,
+      turnosRestantesFim: null,
+      resultadoFinal: null
+    }
+    
+    console.log('Novo estado criado:', estadoJogo.value)
+  } else {
+    // Modo online - solicita novo jogo ao servidor
+    console.log('Modo online - solicitando novo jogo ao servidor')
+    if (props.socket && props.sala) {
+      props.socket.emit('iniciar_jogo', { sala: props.sala })
+    }
+  }
 }
 
 function voltarInicio() {

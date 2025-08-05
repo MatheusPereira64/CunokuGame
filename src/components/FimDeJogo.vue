@@ -37,7 +37,10 @@
         </li>
       </ul>
     </div>
-    <button class="btn-principal" @click="$emit('voltar-inicio')">Voltar ao Início</button>
+    <div class="acoes-fim-jogo">
+      <button class="btn-principal" @click="$emit('novo-jogo')">🎮 Novo Jogo</button>
+      <button class="btn-secundario" @click="$emit('voltar-inicio')">🏠 Voltar ao Início</button>
+    </div>
   </div>
 </template>
 
@@ -45,6 +48,8 @@
 const props = defineProps({
   resultado: Object
 })
+
+const emit = defineEmits(['voltar-inicio', 'novo-jogo'])
 
 // Gera ranking ordenado por soma crescente, com medalhas para os 3 primeiros (empates inclusos)
 import { computed } from 'vue'

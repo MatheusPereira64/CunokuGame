@@ -140,22 +140,26 @@ io.on('connection', (socket) => {
   function avancarTurno(estado, sala) {
     // Avança o jogador da vez
     estado.jogadorDaVez = (estado.jogadorDaVez + 1) % estado.players.length;
+    
     // Só conta turno quando o ciclo completa
     if (estado.jogadorDaVez === 0) {
       estado.turnoAtual = (estado.turnoAtual || 1) + 1;
-    }
-    // Se fim foi declarado, decrementa turnos restantes
-    if (estado.fimDeclarado && estado.turnosRestantesFim !== null) {
-      estado.turnosRestantesFim--;
-      if (estado.turnosRestantesFim <= 0) {
-        // Fim do jogo: revelar cartas e calcular vencedor
-        estado.jogoIniciado = false;
-        // Calcula soma das cartas de cada jogador
-        const somas = estado.players.map(p => ({ nome: p.nome, soma: p.mao.reduce((acc, c) => acc + (typeof c.valor === 'number' ? c.valor : 0), 0) }));
-        const menor = Math.min(...somas.map(s => s.soma));
-        const vencedores = somas.filter(s => s.soma === menor).map(s => s.nome);
-        estado.resultadoFinal = { somas, vencedores };
-        io.to(sala).emit('fim_de_jogo', estado.resultadoFinal);
+      
+      // Se fim foi declarado, decrementa turnos restantes apenas quando completar um ciclo
+      if (estado.fimDeclarado && estado.turnosRestantesFim !== null) {
+        estado.turnosRestantesFim--;
+        console.log(`Turno completo! Turnos restantes: ${estado.turnosRestantesFim}`);
+        
+        if (estado.turnosRestantesFim <= 0) {
+          // Fim do jogo: revelar cartas e calcular vencedor
+          estado.jogoIniciado = false;
+          // Calcula soma das cartas de cada jogador
+          const somas = estado.players.map(p => ({ nome: p.nome, soma: p.mao.reduce((acc, c) => acc + (typeof c.valor === 'number' ? c.valor : 0), 0) }));
+          const menor = Math.min(...somas.map(s => s.soma));
+          const vencedores = somas.filter(s => s.soma === menor).map(s => s.nome);
+          estado.resultadoFinal = { somas, vencedores };
+          io.to(sala).emit('fim_de_jogo', estado.resultadoFinal);
+        }
       }
     }
     // Checa se é vez de bot após avançar (REMOVIDO)
@@ -389,7 +393,7 @@ io.on('connection', (socket) => {
     if (estado.fimDeclarado) return; // Só pode declarar uma vez
     estado.fimDeclarado = true;
     estado.jogadorDeclarouFim = jogador;
-    estado.turnosRestantesFim = 2 * estado.players.length; // 2 turnos completos
+    estado.turnosRestantesFim = 2; // 2 turnos completos
     io.to(sala).emit('mensagem', { tipo: 'fim_declarado', jogador });
     io.to(sala).emit('estado_jogo', estado);
   });
