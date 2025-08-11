@@ -1,11 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { t } from './i18n/index.js'
-import HomePage from './pages/HomePage.vue'
-import JogoPage from './pages/JogoPage.vue'
-import P2PService from './p2pService.js'
+const HomePage = defineAsyncComponent(() => import('./pages/HomePage.vue'))
+const JogoPage = defineAsyncComponent(() => import('./pages/JogoPage.vue'))
 import LanguageSelector from './components/LanguageSelector.vue'
-import { io } from 'socket.io-client'
 
 const pagina = ref('inicio')
 const numJogadores = ref(2)
@@ -19,7 +17,7 @@ const modoBots = ref(false)
 const nomesBots = ref([])
 const dificuldadeBots = ref('facil')
 
-function iniciarJogo({ qtd, jogadorInfo, salaInfo, bots, dificuldade, modoBots: isBots }) {
+async function iniciarJogo({ qtd, jogadorInfo, salaInfo, bots, dificuldade, modoBots: isBots }) {
   numJogadores.value = qtd
   jogador.value = jogadorInfo
   sala.value = salaInfo
@@ -28,25 +26,26 @@ function iniciarJogo({ qtd, jogadorInfo, salaInfo, bots, dificuldade, modoBots: 
   dificuldadeBots.value = dificuldade || 'facil'
   pagina.value = 'jogo'
   if (!isBots) {
-    // Conectar ao backend via Socket.IO
+    const { io } = await import('socket.io-client')
     socket.value = io('http://localhost:3000')
     socket.value.emit('entrar_sala', { nome: jogadorInfo.nome, sala: salaInfo })
-    conectarP2P(qtd, salaInfo)
+    await conectarP2P(qtd, salaInfo)
   } else {
     socket.value = null
   }
 }
 
-function conectarP2P(qtd, salaId) {
+async function conectarP2P(qtd, salaId) {
   totalJogadores.value = qtd
   peers.value = []
   const signalingUrl = 'ws://localhost:3001'
   const tempPeers = []
   let readyCount = 0
 
+  const { default: P2PService } = await import('./p2pService.js')
+
   // Callback para quando receber dados de qualquer peer
   function onData(data, from) {
-    // Aqui você pode tratar as mensagens recebidas de outros jogadores
     console.log('Recebido de', from, data)
   }
 
@@ -85,10 +84,14 @@ function conectarP2P(qtd, salaId) {
 
 // Música de fundo
 const audio = ref(null)
+const audioSrc = ref(null)
 const volume = 0.3
 const aguardandoInteracao = ref(true)
 
 function iniciarMusica() {
+  if (!audioSrc.value) {
+    audioSrc.value = new URL('./assets/audio/elevator.mp3', import.meta.url).href
+  }
   if (audio.value) {
     audio.value.volume = volume
     audio.value.play()
@@ -128,7 +131,7 @@ onMounted(() => {
       />
     </main>
     <div class="player-musica" style="pointer-events: none; background: none; border: none; box-shadow: none; padding: 0; position: fixed; right: 0; bottom: 0; z-index: 0;">
-      <audio ref="audio" src="/src/assets/audio/elevator.mp3" loop />
+      <audio ref="audio" :src="audioSrc" preload="none" loop />
     </div>
   </div>
 </template>

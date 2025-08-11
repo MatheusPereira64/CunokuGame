@@ -27,9 +27,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import CunokuGame from '../components/Game/CunokuGameRefactored.vue'
-import FimDeJogo from '../components/FimDeJogo.vue'
+import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
+const CunokuGame = defineAsyncComponent(() => import('../components/Game/CunokuGameRefactored.vue'))
+const FimDeJogo = defineAsyncComponent(() => import('../components/FimDeJogo.vue'))
 const props = defineProps({
   numJogadores: Number,
   jogador: Object,

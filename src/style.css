@@ -64,6 +64,20 @@ body {
   overflow-x: hidden;
 }
 
+/* Evita baixar o SVG pesado em telas pequenas */
+@media (max-width: 768px) {
+  body {
+    background: 
+      var(--casino-gradient),
+      radial-gradient(circle at 20% 80%, rgba(220, 20, 60, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(212, 175, 55, 0.1) 0%, transparent 50%);
+    background-size: cover, 400px, 400px;
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    background-attachment: fixed;
+    background-position: center, top left, top right;
+  }
+}
+
 /* Efeito de padrão japonês sobreposto */
 body::before {
   content: '';
