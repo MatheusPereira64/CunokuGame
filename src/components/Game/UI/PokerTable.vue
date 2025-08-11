@@ -44,6 +44,9 @@
       
       <!-- Players ao redor da mesa -->
       <slot name="players"></slot>
+      <div v-if="gameState.reacaoAtiva" class="reaction-banner">
+        🃏 Reação aberta: descarte cartas de valor "{{ gameState.valorReacao }}"!
+      </div>
     </div>
   </div>
 </template>
@@ -64,6 +67,7 @@ export default {
     mapValorSvg(nome) {
       switch (nome) {
         case 'Ás': return 'A';
+        case 'Às': return 'A';
         case 'Dois': return '2';
         case 'Três': return '3';
         case 'Quatro': return '4';
@@ -74,8 +78,9 @@ export default {
         case 'Nove': return '9';
         case 'Dez': return '10';
         case 'Valete': return 'J';
-        case 'Dama': return 'Q';
+        case 'Rainha': return 'Q';
         case 'Rei': return 'K';
+        case 'Coringa': return 'C';
         default: return null;
       }
     },
@@ -137,6 +142,20 @@ export default {
   justify-content: center;
   margin: 2rem auto;
 }
+  .reaction-banner {
+    position: absolute;
+    bottom: -48px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #d4af37 0%, #ffd700 100%);
+    color: #0f3d2e;
+    padding: 0.5rem 1rem;
+    border-radius: 12px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+    border: 2px solid rgba(0,0,0,0.2);
+  }
 
 /* Tamanhos específicos baseados no número de jogadores */
 [data-player-count="2"] .poker-table {

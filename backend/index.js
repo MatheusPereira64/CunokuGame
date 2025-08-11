@@ -21,6 +21,9 @@ const infoBots = {};
 // Estrutura para memória dos bots por sala
 const memoriaBots = {};
 
+// Timers de reação por sala (descartes em cadeia do mesmo valor)
+const reacaoTimers = {};
+
 function criarBaralho(numJogadores = 4) {
   const VALORES_CARTAS = [
     { nome: 'Rei', valor: 0 },
@@ -123,12 +126,15 @@ io.on('connection', (socket) => {
       jogadorDaVez: 0,
       cartasPorJogador,
       jogoIniciado: true,
-      aguardandoAcao: null, // Adicionado para controlar ações pendentes
-      turnoAtual: 1, // NOVO: contador de turnos
-      fimDeclarado: false, // NOVO: se o fim foi declarado
-      jogadorDeclarouFim: null, // NOVO: quem declarou
-      turnosRestantesFim: null, // NOVO: turnos extras após declaração
-      resultadoFinal: null // NOVO: resultado do jogo
+      aguardandoAcao: null,
+      turnoAtual: 1,
+      fimDeclarado: false,
+      jogadorDeclarouFim: null,
+      jogadorDeclarouFimIdx: null,
+      passosRestantesAteDeclarador: null,
+      resultadoFinal: null,
+      reacaoAtiva: false,
+      valorReacao: null
     };
     io.to(sala).emit('jogo_iniciado');
     io.to(sala).emit('estado_jogo', estadoJogo[sala]);
@@ -141,29 +147,46 @@ io.on('connection', (socket) => {
     // Avança o jogador da vez
     estado.jogadorDaVez = (estado.jogadorDaVez + 1) % estado.players.length;
     
-    // Só conta turno quando o ciclo completa
+    // Incrementa contador de turnos quando volta para jogador 0
     if (estado.jogadorDaVez === 0) {
       estado.turnoAtual = (estado.turnoAtual || 1) + 1;
-      
-      // Se fim foi declarado, decrementa turnos restantes apenas quando completar um ciclo
-      if (estado.fimDeclarado && estado.turnosRestantesFim !== null) {
-        estado.turnosRestantesFim--;
-        console.log(`Turno completo! Turnos restantes: ${estado.turnosRestantesFim}`);
-        
-        if (estado.turnosRestantesFim <= 0) {
-          // Fim do jogo: revelar cartas e calcular vencedor
-          estado.jogoIniciado = false;
-          // Calcula soma das cartas de cada jogador
-          const somas = estado.players.map(p => ({ nome: p.nome, soma: p.mao.reduce((acc, c) => acc + (typeof c.valor === 'number' ? c.valor : 0), 0) }));
-          const menor = Math.min(...somas.map(s => s.soma));
-          const vencedores = somas.filter(s => s.soma === menor).map(s => s.nome);
-          estado.resultadoFinal = { somas, vencedores };
-          io.to(sala).emit('fim_de_jogo', estado.resultadoFinal);
-        }
+    }
+
+    // Se fim foi declarado, termina quando retornar ao jogador que declarou
+    if (estado.fimDeclarado && typeof estado.jogadorDeclarouFimIdx === 'number') {
+      if (estado.jogadorDaVez === estado.jogadorDeclarouFimIdx) {
+        estado.jogoIniciado = false;
+        const somas = estado.players.map(p => ({ nome: p.nome, soma: p.mao.reduce((acc, c) => acc + (typeof c.valor === 'number' ? c.valor : 0), 0) }));
+        const menor = Math.min(...somas.map(s => s.soma));
+        const vencedores = somas.filter(s => s.soma === menor).map(s => s.nome);
+        estado.resultadoFinal = { somas, vencedores };
+        io.to(sala).emit('fim_de_jogo', estado.resultadoFinal);
       }
     }
-    // Checa se é vez de bot após avançar (REMOVIDO)
-    // setTimeout(() => checarBotEVez(sala), 500);
+  }
+
+  function iniciarReacao(sala, valorCarta) {
+    const estado = estadoJogo[sala];
+    if (!estado) return;
+    // Inicia janela de reação por 2.5s para descartar o mesmo valor (independente do naipe)
+    estado.reacaoAtiva = true;
+    estado.valorReacao = valorCarta;
+    io.to(sala).emit('estado_jogo', estado);
+    // Limpa timer anterior, se existir
+    if (reacaoTimers[sala]) {
+      clearTimeout(reacaoTimers[sala]);
+    }
+    reacaoTimers[sala] = setTimeout(() => finalizarReacao(sala), 2500);
+  }
+
+  function finalizarReacao(sala) {
+    const estado = estadoJogo[sala];
+    if (!estado) return;
+    estado.reacaoAtiva = false;
+    estado.valorReacao = null;
+    // Avança turno após janela de reação
+    avancarTurno(estado, sala);
+    io.to(sala).emit('estado_jogo', estado);
   }
 
   socket.on('comprar_carta', ({ sala, jogador }) => {
@@ -200,9 +223,14 @@ io.on('connection', (socket) => {
           }
         });
       }
+      const valorDescartado = cartaDescartada?.nome;
       delete estado.aguardandoAcao;
-      avancarTurno(estado, sala);
-      io.to(sala).emit('estado_jogo', estado);
+      // Inicia janela de reação de descartes em cadeia
+      if (valorDescartado) iniciarReacao(sala, valorDescartado);
+      else {
+        avancarTurno(estado, sala);
+        io.to(sala).emit('estado_jogo', estado);
+      }
     }
   });
   socket.on('descartar_carta', ({ sala, jogador, carta }) => {
@@ -223,9 +251,13 @@ io.on('connection', (socket) => {
         }
       });
     }
+    const valorDescartado = estado.aguardandoAcao?.carta?.nome;
     delete estado.aguardandoAcao;
-    avancarTurno(estado, sala);
-    io.to(sala).emit('estado_jogo', estado);
+    if (valorDescartado) iniciarReacao(sala, valorDescartado);
+    else {
+      avancarTurno(estado, sala);
+      io.to(sala).emit('estado_jogo', estado);
+    }
   });
   socket.on('usar_habilidade', async ({ sala, jogador, carta, alvo, indiceAlvo, alvos, indicesAlvo }) => {
     const estado = estadoJogo[sala];
@@ -249,9 +281,8 @@ io.on('connection', (socket) => {
       const cartaVista = estado.players[idx].mao[indiceAlvo];
       socket.emit('carta_revelada', { carta: cartaVista, indice: indiceAlvo });
       estado.pilha.push(cartaUsada);
-      avancarTurno(estado, sala);
-      io.to(sala).emit('estado_jogo', estado);
       delete estado.aguardandoAcao;
+      iniciarReacao(sala, cartaUsada.nome);
       return;
     }
 
@@ -272,9 +303,8 @@ io.on('connection', (socket) => {
         salaMem[botNome].cartasOponentes[estado.players[alvo].nome][indiceAlvo] = { ...cartaVista };
       }
       estado.pilha.push(cartaUsada);
-      avancarTurno(estado, sala);
-      io.to(sala).emit('estado_jogo', estado);
       delete estado.aguardandoAcao;
+      iniciarReacao(sala, cartaUsada.nome);
       return;
     }
 
@@ -308,18 +338,16 @@ io.on('connection', (socket) => {
         jogadorB: estado.players[idxB].nome,
         cartaB: indicesAlvo[1]+1
       });
-      avancarTurno(estado, sala);
-      io.to(sala).emit('estado_jogo', estado);
       delete estado.aguardandoAcao;
+      iniciarReacao(sala, cartaUsada.nome);
       return;
     }
 
     // Outras habilidades serão implementadas aqui...
 
     estado.pilha.push(cartaUsada);
-    avancarTurno(estado, sala);
-    io.to(sala).emit('estado_jogo', estado);
     delete estado.aguardandoAcao;
+    iniciarReacao(sala, cartaUsada.nome);
   });
 
   socket.on('tentar_descarte', ({ sala, jogador, indice, indice1, indice2 }) => {
@@ -337,7 +365,7 @@ io.on('connection', (socket) => {
         mao.splice(indice, 1);
         estado.pilha.push(carta);
         io.to(sala).emit('mensagem', { tipo: 'descarte_correto', jogador, carta: carta.nome });
-        io.to(sala).emit('estado_jogo', estado);
+        iniciarReacao(sala, carta.nome);
         return;
       } else {
         // Punição: compra 2 cartas
@@ -371,6 +399,7 @@ io.on('connection', (socket) => {
         }
         estado.pilha.push(carta1, carta2);
         io.to(sala).emit('mensagem', { tipo: 'descarte_correto', jogador, carta: carta1.nome });
+        iniciarReacao(sala, carta1.nome);
       } else {
         // Errou: compra 2 cartas se houver
         for (let i = 0; i < 2; i++) {
@@ -388,13 +417,32 @@ io.on('connection', (socket) => {
   socket.on('declarar_fim_de_jogo', ({ sala, jogador }) => {
     const estado = estadoJogo[sala];
     if (!estado || !estado.jogoIniciado) return;
-    // REGRA: Só pode declarar a partir do 5º turno, independente do número de jogadores
-    if (estado.turnoAtual < 5) return; // Só pode declarar a partir do 5º turno
-    if (estado.fimDeclarado) return; // Só pode declarar uma vez
+    // REGRA: Só pode declarar a partir do 5º turno
+    if (estado.turnoAtual < 5) return;
+    if (estado.fimDeclarado) return;
+    const declaradorIdx = estado.players.findIndex(p => p.nome === jogador);
+    if (declaradorIdx === -1) return;
     estado.fimDeclarado = true;
     estado.jogadorDeclarouFim = jogador;
-    estado.turnosRestantesFim = 2; // 2 turnos completos
+    estado.jogadorDeclarouFimIdx = declaradorIdx;
     io.to(sala).emit('mensagem', { tipo: 'fim_declarado', jogador });
+    io.to(sala).emit('estado_jogo', estado);
+  });
+
+  // Reação: descartar carta do mesmo valor durante janela de reação
+  socket.on('reagir_descartar_mesmo_valor', ({ sala, jogador, indice }) => {
+    const estado = estadoJogo[sala];
+    if (!estado || !estado.jogoIniciado) return;
+    if (!estado.reacaoAtiva || !estado.valorReacao) return;
+    const idx = estado.players.findIndex(p => p.nome === jogador);
+    if (idx === -1) return;
+    const mao = estado.players[idx].mao;
+    if (typeof indice !== 'number' || indice < 0 || indice >= mao.length) return;
+    const carta = mao[indice];
+    if (!carta || carta.nome !== estado.valorReacao) return;
+    // Descarte de reação válido
+    mao.splice(indice, 1);
+    estado.pilha.push(carta);
     io.to(sala).emit('estado_jogo', estado);
   });
 

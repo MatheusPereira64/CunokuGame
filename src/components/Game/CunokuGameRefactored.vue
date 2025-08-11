@@ -26,7 +26,10 @@
             :playerHand="idx === meuIndice ? maoReal : []"
             :revealedCards="cartasReveladas"
             :canDiscard="indiceDescarteTentativa === null"
+            :reactionActive="estado.reacaoAtiva"
+            :reactionValue="estado.valorReacao"
             @try-discard="tentarDescarte"
+            @react-discard="reagirDescartar"
           />
         </template>
       </PokerTable>
@@ -78,7 +81,7 @@
 </template>
 
 <script>
-import { defineComponent } from 'vue'
+import { defineComponent, watch, onMounted, onBeforeUnmount } from 'vue'
 import { t } from '../../i18n/index.js'
 import { useGameLogic } from './Logic/useGameLogic.js'
 import PokerTable from './UI/PokerTable.vue'
@@ -125,6 +128,73 @@ export default defineComponent({
         }, 1000)
       }
     }
+
+    // Sincronizar estado vindo do pai/servidor (online)
+    watch(() => props.estadoInicial, (novo) => {
+      if (novo) {
+        gameLogic.estado.value = novo
+        // Calcula meuIndice com base no nome do jogador atual
+        if (props.jogador?.nome && Array.isArray(novo.players)) {
+          const idx = novo.players.findIndex(p => p?.nome === props.jogador.nome)
+          if (idx !== -1) gameLogic.meuIndice.value = idx
+        }
+      }
+    }, { immediate: true })
+
+    // Listeners de socket (modo online) para fluxos guiados pelo servidor
+    onMounted(() => {
+      if (props.socket) {
+        const s = props.socket
+        s.on('mensagem', (msg) => {
+          if (msg?.tipo === 'fim_declarado') {
+            gameLogic.showMessage(`Fim declarado por ${msg.jogador}`)
+          } else if (msg?.tipo === 'descarte_correto') {
+            gameLogic.showMessage(`${msg.jogador} descartou ${msg.carta}`)
+          } else if (msg?.tipo === 'descarte_errado') {
+            gameLogic.showMessage(`${msg.jogador} errou o descarte e comprou 2 cartas`)
+          } else if (msg?.tipo === 'troca_cartas') {
+            gameLogic.showMessage(`${msg.jogador} trocou carta ${msg.cartaA} de ${msg.jogadorA} com carta ${msg.cartaB} de ${msg.jogadorB}`)
+          }
+        })
+        s.on('escolher_carta_propria', ({ max }) => {
+          gameLogic.escolhendoCartaPropria.value = true
+          gameLogic.escolhendoCartaOponente.value = false
+          gameLogic.escolhendoTroca.value = false
+        })
+        s.on('escolher_carta_oponente', ({ oponentes }) => {
+          gameLogic.escolhendoCartaPropria.value = false
+          gameLogic.escolhendoCartaOponente.value = true
+          gameLogic.escolhendoTroca.value = false
+        })
+        s.on('escolher_jogadores_troca', ({ jogadores }) => {
+          gameLogic.escolhendoCartaPropria.value = false
+          gameLogic.escolhendoCartaOponente.value = false
+          gameLogic.escolhendoTroca.value = true
+        })
+        s.on('carta_revelada', ({ carta, indice, oponente }) => {
+          if (typeof indice === 'number') {
+            // Revela temporariamente carta própria
+            gameLogic.cartasReveladas.value.push({ idx: indice, carta })
+            setTimeout(() => {
+              gameLogic.cartasReveladas.value = gameLogic.cartasReveladas.value.filter(c => c.idx !== indice)
+            }, 5000)
+          }
+          if (oponente) {
+            gameLogic.showMessage(`Carta de ${oponente}: ${carta?.nome ?? ''}`)
+          }
+        })
+      }
+    })
+    onBeforeUnmount(() => {
+      if (props.socket) {
+        const s = props.socket
+        s.off('mensagem')
+        s.off('escolher_carta_propria')
+        s.off('escolher_carta_oponente')
+        s.off('escolher_jogadores_troca')
+        s.off('carta_revelada')
+      }
+    })
     
     // Métodos principais do jogo
     const comprarCarta = () => {
@@ -137,7 +207,7 @@ export default defineComponent({
         gameLogic.escolhendoAcao.value = true
       } else {
         // Lógica online
-        props.socket?.emit('comprar-carta', { roomId: props.roomId })
+        props.socket?.emit('comprar_carta', { sala: props.sala, jogador: props.jogador?.nome })
       }
     }
     
@@ -163,9 +233,11 @@ export default defineComponent({
           gameLogic.showMessage('Descarte realizado com sucesso!')
         } else {
           // Lógica online
-          props.socket?.emit('tentar-descarte', {
-            roomId: props.roomId,
-            indices: [gameLogic.indiceDescarteTentativa.value, idx2]
+          props.socket?.emit('tentar_descarte', {
+            sala: props.sala,
+            jogador: props.jogador?.nome,
+            indice1: gameLogic.indiceDescarteTentativa.value,
+            indice2: idx2
           })
         }
       } else {
@@ -193,8 +265,9 @@ export default defineComponent({
         gameLogic.avancarTurnoLocal()
       } else {
         // Lógica online
-        props.socket?.emit('substituir-carta', {
-          roomId: props.roomId,
+        props.socket?.emit('substituir_carta', {
+          sala: props.sala,
+          jogador: props.jogador?.nome,
           indice: idx
         })
         gameLogic.resetGameState()
@@ -214,7 +287,7 @@ export default defineComponent({
         gameLogic.avancarTurnoLocal()
       } else {
         // Lógica online
-        props.socket?.emit('descartar-carta-comprada', { roomId: props.roomId })
+        props.socket?.emit('descartar_carta', { sala: props.sala, jogador: props.jogador?.nome })
         gameLogic.resetGameState()
       }
     }
@@ -245,7 +318,7 @@ export default defineComponent({
         gameLogic.showMessage('Fim de jogo declarado! Restam 2 turnos completos.')
       } else {
         // Lógica online
-        props.socket?.emit('declarar-fim', { roomId: props.roomId })
+        props.socket?.emit('declarar_fim_de_jogo', { sala: props.sala, jogador: props.jogador?.nome })
       }
     }
     
@@ -339,6 +412,13 @@ export default defineComponent({
     const cancelarHabilidade = () => {
       gameLogic.resetGameState()
     }
+
+    const reagirDescartar = (idx) => {
+      // Reação apenas online
+      if (!gameLogic.modoOffline.value && props.socket && props.sala && typeof idx === 'number') {
+        props.socket.emit('reagir_descartar_mesmo_valor', { sala: props.sala, jogador: props.jogador?.nome, indice: idx })
+      }
+    }
     
     return {
       // Estado
@@ -358,7 +438,8 @@ export default defineComponent({
       declararFimDeJogo,
       getAbilityType,
       handleAbilityAction,
-      cancelarHabilidade
+      cancelarHabilidade,
+      reagirDescartar
     }
   }
 })

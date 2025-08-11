@@ -158,6 +158,13 @@ onMounted(() => {
       estadoJogo.value = estado
       jogoIniciado.value = true
     })
+    // Recebe resultado final do servidor e exibe tela de fim de jogo
+    props.socket.on('fim_de_jogo', (resultado) => {
+      // Garante lista de jogadores para exibição das mãos finais
+      const jogadores = estadoJogo.value?.players || []
+      resultadoFinal.value = { ...resultado, jogadores }
+      fimDeJogo.value = true
+    })
     // Também ouve o evento de início do jogo (caso queira mostrar animação, etc)
     props.socket.on('jogo_iniciado', () => {
       jogoIniciado.value = true

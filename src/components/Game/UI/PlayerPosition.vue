@@ -37,6 +37,10 @@
                   class="discard-btn" @click="$emit('try-discard', cardIdx)">
             Descartar
           </button>
+          <button v-if="reactionActive && isCurrentUser && carta && carta.nome === reactionValue"
+                  class="react-btn" @click="$emit('react-discard', cardIdx)">
+            Reagir
+          </button>
         </div>
       </div>
       <div v-else class="opponent-hand">
@@ -89,9 +93,17 @@ export default {
     canDiscard: {
       type: Boolean,
       default: false
+    },
+    reactionActive: {
+      type: Boolean,
+      default: false
+    },
+    reactionValue: {
+      type: String,
+      default: null
     }
   },
-  emits: ['try-discard'],
+  emits: ['try-discard', 'react-discard'],
   computed: {
     position() {
       // Determina a posição do jogador ao redor da mesa oval
@@ -118,6 +130,7 @@ export default {
     mapValorSvg(nome) {
       switch (nome) {
         case 'Ás': return 'A';
+        case 'Às': return 'A';
         case 'Dois': return '2';
         case 'Três': return '3';
         case 'Quatro': return '4';
@@ -128,8 +141,9 @@ export default {
         case 'Nove': return '9';
         case 'Dez': return '10';
         case 'Valete': return 'J';
-        case 'Dama': return 'Q';
+        case 'Rainha': return 'Q';
         case 'Rei': return 'K';
+        case 'Coringa': return 'C';
         default: return null;
       }
     },

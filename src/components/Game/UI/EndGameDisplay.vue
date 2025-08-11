@@ -94,6 +94,7 @@ export default {
     mapValorSvg(nome) {
       switch (nome) {
         case 'Ás': return 'A'
+        case 'Às': return 'A'
         case 'Dois': return '2'
         case 'Três': return '3'
         case 'Quatro': return '4'
@@ -104,8 +105,9 @@ export default {
         case 'Nove': return '9'
         case 'Dez': return '10'
         case 'Valete': return 'J'
-        case 'Dama': return 'Q'
+        case 'Rainha': return 'Q'
         case 'Rei': return 'K'
+        case 'Coringa': return 'C'
         default: return null
       }
     },
