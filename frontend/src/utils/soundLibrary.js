@@ -164,7 +164,7 @@ export const SOUNDS = {
 
   // Músicas de fundo
   BACKGROUND_MUSIC: {
-    src: new URL('../assets/audio/elevator.mp3', import.meta.url).href,
+    src: new URL('../../assets/audio/elevator.mp3', import.meta.url).href,
     volume: 0.3,
     type: 'music',
     description: 'Música de fundo principal'

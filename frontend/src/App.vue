@@ -214,9 +214,24 @@ onMounted(async () => {
   // Preload de sons críticos
   await preloadSounds(CRITICAL_SOUNDS)
   
-  // Toca a música na primeira interação do usuário
-  window.addEventListener('click', iniciarMusica, { once: true })
-  window.addEventListener('touchstart', iniciarMusica, { once: true })
+  // Tentar tocar música automaticamente (alguns navegadores permitem)
+  try {
+    const musicStarted = await playMusic('BACKGROUND_MUSIC', { volume: 0.3 })
+    if (musicStarted) {
+      aguardandoInteracao.value = false
+      console.log('Música iniciada automaticamente')
+    } else {
+      console.log('Música requer interação do usuário')
+      // Toca a música na primeira interação do usuário
+      window.addEventListener('click', iniciarMusica, { once: true })
+      window.addEventListener('touchstart', iniciarMusica, { once: true })
+    }
+  } catch (error) {
+    console.log('Música requer interação do usuário:', error)
+    // Toca a música na primeira interação do usuário
+    window.addEventListener('click', iniciarMusica, { once: true })
+    window.addEventListener('touchstart', iniciarMusica, { once: true })
+  }
   
   // Inicializar sistema de conquistas
   initAchievements()
