@@ -157,7 +157,7 @@ watch(modoEscolhido, (novo) => {
   position: relative;
   background: 
     linear-gradient(135deg, var(--deep-red) 0%, var(--japanese-black) 50%, var(--dark-navy) 100%),
-    url('@/assets/bg/samurais.png') no-repeat center center;
+    url('../../assets/bg/samurais.png') no-repeat center center;
   background-size: cover, contain;
   background-attachment: fixed;
   display: flex;

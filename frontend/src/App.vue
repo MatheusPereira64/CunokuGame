@@ -90,7 +90,7 @@ const aguardandoInteracao = ref(true)
 
 function iniciarMusica() {
   if (!audioSrc.value) {
-    audioSrc.value = new URL('./assets/audio/elevator.mp3', import.meta.url).href
+    audioSrc.value = new URL('../assets/audio/elevator.mp3', import.meta.url).href
   }
   if (audio.value) {
     audio.value.volume = volume

@@ -55,7 +55,7 @@ body {
     var(--casino-gradient),
     radial-gradient(circle at 20% 80%, rgba(220, 20, 60, 0.1) 0%, transparent 50%),
     radial-gradient(circle at 80% 20%, rgba(212, 175, 55, 0.1) 0%, transparent 50%),
-    url('./assets/bg/seigaiha.svg');
+    url('../assets/bg/seigaiha.svg');
   background-size: cover, 400px, 400px, 200px;
   background-repeat: no-repeat, no-repeat, no-repeat, repeat;
   background-attachment: fixed;
