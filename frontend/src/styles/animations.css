@@ -1,0 +1,480 @@
+/* Animações estilo Flash Game */
+
+/* Bounce exagerado para elementos importantes */
+@keyframes flash-bounce {
+  0%, 100% { 
+    transform: scale(1); 
+  }
+  50% { 
+    transform: scale(1.15); 
+  }
+}
+
+/* Glow pulsante dramático */
+@keyframes flash-glow {
+  0%, 100% { 
+    box-shadow: 
+      0 0 10px rgba(212, 175, 55, 0.5),
+      0 0 20px rgba(212, 175, 55, 0.3),
+      0 0 30px rgba(212, 175, 55, 0.1);
+  }
+  50% { 
+    box-shadow: 
+      0 0 20px rgba(212, 175, 55, 1),
+      0 0 40px rgba(212, 175, 55, 0.8),
+      0 0 60px rgba(212, 175, 55, 0.6);
+  }
+}
+
+/* Slide in dramático */
+@keyframes flash-slide-in {
+  from {
+    transform: translateY(-100px) scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Slide out para saída */
+@keyframes flash-slide-out {
+  from {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100px) scale(0.8);
+    opacity: 0;
+  }
+}
+
+/* Rotação com escala */
+@keyframes flash-spin-scale {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+/* Pulsação rápida */
+@keyframes flash-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* Shake horizontal */
+@keyframes flash-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+/* Shake vertical */
+@keyframes flash-shake-vertical {
+  0%, 100% { transform: translateY(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateY(-3px); }
+  20%, 40%, 60%, 80% { transform: translateY(3px); }
+}
+
+/* Zoom in com fade */
+@keyframes flash-zoom-in {
+  from {
+    transform: scale(0) rotate(180deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+/* Zoom out com fade */
+@keyframes flash-zoom-out {
+  from {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+}
+
+/* Bounce com rotação */
+@keyframes flash-bounce-rotate {
+  0% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-20px) rotate(90deg);
+  }
+  50% {
+    transform: translateY(0) rotate(180deg);
+  }
+  75% {
+    transform: translateY(-10px) rotate(270deg);
+  }
+  100% {
+    transform: translateY(0) rotate(360deg);
+  }
+}
+
+/* Efeito de onda */
+@keyframes flash-wave {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.7);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(212, 175, 55, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(212, 175, 55, 0);
+  }
+}
+
+/* Fade in com slide */
+@keyframes flash-fade-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Efeito de brilho deslizante */
+@keyframes flash-shine {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Rotação contínua */
+@keyframes flash-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pulsação com cor */
+@keyframes flash-color-pulse {
+  0%, 100% {
+    background-color: var(--primary-gold);
+    transform: scale(1);
+  }
+  50% {
+    background-color: var(--secondary-gold);
+    transform: scale(1.1);
+  }
+}
+
+/* Efeito de explosão */
+@keyframes flash-explosion {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* Efeito de estrela */
+@keyframes flash-star {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  25% {
+    transform: scale(1.2) rotate(90deg);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1) rotate(180deg);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(1.2) rotate(270deg);
+    opacity: 0.8;
+  }
+}
+
+/* Efeito de respiração */
+@keyframes flash-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+/* Efeito de flutuação */
+@keyframes flash-float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Efeito de zoom com bounce */
+@keyframes flash-zoom-bounce {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Efeito de deslizar da esquerda */
+@keyframes flash-slide-left {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Efeito de deslizar da direita */
+@keyframes flash-slide-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Efeito de deslizar de baixo */
+@keyframes flash-slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Efeito de deslizar para baixo */
+@keyframes flash-slide-down {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Classes utilitárias para aplicar animações */
+.flash-bounce {
+  animation: flash-bounce 0.6s ease-in-out;
+}
+
+.flash-glow {
+  animation: flash-glow 2s ease-in-out infinite;
+}
+
+.flash-slide-in {
+  animation: flash-slide-in 0.5s ease-out;
+}
+
+.flash-slide-out {
+  animation: flash-slide-out 0.3s ease-in;
+}
+
+.flash-spin-scale {
+  animation: flash-spin-scale 1s ease-in-out;
+}
+
+.flash-pulse {
+  animation: flash-pulse 1s ease-in-out infinite;
+}
+
+.flash-shake {
+  animation: flash-shake 0.5s ease-in-out;
+}
+
+.flash-shake-vertical {
+  animation: flash-shake-vertical 0.5s ease-in-out;
+}
+
+.flash-zoom-in {
+  animation: flash-zoom-in 0.4s ease-out;
+}
+
+.flash-zoom-out {
+  animation: flash-zoom-out 0.3s ease-in;
+}
+
+.flash-bounce-rotate {
+  animation: flash-bounce-rotate 1s ease-in-out;
+}
+
+.flash-wave {
+  animation: flash-wave 1s ease-out;
+}
+
+.flash-fade-slide {
+  animation: flash-fade-slide 0.5s ease-out;
+}
+
+.flash-rotate {
+  animation: flash-rotate 2s linear infinite;
+}
+
+.flash-color-pulse {
+  animation: flash-color-pulse 1s ease-in-out infinite;
+}
+
+.flash-explosion {
+  animation: flash-explosion 0.6s ease-out;
+}
+
+.flash-star {
+  animation: flash-star 1s ease-in-out;
+}
+
+.flash-breathe {
+  animation: flash-breathe 3s ease-in-out infinite;
+}
+
+.flash-float {
+  animation: flash-float 2s ease-in-out infinite;
+}
+
+.flash-zoom-bounce {
+  animation: flash-zoom-bounce 0.6s ease-out;
+}
+
+.flash-slide-left {
+  animation: flash-slide-left 0.5s ease-out;
+}
+
+.flash-slide-right {
+  animation: flash-slide-right 0.5s ease-out;
+}
+
+.flash-slide-up {
+  animation: flash-slide-up 0.5s ease-out;
+}
+
+.flash-slide-down {
+  animation: flash-slide-down 0.5s ease-out;
+}
+
+/* Efeito de brilho deslizante para botões */
+.flash-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.flash-shine::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  animation: flash-shine 2s ease-in-out infinite;
+}
+
+/* Hover effects exagerados */
+.flash-hover-scale:hover {
+  transform: scale(1.1);
+  transition: transform 0.2s ease;
+}
+
+.flash-hover-glow:hover {
+  box-shadow: 
+    0 0 20px rgba(212, 175, 55, 0.6),
+    0 0 40px rgba(212, 175, 55, 0.4);
+  transition: box-shadow 0.3s ease;
+}
+
+.flash-hover-rotate:hover {
+  transform: rotate(5deg) scale(1.05);
+  transition: transform 0.3s ease;
+}
+
+/* Efeitos de loading */
+.flash-loading {
+  animation: flash-rotate 1s linear infinite;
+}
+
+.flash-loading-dots::after {
+  content: '';
+  animation: flash-pulse 1.5s ease-in-out infinite;
+}
+
+/* Efeitos de transição entre páginas */
+.flash-page-enter {
+  animation: flash-slide-in 0.5s ease-out;
+}
+
+.flash-page-leave {
+  animation: flash-slide-out 0.3s ease-in;
+}
+
+/* Efeitos de notificação */
+.flash-notification {
+  animation: flash-slide-right 0.4s ease-out;
+}
+
+.flash-notification-remove {
+  animation: flash-slide-right 0.3s ease-in reverse;
+}

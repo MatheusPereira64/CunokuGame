@@ -1,7 +1,28 @@
 <template>
-  <div class="ability-interface">
+  <div class="ability-interface" :class="`ability-${type}`">
+    <!-- Efeitos de fundo específicos por habilidade -->
+    <div class="ability-background-effects">
+      <div v-if="type === 'own-card'" class="eye-effect">
+        <div class="eye-pupil"></div>
+        <div class="eye-lid"></div>
+      </div>
+      <div v-if="type === 'opponent-card'" class="spy-effect">
+        <div class="spy-glass"></div>
+        <div class="spy-light"></div>
+      </div>
+      <div v-if="type === 'swap-cards'" class="swap-effect">
+        <div class="swap-arrows">
+          <div class="arrow-left">↔</div>
+          <div class="arrow-right">↔</div>
+        </div>
+      </div>
+    </div>
+    
     <div class="ability-panel">
-      <h4>{{ getTitle() }}</h4>
+      <div class="ability-header">
+        <div class="ability-icon">{{ getIcon() }}</div>
+        <h4>{{ getTitle() }}</h4>
+      </div>
       <p>{{ getDescription() }}</p>
       
       <!-- Interface para ver carta própria -->
@@ -172,14 +193,26 @@ export default {
     }
   },
   methods: {
+    getIcon() {
+      switch (this.type) {
+        case 'own-card':
+          return '👁️'
+        case 'opponent-card':
+          return '🔍'
+        case 'swap-cards':
+          return '🔄'
+        default:
+          return '✨'
+      }
+    },
     getTitle() {
       switch (this.type) {
         case 'own-card':
-          return '👁️ Ver Carta Própria'
+          return 'Ver Carta Própria'
         case 'opponent-card':
-          return '🔍 Ver Carta do Oponente'
+          return 'Ver Carta do Oponente'
         case 'swap-cards':
-          return '🔄 Trocar Cartas'
+          return 'Trocar Cartas'
         default:
           return 'Habilidade'
       }
@@ -255,6 +288,202 @@ export default {
   max-width: 90vw;
   max-height: 90vh;
   overflow-y: auto;
+  position: relative;
+  animation: ability-enter 0.5s ease-out;
+}
+
+@keyframes ability-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Efeitos de fundo específicos por habilidade */
+.ability-background-effects {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 25px;
+  overflow: hidden;
+}
+
+/* Efeito para Ver Carta Própria */
+.ability-own-card {
+  border-color: #4169e1;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(65, 105, 225, 0.3);
+}
+
+.eye-effect {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 200px;
+  height: 200px;
+  opacity: 0.1;
+}
+
+.eye-pupil {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle, #4169e1 0%, #1e3a8a 100%);
+  border-radius: 50%;
+  animation: eye-blink 3s ease-in-out infinite;
+}
+
+.eye-lid {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+  height: 60px;
+  background: linear-gradient(45deg, #4169e1 0%, transparent 100%);
+  border-radius: 50%;
+  animation: eye-lid-move 3s ease-in-out infinite;
+}
+
+@keyframes eye-blink {
+  0%, 90%, 100% { transform: translate(-50%, -50%) scaleY(1); }
+  95% { transform: translate(-50%, -50%) scaleY(0.1); }
+}
+
+@keyframes eye-lid-move {
+  0%, 90%, 100% { transform: translate(-50%, -50%) scaleY(1); }
+  95% { transform: translate(-50%, -50%) scaleY(0.1); }
+}
+
+/* Efeito para Ver Carta do Oponente */
+.ability-opponent-card {
+  border-color: #dc2626;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(220, 38, 38, 0.3);
+}
+
+.spy-effect {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 100px;
+  height: 100px;
+  opacity: 0.2;
+}
+
+.spy-glass {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100px;
+  height: 100px;
+  border: 3px solid #dc2626;
+  border-radius: 50%;
+  animation: spy-scan 2s ease-in-out infinite;
+}
+
+.spy-light {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  background: #dc2626;
+  border-radius: 50%;
+  animation: spy-light-move 2s ease-in-out infinite;
+}
+
+@keyframes spy-scan {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(180deg); }
+}
+
+@keyframes spy-light-move {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.5); }
+}
+
+/* Efeito para Trocar Cartas */
+.ability-swap-cards {
+  border-color: #10b981;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(16, 185, 129, 0.3);
+}
+
+.swap-effect {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 300px;
+  height: 100px;
+  opacity: 0.1;
+}
+
+.swap-arrows {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.arrow-left, .arrow-right {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 3rem;
+  color: #10b981;
+  animation: swap-arrow-move 1.5s ease-in-out infinite;
+}
+
+.arrow-left {
+  left: 20px;
+  animation-delay: 0s;
+}
+
+.arrow-right {
+  right: 20px;
+  animation-delay: 0.75s;
+}
+
+@keyframes swap-arrow-move {
+  0%, 100% { transform: translateY(-50%) scale(1); }
+  50% { transform: translateY(-50%) scale(1.2); }
+}
+
+/* Header da habilidade */
+.ability-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  z-index: 2;
+  position: relative;
+}
+
+.ability-icon {
+  font-size: 2rem;
+  animation: ability-icon-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ability-icon-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
 }
 
 .ability-panel {
@@ -300,10 +529,15 @@ export default {
   transition: all 0.3s ease;
   background: none;
   border: none;
+  z-index: 2;
 }
 
 .hand-card:hover {
-  transform: translateY(-8px);
+  transform: translateY(-8px) scale(1.05);
+}
+
+.hand-card:active {
+  transform: translateY(-4px) scale(0.95);
 }
 
 .card-back {
@@ -420,13 +654,41 @@ export default {
   cursor: pointer;
   transition: all 0.3s ease;
   font-weight: bold;
+  position: relative;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.player-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.player-btn:hover::before {
+  left: 100%;
 }
 
 .player-btn:hover {
   border-color: #d4af37;
   background: 
     linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.1) 100%);
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.3);
+}
+
+.player-btn:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .ability-actions {

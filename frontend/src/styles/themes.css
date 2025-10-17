@@ -1,0 +1,233 @@
+/* Sistema de Temas para Cunoku Game */
+
+/* Tema 1: Clássico (Padrão) */
+:root {
+  --theme-name: 'classic';
+  --primary-gold: #D4AF37;
+  --secondary-gold: #B8860B;
+  --accent-red: #DC143C;
+  --japanese-black: #1A1A1A;
+  --pearl-white: #F8F8FF;
+  --card-bg: #2A2A2A;
+  --card-border: #D4AF37;
+  --text-primary: #F8F8FF;
+  --text-secondary: #B8860B;
+  --bg-primary: #1A1A1A;
+  --bg-secondary: #2A2A2A;
+  --bg-gradient: linear-gradient(135deg, #1A1A1A 0%, #2A2A2A 100%);
+  --card-gradient: linear-gradient(135deg, #2A2A2A 0%, #1A1A1A 100%);
+  --gold-gradient: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%);
+  --shadow-color: rgba(0, 0, 0, 0.6);
+  --glow-color: rgba(212, 175, 55, 0.3);
+}
+
+/* Tema 2: Neon */
+.theme-neon {
+  --theme-name: 'neon';
+  --primary-gold: #00FF00;
+  --secondary-gold: #00CC00;
+  --accent-red: #FF0080;
+  --japanese-black: #000000;
+  --pearl-white: #FFFFFF;
+  --card-bg: #001100;
+  --card-border: #00FF00;
+  --text-primary: #FFFFFF;
+  --text-secondary: #00FF00;
+  --bg-primary: #000000;
+  --bg-secondary: #001100;
+  --bg-gradient: linear-gradient(135deg, #000000 0%, #001100 100%);
+  --card-gradient: linear-gradient(135deg, #001100 0%, #000000 100%);
+  --gold-gradient: linear-gradient(135deg, #00FF00 0%, #00CC00 100%);
+  --shadow-color: rgba(0, 255, 0, 0.3);
+  --glow-color: rgba(0, 255, 0, 0.5);
+}
+
+.theme-neon .flash-glow-pulse {
+  animation: neon-glow 2s ease-in-out infinite alternate;
+}
+
+.theme-neon .flash-text-glow {
+  text-shadow: 0 0 10px var(--primary-gold), 0 0 20px var(--primary-gold), 0 0 30px var(--primary-gold);
+}
+
+@keyframes neon-glow {
+  0% {
+    box-shadow: 0 0 5px var(--glow-color), 0 0 10px var(--glow-color), 0 0 15px var(--glow-color);
+  }
+  100% {
+    box-shadow: 0 0 10px var(--glow-color), 0 0 20px var(--glow-color), 0 0 30px var(--glow-color);
+  }
+}
+
+/* Tema 3: Dark Mode */
+.theme-dark {
+  --theme-name: 'dark';
+  --primary-gold: #4169E1;
+  --secondary-gold: #1E90FF;
+  --accent-red: #FF6B6B;
+  --japanese-black: #0A0A0A;
+  --pearl-white: #E0E0E0;
+  --card-bg: #1A1A2E;
+  --card-border: #4169E1;
+  --text-primary: #E0E0E0;
+  --text-secondary: #1E90FF;
+  --bg-primary: #0A0A0A;
+  --bg-secondary: #1A1A2E;
+  --bg-gradient: linear-gradient(135deg, #0A0A0A 0%, #1A1A2E 100%);
+  --card-gradient: linear-gradient(135deg, #1A1A2E 0%, #0A0A0A 100%);
+  --gold-gradient: linear-gradient(135deg, #4169E1 0%, #1E90FF 100%);
+  --shadow-color: rgba(65, 105, 225, 0.3);
+  --glow-color: rgba(65, 105, 225, 0.4);
+}
+
+.theme-dark .flash-glow-pulse {
+  animation: dark-glow 2s ease-in-out infinite alternate;
+}
+
+.theme-dark .flash-text-glow {
+  text-shadow: 0 0 10px var(--primary-gold), 0 0 20px var(--primary-gold);
+}
+
+@keyframes dark-glow {
+  0% {
+    box-shadow: 0 0 5px var(--glow-color), 0 0 10px var(--glow-color);
+  }
+  100% {
+    box-shadow: 0 0 15px var(--glow-color), 0 0 25px var(--glow-color);
+  }
+}
+
+/* Tema 4: Sakura */
+.theme-sakura {
+  --theme-name: 'sakura';
+  --primary-gold: #FFB6C1;
+  --secondary-gold: #FF69B4;
+  --accent-red: #DC143C;
+  --japanese-black: #2F1B14;
+  --pearl-white: #FFF8DC;
+  --card-bg: #FFE4E1;
+  --card-border: #FFB6C1;
+  --text-primary: #2F1B14;
+  --text-secondary: #FF69B4;
+  --bg-primary: #2F1B14;
+  --bg-secondary: #FFE4E1;
+  --bg-gradient: linear-gradient(135deg, #2F1B14 0%, #FFE4E1 100%);
+  --card-gradient: linear-gradient(135deg, #FFE4E1 0%, #FFB6C1 100%);
+  --gold-gradient: linear-gradient(135deg, #FFB6C1 0%, #FF69B4 100%);
+  --shadow-color: rgba(255, 182, 193, 0.3);
+  --glow-color: rgba(255, 182, 193, 0.4);
+}
+
+.theme-sakura .flash-glow-pulse {
+  animation: sakura-glow 2s ease-in-out infinite alternate;
+}
+
+.theme-sakura .flash-text-glow {
+  text-shadow: 0 0 10px var(--primary-gold), 0 0 20px var(--primary-gold);
+}
+
+.theme-sakura .achievement-notification {
+  background: linear-gradient(135deg, #FFE4E1 0%, #FFB6C1 100%);
+  color: var(--text-primary);
+}
+
+.theme-sakura .achievement-notification .achievement-title {
+  color: var(--text-secondary);
+}
+
+.theme-sakura .achievement-notification .achievement-name {
+  color: var(--text-primary);
+}
+
+.theme-sakura .achievement-notification .achievement-description {
+  color: rgba(47, 27, 20, 0.8);
+}
+
+@keyframes sakura-glow {
+  0% {
+    box-shadow: 0 0 5px var(--glow-color), 0 0 10px var(--glow-color);
+  }
+  100% {
+    box-shadow: 0 0 15px var(--glow-color), 0 0 25px var(--glow-color);
+  }
+}
+
+/* Efeitos específicos por tema */
+.theme-neon .menu button:hover {
+  box-shadow: 0 0 20px var(--primary-gold), 0 0 40px var(--primary-gold);
+}
+
+.theme-dark .menu button:hover {
+  box-shadow: 0 0 15px var(--primary-gold), 0 0 30px var(--primary-gold);
+}
+
+.theme-sakura .menu button:hover {
+  box-shadow: 0 0 15px var(--primary-gold), 0 0 30px var(--primary-gold);
+}
+
+/* Transições suaves entre temas */
+* {
+  transition: 
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    text-shadow 0.3s ease;
+}
+
+/* Aplicar tema ao body */
+body.theme-neon {
+  background: var(--bg-gradient);
+}
+
+body.theme-dark {
+  background: var(--bg-gradient);
+}
+
+body.theme-sakura {
+  background: var(--bg-gradient);
+}
+
+/* Efeitos de partículas por tema */
+.theme-neon .particle {
+  background: var(--primary-gold);
+  box-shadow: 0 0 10px var(--primary-gold);
+}
+
+.theme-dark .particle {
+  background: var(--primary-gold);
+  box-shadow: 0 0 10px var(--primary-gold);
+}
+
+.theme-sakura .particle {
+  background: var(--primary-gold);
+  box-shadow: 0 0 10px var(--primary-gold);
+}
+
+/* Efeitos de confetti por tema */
+.theme-neon .confetti-piece {
+  background: var(--primary-gold);
+}
+
+.theme-dark .confetti-piece {
+  background: var(--primary-gold);
+}
+
+.theme-sakura .confetti-piece {
+  background: var(--primary-gold);
+}
+
+/* Responsividade para temas */
+@media (max-width: 768px) {
+  .theme-neon .flash-text-glow {
+    text-shadow: 0 0 5px var(--primary-gold), 0 0 10px var(--primary-gold);
+  }
+  
+  .theme-dark .flash-text-glow {
+    text-shadow: 0 0 5px var(--primary-gold), 0 0 10px var(--primary-gold);
+  }
+  
+  .theme-sakura .flash-text-glow {
+    text-shadow: 0 0 5px var(--primary-gold), 0 0 10px var(--primary-gold);
+  }
+}

@@ -1,10 +1,10 @@
 <template>
   <div class="home-container">
-    <h1>{{ t('gameTitle') }}</h1>
+    <h1 class="flash-text-glow flash-glow-pulse">{{ t('gameTitle') }}</h1>
     <div v-if="!modoEscolhido" class="menu-inicial">
-      <button @click="modoEscolhido = 'host'">{{ t('hostRoom') }}</button>
-      <button @click="modoEscolhido = 'join'">{{ t('joinRoom') }}</button>
-      <button @click="modoEscolhido = 'bots'">{{ t('playAgainstBots') }}</button>
+      <button @click="selectMode('host')" class="flash-button flash-hover-scale flash-glow-pulse">{{ t('hostRoom') }}</button>
+      <button @click="selectMode('join')" class="flash-button flash-hover-scale flash-glow-pulse">{{ t('joinRoom') }}</button>
+      <button @click="selectMode('bots')" class="flash-button flash-hover-scale flash-glow-pulse">{{ t('playAgainstBots') }}</button>
     </div>
     <div v-else-if="modoEscolhido === 'host'" class="host-form">
       <h2>{{ t('hostRoomTitle') }}</h2>
@@ -17,8 +17,8 @@
       <label>{{ t('numberOfPlayers') }}:
         <input type="number" v-model.number="qtdJogadores" min="2" max="6" />
       </label>
-      <button :disabled="!nomeJogador" @click="hostearSala">{{ t('createRoom') }}</button>
-      <button class="voltar" @click="modoEscolhido = null">{{ t('back') }}</button>
+      <button :disabled="!nomeJogador" @click="hostearSalaWithSound" class="flash-button flash-hover-scale" :class="{ 'disabled': !nomeJogador }">{{ t('createRoom') }}</button>
+      <button class="voltar flash-button flash-hover-rotate" @click="goBackWithSound">{{ t('back') }}</button>
     </div>
     <div v-else-if="modoEscolhido === 'join'" class="join-form">
       <h2>{{ t('joinRoomTitle') }}</h2>
@@ -28,15 +28,15 @@
       <label>{{ t('roomName') }}:
         <input v-model="nomeSala" :placeholder="t('enterRoomName')" />
       </label>
-      <button :disabled="!nomeJogador || !nomeSala" @click="entrarSala">{{ t('join') }}</button>
-      <button class="voltar" @click="modoEscolhido = null">{{ t('back') }}</button>
+      <button :disabled="!nomeJogador || !nomeSala" @click="entrarSalaWithSound" class="flash-button flash-hover-scale" :class="{ 'disabled': !nomeJogador || !nomeSala }">{{ t('join') }}</button>
+      <button class="voltar flash-button flash-hover-rotate" @click="goBackWithSound">{{ t('back') }}</button>
       <div class="lobbys-lista">
         <h3>{{ t('availableLobbies') }}</h3>
         <div v-if="carregandoLobbys">{{ t('loadingLobbies') }}</div>
         <div v-else-if="erroLobbys">{{ erroLobbys }}</div>
         <ul v-else>
           <li v-for="lobby in lobbys" :key="lobby.nome">
-            <button class="lobby-btn" @click="selecionarLobby(lobby.nome)">
+            <button class="lobby-btn flash-button flash-hover-glow" @click="selecionarLobbyWithSound(lobby.nome)">
               {{ lobby.nome }} ({{ lobby.jogadores }}/8)
             </button>
           </li>
@@ -59,8 +59,8 @@
           <option value="dificil">{{ t('hard') }}</option>
         </select>
       </label>
-      <button :disabled="!nomeJogador || qtdBots < 1" @click="iniciarContraBots">{{ t('startAgainstBots') }}</button>
-      <button class="voltar" @click="modoEscolhido = null">{{ t('back') }}</button>
+      <button :disabled="!nomeJogador || qtdBots < 1" @click="iniciarContraBotsWithSound" class="flash-button flash-hover-scale" :class="{ 'disabled': !nomeJogador || qtdBots < 1 }">{{ t('startAgainstBots') }}</button>
+      <button class="voltar flash-button flash-hover-rotate" @click="goBackWithSound">{{ t('back') }}</button>
     </div>
   </div>
 </template>
@@ -68,6 +68,10 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { t } from '../i18n/index.js'
+import { useAudioManager } from '../composables/useAudioManager.js'
+
+// Sistema de áudio
+const { playSFX } = useAudioManager()
 
 const emit = defineEmits(['iniciar-jogo'])
 const modoEscolhido = ref(null)
@@ -147,6 +151,49 @@ function iniciarContraBots() {
 watch(modoEscolhido, (novo) => {
   if (novo === 'join') buscarLobbys()
 })
+
+// Funções com sons
+const selectMode = (mode) => {
+  playSFX('BUTTON_CLICK')
+  modoEscolhido.value = mode
+}
+
+const goBackWithSound = () => {
+  playSFX('BUTTON_CLICK')
+  modoEscolhido.value = null
+}
+
+const hostearSalaWithSound = () => {
+  if (!nomeJogador.value) {
+    playSFX('ERROR')
+    return
+  }
+  playSFX('BUTTON_CLICK')
+  hostearSala()
+}
+
+const entrarSalaWithSound = () => {
+  if (!nomeSala.value || !nomeJogador.value) {
+    playSFX('ERROR')
+    return
+  }
+  playSFX('BUTTON_CLICK')
+  entrarSala()
+}
+
+const selecionarLobbyWithSound = (nome) => {
+  playSFX('BUTTON_CLICK')
+  selecionarLobby(nome)
+}
+
+const iniciarContraBotsWithSound = () => {
+  if (!nomeJogador.value || qtdBots.value < 1) {
+    playSFX('ERROR')
+    return
+  }
+  playSFX('BUTTON_CLICK')
+  iniciarContraBots()
+}
 </script>
 
 <style scoped>
@@ -247,8 +294,25 @@ h1 {
   padding: 1rem 2rem;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: 0.2px;
-  word-spacing: 0.05em;
+}
+
+/* Estilos para botões desabilitados */
+.flash-button.disabled,
+.flash-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+  background: var(--card-gradient) !important;
+  color: rgba(248, 248, 255, 0.5) !important;
+}
+
+.flash-button.disabled:hover,
+.flash-button:disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  background: var(--card-gradient) !important;
+  color: rgba(248, 248, 255, 0.5) !important;
 }
 
 @media (min-width: 768px) {

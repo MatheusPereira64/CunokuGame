@@ -1,14 +1,101 @@
 <script setup>
 import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { t } from './i18n/index.js'
+import { useAudioManager } from './composables/useAudioManager.js'
+import { useAchievements } from './composables/useAchievements.js'
+import { useThemes } from './composables/useThemes.js'
+import { useStats } from './composables/useStats.js'
+import { useTooltips } from './composables/useTooltips.js'
+import { SOUNDS, CRITICAL_SOUNDS } from './utils/soundLibrary.js'
+import './styles/animations.css'
+import './styles/effects.css'
+import './styles/themes.css'
+import AchievementNotification from './components/AchievementNotification.vue'
+import ParticleSystem from './components/effects/ParticleSystem.vue'
+import Confetti from './components/effects/Confetti.vue'
+import ScreenShake from './components/effects/ScreenShake.vue'
+import GlowEffect from './components/effects/GlowEffect.vue'
+import Tooltip from './components/Tooltip.vue'
+import Tutorial from './components/Tutorial.vue'
 const HomePage = defineAsyncComponent(() => import('./pages/HomePage.vue'))
 const JogoPage = defineAsyncComponent(() => import('./pages/JogoPage.vue'))
+const AchievementsPage = defineAsyncComponent(() => import('./pages/AchievementsPage.vue'))
+const StatsPage = defineAsyncComponent(() => import('./pages/StatsPage.vue'))
 import LanguageSelector from './components/LanguageSelector.vue'
+
+// Sistema de áudio
+const {
+  audioState,
+  isInitialized,
+  isLoading,
+  initAudioContext,
+  playSFX,
+  playMusic,
+  stopMusic,
+  setMasterVolume,
+  setMusicVolume,
+  setSFXVolume,
+  toggleMute,
+  registerSound,
+  preloadSounds
+} = useAudioManager()
+
+// Sistema de conquistas
+const {
+  achievementState,
+  init: initAchievements,
+  onGameStart,
+  onGameWin,
+  onGameLose,
+  onCardDiscard,
+  onAbilityUsed,
+  onCombo,
+  onRoomCreate
+} = useAchievements()
+
+// Sistema de temas
+const {
+  themeState,
+  init: initThemes,
+  applyTheme,
+  getCurrentTheme,
+  getAllThemes,
+  isThemeActive,
+  cycleNextTheme
+} = useThemes()
+
+// Sistema de estatísticas
+const {
+  statsState,
+  init: initStats,
+  onGameStart: statsOnGameStart,
+  onGameWin: statsOnGameWin,
+  onGameLose: statsOnGameLose,
+  onCardDiscard: statsOnCardDiscard,
+  onAbilityUsed: statsOnAbilityUsed,
+  onCombo: statsOnCombo,
+  onGameEnd: statsOnGameEnd
+} = useStats()
+
+// Sistema de tooltips
+const {
+  init: initTooltips,
+  showGameTooltip,
+  showHelpTooltip
+} = useTooltips()
 
 const pagina = ref('inicio')
 const numJogadores = ref(2)
 const jogador = ref(null)
 const sala = ref('')
+
+// Estados para efeitos visuais
+const showParticles = ref(false)
+const particles = ref([])
+const showConfetti = ref(false)
+const screenShake = ref(false)
+const showGlow = ref(false)
+const glowTarget = ref(null)
 const socket = ref(null)
 const peers = ref([]) // Array de conexões P2P
 const meuIndice = ref(null)
@@ -82,57 +169,206 @@ async function conectarP2P(qtd, salaId) {
   socket.onerror = (err) => console.error('Erro sinalização', err)
 }
 
-// Música de fundo
-const audio = ref(null)
-const audioSrc = ref(null)
-const volume = 0.3
+// Sistema de música melhorado
 const aguardandoInteracao = ref(true)
 
-function iniciarMusica() {
-  if (!audioSrc.value) {
-    audioSrc.value = new URL('../assets/audio/elevator.mp3', import.meta.url).href
-  }
-  if (audio.value) {
-    audio.value.volume = volume
-    audio.value.play()
+async function iniciarMusica() {
+  try {
+    // Marcar interação do usuário
+    if (!audioState.userInteracted) {
+      audioState.userInteracted = true
+      await initAudioContext()
+    }
+    
+    // Tocar música de fundo
+    await playMusic('BACKGROUND_MUSIC')
+    aguardandoInteracao.value = false
+  } catch (error) {
+    console.warn('Erro ao iniciar música:', error)
     aguardandoInteracao.value = false
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // Inicializar sistema de áudio
+  await initAudioContext()
+  
+  // Registrar sons
+  Object.entries(SOUNDS).forEach(([key, config]) => {
+    registerSound(key, config)
+  })
+  
+  // Preload de sons críticos
+  await preloadSounds(CRITICAL_SOUNDS)
+  
   // Toca a música na primeira interação do usuário
   window.addEventListener('click', iniciarMusica, { once: true })
   window.addEventListener('touchstart', iniciarMusica, { once: true })
+  
+  // Inicializar sistema de conquistas
+  initAchievements()
+  
+  // Inicializar sistema de temas
+  initThemes()
+  
+  // Inicializar sistema de estatísticas
+  initStats()
+  
+  // Inicializar sistema de tooltips
+  initTooltips()
 })
+
+// Função para remover notificação de conquista
+const removeAchievementNotification = (notificationId) => {
+  const index = achievementState.notifications.findIndex(n => n.id === notificationId)
+  if (index > -1) {
+    achievementState.notifications.splice(index, 1)
+  }
+}
+
+// Callbacks do tutorial
+const onTutorialComplete = () => {
+  console.log('Tutorial concluído!')
+  // Adicionar XP por completar tutorial
+  if (statsOnGameStart) {
+    statsOnGameStart({ mode: 'tutorial' })
+  }
+}
+
+const onTutorialSkip = () => {
+  console.log('Tutorial pulado')
+}
+
+// Funções de navegação com sons
+const navigateTo = (page) => {
+  playSFX('BUTTON_CLICK')
+  pagina.value = page
+}
+
+const cycleNextThemeWithSound = () => {
+  playSFX('BUTTON_CLICK')
+  cycleNextTheme()
+}
+
+const toggleMuteWithSound = () => {
+  playSFX('BUTTON_CLICK')
+  toggleMute()
+}
+
+const setMusicVolumeWithSound = (volume) => {
+  playSFX('BUTTON_HOVER')
+  setMusicVolume(volume)
+}
+
+const setSFXVolumeWithSound = (volume) => {
+  playSFX('BUTTON_HOVER')
+  setSFXVolume(volume)
+}
 </script>
 
 <template>
   <div class="app-layout">
     <div v-if="aguardandoInteracao" class="overlay-musica" @click="iniciarMusica">
-      <div class="msg-musica">{{ t('gameStart') }} 🎵</div>
+      <div class="msg-musica flash-glow-pulse flash-text-glow">{{ t('gameStart') }} 🎵</div>
     </div>
     <nav class="menu">
-      <button :class="{ ativo: pagina === 'inicio' }" @click="pagina = 'inicio'">{{ t('gameStart') }}</button>
+      <Tooltip :title="'Início'" :content="'Voltar para a página inicial do jogo'" position="bottom">
+        <button :class="{ ativo: pagina === 'inicio' }" @click="navigateTo('inicio')" class="flash-button flash-hover-scale">{{ t('gameStart') }}</button>
+      </Tooltip>
+      
+      <Tooltip :title="'Conquistas'" :content="'Veja suas conquistas desbloqueadas e progresso'" position="bottom">
+        <button :class="{ ativo: pagina === 'conquistas' }" @click="navigateTo('conquistas')" class="flash-button flash-hover-scale">🏆 Conquistas</button>
+      </Tooltip>
+      
+      <Tooltip :title="'Estatísticas'" :content="'Visualize suas estatísticas de jogo e progresso'" position="bottom">
+        <button :class="{ ativo: pagina === 'estatisticas' }" @click="navigateTo('estatisticas')" class="flash-button flash-hover-scale">📊 Estatísticas</button>
+      </Tooltip>
+      
       <div class="language-selector-nav">
         <LanguageSelector />
       </div>
+      
+      <Tooltip :title="'Tema'" :content="`Tema atual: ${getCurrentTheme()?.name}. Clique para alternar.`" position="bottom">
+        <button @click="cycleNextThemeWithSound" class="theme-btn flash-hover-scale flash-glow-pulse">
+          {{ getCurrentTheme()?.icon || '🎨' }}
+        </button>
+      </Tooltip>
+      <div class="audio-controls">
+        <Tooltip :title="'Controle de Áudio'" :content="audioState.isMuted ? 'Clique para ativar o som' : 'Clique para desativar o som'" position="bottom">
+          <button @click="toggleMuteWithSound" class="audio-btn flash-hover-scale flash-glow-pulse">
+            {{ audioState.isMuted ? '🔇' : '🔊' }}
+          </button>
+        </Tooltip>
+        <div class="volume-controls" v-if="!audioState.isMuted">
+          <label>🎵</label>
+          <input 
+            type="range" 
+            min="0" 
+            max="1" 
+            step="0.1" 
+            :value="audioState.musicVolume"
+            @input="setMusicVolumeWithSound($event.target.value)"
+            class="volume-slider"
+          />
+          <label>🔊</label>
+          <input 
+            type="range" 
+            min="0" 
+            max="1" 
+            step="0.1" 
+            :value="audioState.sfxVolume"
+            @input="setSFXVolumeWithSound($event.target.value)"
+            class="volume-slider"
+          />
+        </div>
+      </div>
     </nav>
     <main>
-      <HomePage v-if="pagina === 'inicio'" @iniciar-jogo="iniciarJogo" />
-      <JogoPage v-else-if="pagina === 'jogo'"
-        :num-jogadores="numJogadores"
-        :jogador="jogador"
-        :sala="sala"
-        :socket="socket"
-        :nome-jogador="jogador?.nome"
-        :modo-bots="modoBots"
-        :nomes-bots="nomesBots"
-        :dificuldade-bots="dificuldadeBots"
-      />
+      <Transition name="page" mode="out-in">
+        <HomePage v-if="pagina === 'inicio'" @iniciar-jogo="iniciarJogo" key="home" />
+        <AchievementsPage v-else-if="pagina === 'conquistas'" key="achievements" />
+        <StatsPage v-else-if="pagina === 'estatisticas'" key="stats" />
+        <JogoPage v-else-if="pagina === 'jogo'"
+          :num-jogadores="numJogadores"
+          :jogador="jogador"
+          :sala="sala"
+          :socket="socket"
+          :nome-jogador="jogador?.nome"
+          :modo-bots="modoBots"
+          :nomes-bots="nomesBots"
+          :dificuldade-bots="dificuldadeBots"
+          key="game"
+        />
+      </Transition>
     </main>
-    <div class="player-musica" style="pointer-events: none; background: none; border: none; box-shadow: none; padding: 0; position: fixed; right: 0; bottom: 0; z-index: 0;">
-      <audio ref="audio" :src="audioSrc" preload="none" loop />
-    </div>
+    
+    <!-- Sistema de Partículas -->
+    <ParticleSystem v-if="showParticles" :particles="particles" />
+    
+    <!-- Efeito Confetti -->
+    <Confetti v-if="showConfetti" @complete="showConfetti = false" />
+    
+    <!-- Screen Shake -->
+    <ScreenShake :shake="screenShake" @complete="screenShake = false" />
+    
+    <!-- Glow Effect -->
+    <GlowEffect v-if="showGlow" :target="glowTarget" />
+    
+    <!-- Notificações de Conquistas -->
+    <AchievementNotification
+      v-for="notification in achievementState.notifications"
+      :key="notification.id"
+      :notification="notification"
+      @close="removeAchievementNotification"
+    />
+    
+    <!-- Tutorial Interativo -->
+    <Tutorial 
+      :auto-start="true"
+      :flash-style="true"
+      @complete="onTutorialComplete"
+      @skip="onTutorialSkip"
+    />
   </div>
 </template>
 
@@ -203,6 +439,101 @@ onMounted(() => {
   align-items: center;
 }
 
+/* Controles de áudio */
+.audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.audio-btn {
+  background: var(--gold-gradient);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.audio-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.5);
+}
+
+.theme-btn {
+  background: var(--gold-gradient);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  margin-left: 10px;
+}
+
+.theme-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.5);
+}
+
+.volume-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.volume-controls label {
+  font-size: 0.9rem;
+  color: var(--pearl-white);
+  min-width: 20px;
+  text-align: center;
+}
+
+.volume-slider {
+  width: 60px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--gold-gradient);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--gold-gradient);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
 .menu button {
   background: var(--card-gradient);
   border: 2px solid var(--primary-gold);
@@ -271,6 +602,37 @@ main {
   flex: 1;
   overflow-y: auto;
   max-height: calc(100vh - 120px);
+}
+
+/* Transições de página estilo Flash */
+.page-enter-active {
+  animation: flash-page-enter 0.6s ease-out;
+}
+
+.page-leave-active {
+  animation: flash-page-leave 0.4s ease-in;
+}
+
+@keyframes flash-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes flash-page-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+  }
 }
 
 main::before {
