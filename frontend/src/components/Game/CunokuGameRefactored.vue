@@ -18,7 +18,10 @@
           <PlayerPosition
             v-for="(player, idx) in estado.players"
             :key="idx"
-            :player="player"
+            :player="{
+              ...player,
+              icone: getPlayerIcon(idx, player.nome)
+            }"
             :playerIndex="idx"
             :totalPlayers="estado.players.length"
             :isActivePlayer="idx === estado.jogadorDaVez"
@@ -28,6 +31,7 @@
             :canDiscard="indiceDescarteTentativa === null"
             :reactionActive="estado.reacaoAtiva"
             :reactionValue="estado.valorReacao"
+            :cartaEstaReveladaTemporariamente="cartaEstaReveladaTemporariamente"
             @try-discard="tentarDescarte"
             @react-discard="reagirDescartar"
           />
@@ -230,7 +234,12 @@ export default defineComponent({
             player.mao.splice(Math.min(gameLogic.indiceDescarteTentativa.value, idx2), 1)[0]
           ]
           gameLogic.estado.value.pilha.push(...cartasDescartadas)
+          
+          // Ativar reação para a primeira carta descartada
+          gameLogic.ativarReacao(cartasDescartadas[0])
+          
           gameLogic.showMessage('Descarte realizado com sucesso!')
+          gameLogic.avancarTurnoComFim()
         } else {
           // Lógica online
           props.socket?.emit('tentar_descarte', {
@@ -281,10 +290,15 @@ export default defineComponent({
     const descartarCartaComprada = () => {
       if (gameLogic.modoOffline.value) {
         // Lógica offline
-        gameLogic.estado.value.pilha.push(gameLogic.cartaComprada.value)
+        const carta = gameLogic.cartaComprada.value
+        gameLogic.estado.value.pilha.push(carta)
+        
+        // Ativar reação para outros jogadores
+        gameLogic.ativarReacao(carta)
+        
         gameLogic.showMessage('Carta descartada!')
         gameLogic.resetGameState()
-        gameLogic.avancarTurnoLocal()
+        gameLogic.avancarTurnoComFim()
       } else {
         // Lógica online
         props.socket?.emit('descartar_carta', { sala: props.sala, jogador: props.jogador?.nome })
@@ -311,11 +325,7 @@ export default defineComponent({
     const declararFimDeJogo = () => {
       if (gameLogic.modoOffline.value) {
         // Lógica offline
-        gameLogic.estado.value.fimDeclarado = true
-        gameLogic.estado.value.jogadorDeclarouFim = gameLogic.estado.value.players[gameLogic.meuIndice.value].nome
-        // 2 turnos completos após declarar fim
-        gameLogic.estado.value.turnosRestantesFim = 2
-        gameLogic.showMessage('Fim de jogo declarado! Restam 2 turnos completos.')
+        gameLogic.declararFimDeJogo(gameLogic.meuIndice.value)
       } else {
         // Lógica online
         props.socket?.emit('declarar_fim_de_jogo', { sala: props.sala, jogador: props.jogador?.nome })
@@ -339,13 +349,10 @@ export default defineComponent({
           // Ver carta própria (cartas 7 e 8)
           const player = gameLogic.estado.value.players[gameLogic.meuIndice.value]
           const cartaVista = player.mao[action.cardIndex]
-          gameLogic.cartasReveladas.value.push({ idx: action.cardIndex, carta: cartaVista })
-          gameLogic.showMessage(`Carta revelada: ${cartaVista.nome} de ${cartaVista.naipe}`, 5000)
           
-          // Remove após 5 segundos
-          setTimeout(() => {
-            gameLogic.cartasReveladas.value = gameLogic.cartasReveladas.value.filter(c => c.idx !== action.cardIndex)
-          }, 5000)
+          // Usar o novo sistema de revelação temporária
+          gameLogic.revelarCartaTemporariamente(gameLogic.meuIndice.value, action.cardIndex, 5000)
+          gameLogic.showMessage(`Carta revelada: ${cartaVista.nome} de ${cartaVista.naipe}`, 5000)
           
           gameLogic.estado.value.pilha.push(carta)
           gameLogic.resetGameState()
@@ -355,6 +362,9 @@ export default defineComponent({
           // Ver carta de oponente (cartas 5 e 6)
           const player = gameLogic.estado.value.players[action.playerIndex]
           const cartaVista = player.mao[action.cardIndex]
+          
+          // Usar o novo sistema de revelação temporária
+          gameLogic.revelarCartaTemporariamente(action.playerIndex, action.cardIndex, 5000)
           gameLogic.showMessage(`Carta do ${player.nome}: ${cartaVista.nome} de ${cartaVista.naipe}`, 5000)
           
           gameLogic.estado.value.pilha.push(carta)
@@ -414,9 +424,20 @@ export default defineComponent({
     }
 
     const reagirDescartar = (idx) => {
-      // Reação apenas online
-      if (!gameLogic.modoOffline.value && props.socket && props.sala && typeof idx === 'number') {
-        props.socket.emit('reagir_descartar_mesmo_valor', { sala: props.sala, jogador: props.jogador?.nome, indice: idx })
+      if (gameLogic.modoOffline.value) {
+        // Lógica offline
+        const carta = gameLogic.maoReal.value[idx]
+        if (carta && gameLogic.reacaoAtiva.value) {
+          const sucesso = gameLogic.processarDescarteReacao(gameLogic.meuIndice.value, carta)
+          if (sucesso) {
+            gameLogic.estado.value.players[gameLogic.meuIndice.value].mao.splice(idx, 1)
+          }
+        }
+      } else {
+        // Lógica online
+        if (props.socket && props.sala && typeof idx === 'number') {
+          props.socket.emit('reagir_descartar_mesmo_valor', { sala: props.sala, jogador: props.jogador?.nome, indice: idx })
+        }
       }
     }
     

@@ -11,6 +11,10 @@ export function useGameLogic() {
   const acaoPendente = ref(false)
   const mensagemStatus = ref('')
   const cartasReveladas = ref([])
+  const cartasReveladasTemporariamente = ref([])
+  const reacaoAtiva = ref(false)
+  const valorReacao = ref('')
+  const cartaOriginalReacao = ref(null)
   
   // Estados para habilidades
   const escolhendoCartaPropria = ref(false)
@@ -18,6 +22,9 @@ export function useGameLogic() {
   const escolhendoTroca = ref(false)
   const resultadoFinal = ref(null)
   const fimDeJogo = ref(false)
+  const fimDeclarado = ref(false)
+  const jogadorDeclarouFim = ref(null)
+  const turnosRestantesFim = ref(0)
   
   // Modo offline
   const modoOffline = ref(false)
@@ -76,6 +83,154 @@ export function useGameLogic() {
     return cartasReveladas.value.some(c => c.idx === idx)
   }
 
+  // Sistema de revelação temporária
+  const revelarCartaTemporariamente = (playerIdx, cardIdx, duracao = 5000) => {
+    cartasReveladasTemporariamente.value.push({ playerIdx, cardIdx })
+    setTimeout(() => {
+      cartasReveladasTemporariamente.value = cartasReveladasTemporariamente.value
+        .filter(c => !(c.playerIdx === playerIdx && c.cardIdx === cardIdx))
+    }, duracao)
+  }
+
+  const cartaEstaReveladaTemporariamente = (playerIdx, cardIdx) => {
+    return cartasReveladasTemporariamente.value.some(
+      c => c.playerIdx === playerIdx && c.cardIdx === cardIdx
+    )
+  }
+
+  // Sistema de pontuação
+  const calcularPontuacao = (cartas) => {
+    return cartas.reduce((total, carta) => {
+      const valor = carta.nome
+      switch (valor) {
+        case 'Rei': return total + 0
+        case 'Ás': return total + 1
+        case 'Coringa': return total - 1
+        case 'Dois': return total + 2
+        case 'Três': return total + 3
+        case 'Quatro': return total + 4
+        case 'Cinco': return total + 5
+        case 'Seis': return total + 6
+        case 'Sete': return total + 7
+        case 'Oito': return total + 8
+        case 'Nove': return total + 9
+        case 'Dez': return total + 10
+        case 'Valete': return total + 11
+        case 'Dama': return total + 12
+        default: return total
+      }
+    }, 0)
+  }
+
+  const calcularPontuacoesFinais = () => {
+    if (!estado.value) return []
+    
+    return estado.value.players.map((player, index) => ({
+      nome: player.nome,
+      pontuacao: calcularPontuacao(player.mao || []),
+      indice: index
+    })).sort((a, b) => a.pontuacao - b.pontuacao) // Menor pontuação primeiro
+  }
+
+  // Sistema de punição por descarte errado
+  const punirDescarteErrado = (playerIndex) => {
+    if (!estado.value) return
+    
+    const player = estado.value.players[playerIndex]
+    if (!player) return
+    
+    // Comprar 2 cartas do baralho
+    for (let i = 0; i < 2; i++) {
+      if (estado.value.baralho.length > 0) {
+        const carta = estado.value.baralho.pop()
+        player.mao.push(carta)
+      }
+    }
+    
+    showMessage(`${player.nome} descartou carta errada e comprou 2 cartas!`, 5000)
+  }
+
+  // Validar descarte em reação
+  const validarDescarteReacao = (playerIndex, cartaDescartada, cartaOriginal) => {
+    // Verificar se os valores são iguais (independente do naipe)
+    return cartaDescartada.nome === cartaOriginal.nome
+  }
+
+  // Ativar reação quando uma carta é descartada
+  const ativarReacao = (cartaDescartada) => {
+    reacaoAtiva.value = true
+    valorReacao.value = cartaDescartada.nome
+    cartaOriginalReacao.value = cartaDescartada
+    showMessage(`Reação ativada! Jogadores podem descartar cartas de valor "${cartaDescartada.nome}"`, 5000)
+  }
+
+  // Desativar reação
+  const desativarReacao = () => {
+    reacaoAtiva.value = false
+    valorReacao.value = ''
+    cartaOriginalReacao.value = null
+  }
+
+  // Processar descarte em reação
+  const processarDescarteReacao = (playerIndex, cartaDescartada) => {
+    if (!reacaoAtiva.value || !cartaOriginalReacao.value) return false
+    
+    const isValid = validarDescarteReacao(playerIndex, cartaDescartada, cartaOriginalReacao.value)
+    
+    if (isValid) {
+      // Descarte válido - remover carta da mão e adicionar à pilha
+      const player = estado.value.players[playerIndex]
+      const cardIndex = player.mao.findIndex(c => c.nome === cartaDescartada.nome && c.naipe === cartaDescartada.naipe)
+      if (cardIndex !== -1) {
+        player.mao.splice(cardIndex, 1)
+        estado.value.pilha.push(cartaDescartada)
+        showMessage(`${player.nome} reagiu com sucesso!`, 3000)
+        desativarReacao()
+        return true
+      }
+    } else {
+      // Descarte inválido - punir jogador
+      punirDescarteErrado(playerIndex)
+      return false
+    }
+    
+    return false
+  }
+
+  // Sistema de fim de jogo
+  const declararFimDeJogo = (playerIndex) => {
+    if (!estado.value || fimDeclarado.value) return false
+    
+    fimDeclarado.value = true
+    jogadorDeclarouFim.value = estado.value.players[playerIndex]?.nome
+    turnosRestantesFim.value = estado.value.players.length // Uma rodada completa
+    
+    showMessage(`${jogadorDeclarouFim.value} declarou fim do jogo! Mais uma rodada completa.`, 5000)
+    return true
+  }
+
+  const avancarTurnoComFim = () => {
+    if (!estado.value || !fimDeclarado.value) return
+    
+    // Avançar turno normalmente
+    estado.value.jogadorDaVez = (estado.value.jogadorDaVez + 1) % estado.value.players.length
+    
+    // Se voltou ao jogador que declarou fim, terminar jogo
+    if (estado.value.jogadorDaVez === estado.value.players.findIndex(p => p.nome === jogadorDeclarouFim.value)) {
+      finalizarJogo()
+    }
+  }
+
+  const finalizarJogo = () => {
+    if (!estado.value) return
+    
+    fimDeJogo.value = true
+    resultadoFinal.value = calcularPontuacoesFinais()
+    
+    const vencedor = resultadoFinal.value[0]
+    showMessage(`🎉 ${vencedor.nome} venceu com ${vencedor.pontuacao} pontos!`, 10000)
+  }
+
   // Métodos de posicionamento
   const getPlayerPosition = (playerIndex) => {
     if (!estado.value) return 'bottom'
@@ -93,9 +248,24 @@ export function useGameLogic() {
     return positionArray[playerIndex] || 'bottom'
   }
 
-  const getPlayerIcon = (playerIndex) => {
-    const icons = ['👤', '🎭', '🎪', '🎯', '🎲', '🎨']
-    return icons[playerIndex % icons.length]
+  const getPlayerIcon = (playerIndex, playerName = '') => {
+    // Ícones especiais para bots conhecidos
+    const botIcons = {
+      'Hulk': '/assets/botIcons/Hulk.jpeg',
+      'Naldo': '/assets/botIcons/Naldo.jpeg',
+      'Noku': '/assets/botIcons/Noku.jpeg',
+      'Sanfona': '/assets/botIcons/Sanfona.jpeg',
+      'Jogador': '👤'
+    }
+    
+    // Verificar se é um bot com ícone especial
+    if (botIcons[playerName]) {
+      return botIcons[playerName]
+    }
+    
+    // Ícones padrão para outros jogadores
+    const defaultIcons = ['👤', '🎭', '🎪', '🎯', '🎲', '🎨']
+    return defaultIcons[playerIndex % defaultIcons.length]
   }
 
   // Métodos de reset
@@ -241,11 +411,16 @@ export function useGameLogic() {
     acaoPendente,
     mensagemStatus,
     cartasReveladas,
+    reacaoAtiva,
+    valorReacao,
     escolhendoCartaPropria,
     escolhendoCartaOponente,
     escolhendoTroca,
     resultadoFinal,
     fimDeJogo,
+    fimDeclarado,
+    jogadorDeclarouFim,
+    turnosRestantesFim,
     modoOffline,
     
     // Computed
@@ -257,6 +432,18 @@ export function useGameLogic() {
     mapValorSvg,
     mapNaipeSvg,
     cartaEstaRevelada,
+    revelarCartaTemporariamente,
+    cartaEstaReveladaTemporariamente,
+    calcularPontuacao,
+    calcularPontuacoesFinais,
+    punirDescarteErrado,
+    validarDescarteReacao,
+    ativarReacao,
+    desativarReacao,
+    processarDescarteReacao,
+    declararFimDeJogo,
+    avancarTurnoComFim,
+    finalizarJogo,
     getPlayerPosition,
     getPlayerIcon,
     resetGameState,

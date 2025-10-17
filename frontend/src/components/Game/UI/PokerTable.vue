@@ -46,10 +46,18 @@
         </div>
       </div>
       
-      <!-- Banner de reação -->
-      <div v-if="gameState.reacaoAtiva" class="reaction-banner">
-        <span class="reaction-text">Reação: descarte cartas de valor "{{ gameState.valorReacao }}"!</span>
-      </div>
+          <!-- Banner de reação -->
+          <div v-if="gameState.reacaoAtiva" class="reaction-banner">
+            <span class="reaction-text">⚡ Reação: descarte cartas de valor "{{ gameState.valorReacao }}"!</span>
+          </div>
+
+          <!-- Banner de fim declarado -->
+          <div v-if="gameState.fimDeclarado" class="endgame-banner">
+            <span class="endgame-text">
+              🏁 Fim declarado por {{ gameState.jogadorDeclarouFim }}! 
+              {{ gameState.turnosRestantesFim }} {{ gameState.turnosRestantesFim === 1 ? 'turno restante' : 'turnos restantes' }}
+            </span>
+          </div>
     </div>
     
     <!-- Players ao redor da mesa -->
@@ -103,15 +111,15 @@ export default {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 2rem;
+  padding: 3rem;
   box-sizing: border-box;
 }
 
 /* Mesa quadrada de poker */
 .poker-table {
   position: relative;
-  width: 600px;
-  height: 400px;
+  width: 500px;
+  height: 350px;
   background: linear-gradient(135deg, #2d5016 0%, #1a3009 70%, #0d1a05 100%);
   border: 8px solid #d4af37;
   border-radius: 20px;
@@ -370,11 +378,42 @@ export default {
   border-radius: 20px;
   padding: 0.5rem 1rem;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  animation: pulse-red 2s infinite;
 }
 
 .reaction-text {
   font-size: 14px;
   color: #fca5a5;
   font-weight: bold;
+}
+
+/* Banner de fim de jogo */
+.endgame-banner {
+  position: absolute;
+  top: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+  border: 2px solid #c4b5fd;
+  border-radius: 20px;
+  padding: 0.5rem 1rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  animation: pulse-purple 2s infinite;
+}
+
+.endgame-text {
+  font-size: 14px;
+  color: #c4b5fd;
+  font-weight: bold;
+}
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); }
+  50% { box-shadow: 0 4px 15px rgba(220, 38, 38, 0.5); }
+}
+
+@keyframes pulse-purple {
+  0%, 100% { box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); }
+  50% { box-shadow: 0 4px 15px rgba(124, 58, 237, 0.5); }
 }
 </style>

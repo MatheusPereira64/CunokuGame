@@ -9,7 +9,11 @@
     <!-- Avatar/Nome do Jogador -->
     <div class="player-info">
       <div class="player-avatar">
-        <span class="avatar-icon">{{ playerIcon }}</span>
+        <img v-if="isImageIcon" 
+             :src="playerIcon" 
+             :alt="player.nome" 
+             class="avatar-image" />
+        <span v-else class="avatar-icon">{{ playerIcon }}</span>
         <div v-if="isActivePlayer" class="turn-indicator-ring"></div>
       </div>
       <div class="player-name">{{ player.nome }}</div>
@@ -128,6 +132,10 @@ export default {
     playerIndex: {
       type: Number,
       default: 0
+    },
+    cartaEstaReveladaTemporariamente: {
+      type: Function,
+      default: () => false
     }
   },
   computed: {
@@ -135,14 +143,22 @@ export default {
       return this.player.mao || []
     },
     playerIcon() {
+      // Se o ícone é uma URL de imagem, retornar como está
+      if (this.player.icone && this.player.icone.startsWith('/')) {
+        return this.player.icone
+      }
+      // Caso contrário, usar ícones emoji padrão
       const icons = ['🎯', '🎲', '🃏', '🎪', '🎨', '🎭']
-      return icons[this.playerIndex % icons.length]
+      return this.player.icone || icons[this.playerIndex % icons.length]
+    },
+    isImageIcon() {
+      return this.playerIcon && this.playerIcon.startsWith('/')
     }
   },
   methods: {
     isCardRevealed(cardIdx) {
-      // Lógica para determinar se a carta está revelada
-      return this.isCurrentUser || this.player.cartasReveladas?.includes(cardIdx)
+      // No Cunoku, as cartas só são reveladas temporariamente com habilidades
+      return this.cartaEstaReveladaTemporariamente(this.playerIndex, cardIdx)
     },
     mapValorSvg(valor) {
       const valorMap = {
@@ -250,6 +266,13 @@ export default {
   color: #1a1a2e;
 }
 
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
 .turn-indicator-ring {
   position: absolute;
   top: -5px;
@@ -341,17 +364,17 @@ export default {
 }
 
 .opponent-card .card-back {
-  width: 40px;
-  height: 60px;
+  width: 25px;
+  height: 35px;
 }
 
 .card-symbol {
-  font-size: 20px;
+  font-size: 16px;
   color: #d4af37;
 }
 
 .opponent-card .card-symbol {
-  font-size: 14px;
+  font-size: 10px;
 }
 
 /* Botões de ação */
@@ -444,8 +467,8 @@ export default {
   }
   
   .opponent-card .card-back {
-    width: 35px;
-    height: 50px;
+    width: 20px;
+    height: 28px;
   }
 }
 </style>

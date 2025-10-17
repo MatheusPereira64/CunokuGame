@@ -193,23 +193,23 @@ export default {
 /* Área de ações Flash */
 .flash-action-area {
   position: fixed;
-  bottom: 0.5rem;
+  top: 60%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.8rem;
-  z-index: 50;
-  max-width: 95vw;
+  z-index: 100;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
   background: var(--flash-dark-gradient);
   padding: 1rem 1.5rem;
   border-radius: 20px;
   border: 3px solid var(--flash-gold);
   backdrop-filter: blur(15px);
   box-shadow: var(--flash-glow-strong), var(--flash-shadow-strong);
-  position: relative;
-  overflow: hidden;
 }
 
 .flash-action-area::before {
@@ -669,7 +669,7 @@ export default {
   .flash-action-area {
     padding: 0.8rem 1rem;
     gap: 0.6rem;
-    bottom: 0.3rem;
+    top: 65%;
     max-width: 98vw;
   }
   
