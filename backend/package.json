@@ -1,17 +1,24 @@
 {
-  "name": "backend",
+  "name": "cunoku-backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Backend do jogo Cunoku - servidor de jogo e sinalização WebRTC",
   "main": "index.js",
   "scripts": {
+    "start": "node index.js",
+    "signaling": "node signaling-server.js",
+    "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["game", "cunoku", "multiplayer", "websocket", "webrtc"],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
     "express": "^5.1.0",
+    "socket.io": "^4.8.1",
     "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
   }
 }

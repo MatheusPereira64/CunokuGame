@@ -21,8 +21,8 @@ console.log('');
 const isWindows = process.platform === 'win32';
 const npmCommand = isWindows ? 'npm.cmd' : 'npm';
 
-// Executar npm run dev:all
-const child = spawn(npmCommand, ['run', 'dev:all'], {
+// Executar npm run dev (que agora executa todos os serviços)
+const child = spawn(npmCommand, ['run', 'dev'], {
   stdio: 'inherit',
   shell: true,
   cwd: __dirname

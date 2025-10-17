@@ -49,7 +49,7 @@ echo ╚════════════════════════
 echo.
 echo ⏳ Carregando...
 echo.
-npm run dev:all
+npm run dev
 echo.
 echo ✅ Pressione qualquer tecla para voltar ao menu...
 pause >nul
@@ -62,6 +62,7 @@ echo ╔════════════════════════
 echo ║                🌐 INICIANDO FRONTEND (Vite) 🌐               ║
 echo ╚══════════════════════════════════════════════════════════════╝
 echo.
+cd frontend
 npm run dev
 echo.
 echo ✅ Pressione qualquer tecla para voltar ao menu...
@@ -75,7 +76,8 @@ echo ╔════════════════════════
 echo ║                ⚙️ INICIANDO BACKEND (API) ⚙️                 ║
 echo ╚══════════════════════════════════════════════════════════════╝
 echo.
-npm run backend
+cd backend
+npm run start
 echo.
 echo ✅ Pressione qualquer tecla para voltar ao menu...
 pause >nul
@@ -88,6 +90,7 @@ echo ╔════════════════════════
 echo ║             📡 INICIANDO SIGNALING (WebRTC) 📡               ║
 echo ╚══════════════════════════════════════════════════════════════╝
 echo.
+cd backend
 npm run signaling
 echo.
 echo ✅ Pressione qualquer tecla para voltar ao menu...

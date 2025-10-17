@@ -14,7 +14,7 @@ Write-Host "========================================" -ForegroundColor Yellow
 Write-Host ""
 
 try {
-    npm run dev:all
+    npm run dev
 }
 catch {
     Write-Host "Erro ao executar os serviços. Verifique se o Node.js e npm estão instalados." -ForegroundColor Red
