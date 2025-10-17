@@ -53,15 +53,30 @@ export function useAudioManager() {
       audio.preload = 'auto'
       audio.volume = options.volume || 1.0
       audio.loop = options.loop || false
+      audio.crossOrigin = 'anonymous'
       
-      // Aguardar carregamento
+      // Aguardar carregamento com timeout
       await new Promise((resolve, reject) => {
-        audio.addEventListener('canplaythrough', resolve, { once: true })
-        audio.addEventListener('error', reject, { once: true })
+        const timeout = setTimeout(() => {
+          reject(new Error(`Timeout ao carregar áudio: ${src}`))
+        }, 10000) // 10 segundos timeout
+        
+        audio.addEventListener('canplaythrough', () => {
+          clearTimeout(timeout)
+          resolve()
+        }, { once: true })
+        
+        audio.addEventListener('error', (e) => {
+          clearTimeout(timeout)
+          console.error(`Erro ao carregar áudio ${src}:`, e)
+          reject(e)
+        }, { once: true })
+        
         audio.load()
       })
 
       audioCache.set(src, audio)
+      console.log(`Áudio carregado com sucesso: ${src}`)
       return audio
     } catch (error) {
       console.warn(`Erro ao carregar áudio ${src}:`, error)
@@ -122,8 +137,10 @@ export function useAudioManager() {
       const musicConfig = audioState.sounds.get(musicKey)
       if (!musicConfig) {
         console.warn(`Música não encontrada: ${musicKey}`)
-        return
+        return false
       }
+
+      console.log(`Tentando reproduzir música: ${musicKey}`, musicConfig)
 
       // Parar música atual se estiver tocando
       if (audioState.currentMusic) {
@@ -142,11 +159,23 @@ export function useAudioManager() {
         audioState.isMusicPlaying = true
         
         if (!audioState.isMuted) {
-          await audio.play()
+          try {
+            await audio.play()
+            console.log(`Música ${musicKey} reproduzida com sucesso`)
+            return true
+          } catch (playError) {
+            console.warn(`Erro ao tocar áudio: ${playError.message}`)
+            return false
+          }
         }
+        return true
+      } else {
+        console.warn(`Falha ao carregar áudio para ${musicKey}`)
+        return false
       }
     } catch (error) {
       console.warn(`Erro ao reproduzir música ${musicKey}:`, error)
+      return false
     }
   }
 

@@ -10,6 +10,7 @@ import { SOUNDS, CRITICAL_SOUNDS } from './utils/soundLibrary.js'
 import './styles/animations.css'
 import './styles/effects.css'
 import './styles/themes.css'
+import './styles/flash-game.css'
 import AchievementNotification from './components/AchievementNotification.vue'
 import ParticleSystem from './components/effects/ParticleSystem.vue'
 import Confetti from './components/effects/Confetti.vue'
@@ -174,14 +175,26 @@ const aguardandoInteracao = ref(true)
 
 async function iniciarMusica() {
   try {
+    console.log('Iniciando música...')
+    
     // Marcar interação do usuário
     if (!audioState.userInteracted) {
       audioState.userInteracted = true
       await initAudioContext()
     }
     
+    // Aguardar um pouco para garantir que o contexto esteja pronto
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
     // Tocar música de fundo
-    await playMusic('BACKGROUND_MUSIC')
+    const success = await playMusic('BACKGROUND_MUSIC')
+    
+    if (success) {
+      console.log('Música iniciada com sucesso!')
+    } else {
+      console.warn('Falha ao iniciar música, mas continuando...')
+    }
+    
     aguardandoInteracao.value = false
   } catch (error) {
     console.warn('Erro ao iniciar música:', error)

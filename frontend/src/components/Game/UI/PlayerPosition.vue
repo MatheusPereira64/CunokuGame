@@ -1,56 +1,78 @@
 <template>
-  <div class="player-position"
+  <div class="flash-player-position"
        :class="[
          `position-${position}`,
          { 'active-turn': isActivePlayer },
          { 'current-player': isCurrentUser }
        ]">
     
+    <!-- Efeitos de fundo -->
+    <div class="player-background-effects">
+      <div class="player-particles"></div>
+      <div class="player-glow"></div>
+    </div>
+    
     <!-- Avatar/Nome do Jogador -->
     <div class="player-info">
-      <div class="player-avatar">
-        <span class="avatar-icon">{{ playerIcon }}</span>
-        <div v-if="isActivePlayer" class="turn-indicator-ring"></div>
+      <div class="player-avatar-flash">
+        <span class="avatar-icon-flash">{{ playerIcon }}</span>
+        <div v-if="isActivePlayer" class="turn-indicator-ring-flash flash-glow-pulse"></div>
+        <div class="avatar-glow-effect"></div>
       </div>
-      <div class="player-name">{{ player.nome }}</div>
-      <div class="player-stats">
-        <span class="card-count">{{ player.mao.length }} cartas</span>
-        <span v-if="isCurrentUser" class="you-indicator">(Você)</span>
+      <div class="player-name-flash flash-text-glow">{{ player.nome }}</div>
+      <div class="player-stats-flash">
+        <span class="card-count-flash">{{ player.mao.length }} cartas</span>
+        <span v-if="isCurrentUser" class="you-indicator-flash flash-text-glow">(Você)</span>
       </div>
     </div>
     
     <!-- Cartas do Jogador -->
-    <div class="player-cards">
-      <div v-if="isCurrentUser" class="my-hand">
+    <div class="player-cards-flash">
+      <div v-if="isCurrentUser" class="my-hand-flash">
         <!-- Sua mão -->
         <div v-for="(carta, cardIdx) in playerHand" :key="`my-card-${cardIdx}`" 
-             class="my-card" 
+             class="my-card-flash flash-hover-scale" 
              :class="{ 'card-revealed': isCardRevealed(cardIdx) }">
-          <CartaSvg v-if="isCardRevealed(cardIdx)" 
-                   :valor="mapValorSvg(carta.nome)" 
-                   :naipe="mapNaipeSvg(carta.naipe)" 
-                   :width="60" :height="90" />
-          <div v-else class="card-back small">
-            <span>🂠</span>
+          <div class="card-container-flash">
+            <CartaSvg v-if="isCardRevealed(cardIdx)" 
+                     :valor="mapValorSvg(carta.nome)" 
+                     :naipe="mapNaipeSvg(carta.naipe)" 
+                     :width="70" :height="100"
+                     class="revealed-card-flash" />
+            <div v-else class="card-back-flash small">
+              <span class="card-symbol">🂠</span>
+              <div class="card-shine"></div>
+            </div>
+            <div class="card-particles" v-if="isCardRevealed(cardIdx)"></div>
           </div>
           <button v-if="canDiscard && isActivePlayer" 
-                  class="discard-btn" @click="$emit('try-discard', cardIdx)">
-            Descartar
+                  class="discard-btn-flash flash-action-btn danger" @click="$emit('try-discard', cardIdx)">
+            <span class="action-icon">🗑️</span>
+            <span class="action-text">Descartar</span>
           </button>
           <button v-if="reactionActive && isCurrentUser && carta && carta.nome === reactionValue"
-                  class="react-btn" @click="$emit('react-discard', cardIdx)">
-            Reagir
+                  class="react-btn-flash flash-action-btn success flash-glow-pulse" @click="$emit('react-discard', cardIdx)">
+            <span class="action-icon">⚡</span>
+            <span class="action-text">Reagir</span>
           </button>
         </div>
       </div>
-      <div v-else class="opponent-hand">
+      <div v-else class="opponent-hand-flash">
         <!-- Cartas dos oponentes -->
-        <div v-for="n in player.mao.length" :key="`opp-card-${playerIndex}-${n}`" class="opponent-card">
-          <div class="card-back small">
-            <span>🂠</span>
+        <div v-for="n in player.mao.length" :key="`opp-card-${playerIndex}-${n}`" class="opponent-card-flash flash-hover-scale">
+          <div class="card-back-flash small">
+            <span class="card-symbol">🂠</span>
+            <div class="card-shine"></div>
           </div>
         </div>
       </div>
+    </div>
+    
+    <!-- Pontuação -->
+    <div class="player-score-flash flash-card">
+      <span class="score-label-flash">Pontos:</span>
+      <span class="score-value-flash flash-text-glow">{{ player.pontuacao || 0 }}</span>
+      <div class="score-glow-effect"></div>
     </div>
   </div>
 </template>
@@ -161,280 +183,504 @@ export default {
 </script>
 
 <style scoped>
-/* Posições dos jogadores ao redor da mesa */
-.player-position {
+/* Posições dos jogadores ao redor da mesa Flash */
+.flash-player-position {
   position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: 1.2rem;
   z-index: 3;
+  background: var(--flash-dark-gradient);
+  border: 3px solid var(--flash-gold);
+  border-radius: 20px;
+  padding: 1rem;
+  box-shadow: var(--flash-glow), var(--flash-shadow-strong);
+  position: relative;
+  overflow: hidden;
+  min-width: 120px;
+  max-width: 160px;
+}
+
+.flash-player-position::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.1), transparent);
+  animation: flash-player-sweep 3s ease-in-out infinite;
+}
+
+@keyframes flash-player-sweep {
+  0% { left: -100%; }
+  50% { left: 100%; }
+  100% { left: 100%; }
+}
+
+/* Efeitos de fundo do jogador */
+.player-background-effects {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.player-particles {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 215, 0, 0.1) 0%, transparent 50%),
+              radial-gradient(circle at 70% 70%, rgba(0, 255, 255, 0.1) 0%, transparent 50%);
+  animation: flash-player-particles 4s ease-in-out infinite;
+}
+
+.player-glow {
+  position: absolute;
+  top: -20%;
+  left: -20%;
+  width: 140%;
+  height: 140%;
+  background: radial-gradient(ellipse, rgba(255, 215, 0, 0.1) 0%, transparent 60%);
+  animation: flash-player-glow 3s ease-in-out infinite;
+}
+
+@keyframes flash-player-particles {
+  0%, 100% { opacity: 0.3; transform: translateY(0) rotate(0deg); }
+  50% { opacity: 0.6; transform: translateY(-5px) rotate(180deg); }
+}
+
+@keyframes flash-player-glow {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.1); }
 }
 
 /* Posições otimizadas para 2-6 jogadores */
 .position-bottom {
-  bottom: -120px;
+  bottom: -140px;
   left: 50%;
   transform: translateX(-50%);
   flex-direction: column;
 }
 
 .position-top {
-  top: -120px;
+  top: -140px;
   left: 50%;
   transform: translateX(-50%);
   flex-direction: column-reverse;
 }
 
 .position-left {
-  left: -160px;
+  left: -180px;
   top: 50%;
   transform: translateY(-50%);
   flex-direction: row;
 }
 
 .position-right {
-  right: -160px;
+  right: -180px;
   top: 50%;
   transform: translateY(-50%);
   flex-direction: row-reverse;
 }
 
 .position-top-left {
-  top: -100px;
+  top: -120px;
   left: 15%;
   flex-direction: column-reverse;
 }
 
 .position-top-right {
-  top: -100px;
+  top: -120px;
   right: 15%;
   flex-direction: column-reverse;
 }
 
 .position-bottom-left {
-  bottom: -100px;
+  bottom: -120px;
   left: 15%;
   flex-direction: column;
 }
 
 .position-bottom-right {
-  bottom: -100px;
+  bottom: -120px;
   right: 15%;
   flex-direction: column;
 }
 
-/* Info do jogador */
+/* Info do jogador Flash */
 .player-info {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
-  background: 
-    linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.6) 100%);
-  padding: 0.8rem;
-  border-radius: 12px;
-  border: 2px solid rgba(212, 175, 55, 0.4);
+  gap: 0.6rem;
+  background: var(--flash-dark-gradient);
+  padding: 1rem;
+  border-radius: 15px;
+  border: 2px solid var(--flash-gold);
   backdrop-filter: blur(10px);
-  min-width: 100px;
-  max-width: 140px;
+  min-width: 120px;
+  max-width: 160px;
+  position: relative;
+  z-index: 2;
 }
 
-.player-avatar {
+.player-avatar-flash {
   position: relative;
-  width: 50px;
-  height: 50px;
-  background: 
-    linear-gradient(135deg, #d4af37 0%, #ffd700 100%);
+  width: 60px;
+  height: 60px;
+  background: var(--flash-gold-gradient);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--flash-glow), var(--flash-shadow);
+  animation: flash-avatar-pulse 2s ease-in-out infinite;
 }
 
-.avatar-icon {
-  font-size: 1.6rem;
+.avatar-icon-flash {
+  font-size: 2rem;
+  color: var(--japanese-black);
+  font-weight: bold;
 }
 
-.turn-indicator-ring {
+.turn-indicator-ring-flash {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border: 4px solid var(--flash-neon-blue);
+  border-radius: 50%;
+  animation: flash-ring-rotate 2s linear infinite;
+  box-shadow: 0 0 25px var(--flash-neon-blue);
+}
+
+@keyframes flash-ring-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.avatar-glow-effect {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: flash-avatar-glow 2s ease-in-out infinite;
+}
+
+@keyframes flash-avatar-glow {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+.player-name-flash {
+  color: var(--flash-gold);
+  font-weight: bold;
+  font-size: 0.9rem;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.player-stats-flash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.card-count-flash {
+  color: var(--flash-neon-blue);
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-shadow: 0 0 5px currentColor;
+}
+
+.you-indicator-flash {
+  color: var(--flash-gold);
+  font-size: 0.7rem;
+  font-weight: bold;
+  text-shadow: 0 0 5px currentColor;
+}
+
+/* Estados do jogador Flash */
+.flash-player-position.active-turn {
+  border-color: var(--flash-neon-blue);
+  box-shadow: 0 0 30px var(--flash-neon-blue), var(--flash-shadow-strong);
+  animation: flash-player-active 1s ease-in-out infinite;
+}
+
+@keyframes flash-player-active {
+  0%, 100% { 
+    box-shadow: 0 0 30px var(--flash-neon-blue), var(--flash-shadow-strong);
+  }
+  50% { 
+    box-shadow: 0 0 40px var(--flash-neon-blue), 0 0 60px var(--flash-neon-blue), var(--flash-shadow-strong);
+  }
+}
+
+.flash-player-position.current-player {
+  border-color: var(--flash-gold);
+  background: var(--flash-dark-gradient);
+  box-shadow: var(--flash-glow-strong), var(--flash-shadow-strong);
+}
+
+/* Cartas dos jogadores Flash */
+.player-cards-flash {
+  display: flex;
+  gap: 0.4rem;
+  max-width: 350px;
+  justify-content: center;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 2;
+}
+
+.my-hand-flash {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  max-width: 400px;
+  justify-content: center;
+}
+
+.my-card-flash {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.2rem;
+  transition: all var(--flash-normal) var(--flash-ease);
+}
+
+.my-card-flash.card-revealed {
+  transform: scale(1.1);
+  z-index: 10;
+}
+
+.card-container-flash {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.revealed-card-flash {
+  box-shadow: var(--flash-glow-strong), var(--flash-shadow-strong);
+  border-radius: 12px;
+  animation: flash-card-reveal 0.5s var(--flash-bounce);
+}
+
+@keyframes flash-card-reveal {
+  from { 
+    transform: scale(0.5) rotate(-180deg);
+    opacity: 0;
+  }
+  to { 
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.card-particles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 50%);
+  border-radius: 50%;
+  animation: flash-particles-pulse 2s ease-in-out infinite;
+}
+
+.opponent-hand-flash {
+  display: flex;
+  gap: 0.2rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.opponent-card-flash {
+  transform: scale(0.8);
+  margin: 0.1rem;
+  transition: all var(--flash-normal) var(--flash-ease);
+}
+
+.opponent-card-flash:hover {
+  transform: scale(0.9);
+}
+
+.card-back-flash.small {
+  width: 60px;
+  height: 85px;
+  background: var(--flash-dark-gradient);
+  border: 3px solid var(--flash-gold);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--flash-glow), var(--flash-shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-back-flash.small:hover {
+  box-shadow: var(--flash-glow-strong), var(--flash-shadow-strong);
+}
+
+.card-symbol {
+  font-size: 1.8rem;
+  color: var(--flash-gold);
+  text-shadow: 0 0 10px currentColor;
+}
+
+.card-shine {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: flash-card-shine 2s ease-in-out infinite;
+}
+
+.discard-btn-flash, .react-btn-flash {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.7rem;
+  min-width: 80px;
+  height: 35px;
+  margin-top: 0.3rem;
+}
+
+.discard-btn-flash .action-icon, .react-btn-flash .action-icon {
+  font-size: 0.8rem;
+}
+
+.discard-btn-flash .action-text, .react-btn-flash .action-text {
+  font-size: 0.7rem;
+}
+
+/* Pontuação Flash */
+.player-score-flash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--flash-dark-gradient);
+  padding: 0.8rem;
+  border-radius: 15px;
+  border: 2px solid var(--flash-gold);
+  box-shadow: var(--flash-glow);
+  position: relative;
+  z-index: 2;
+  min-width: 80px;
+}
+
+.score-label-flash {
+  color: var(--flash-gold);
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 0 5px currentColor;
+}
+
+.score-value-flash {
+  color: var(--flash-neon-blue);
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.score-glow-effect {
   position: absolute;
   top: -5px;
   left: -5px;
   right: -5px;
   bottom: -5px;
-  border: 3px solid #ffd700;
-  border-radius: 50%;
-  animation: rotate 2s linear infinite;
-  box-shadow: 0 0 20px #ffd700;
+  background: radial-gradient(circle, rgba(0, 255, 255, 0.2) 0%, transparent 70%);
+  border-radius: 15px;
+  animation: flash-score-glow 2s ease-in-out infinite;
 }
 
-@keyframes rotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.player-name {
-  color: #ffd700;
-  font-weight: bold;
-  font-size: 0.8rem;
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.player-stats {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.1rem;
-}
-
-.card-count {
-  color: #ccc;
-  font-size: 0.7rem;
-}
-
-.you-indicator {
-  color: #d4af37;
-  font-size: 0.6rem;
-  font-weight: bold;
-}
-
-/* Estados do jogador */
-.player-position.active-turn .player-info {
-  border-color: #ffd700;
-  box-shadow: 0 0 25px rgba(212, 175, 55, 0.5);
-  animation: glow 2s ease-in-out infinite alternate;
-}
-
-@keyframes glow {
-  0% { box-shadow: 0 0 25px rgba(212, 175, 55, 0.5); }
-  100% { box-shadow: 0 0 35px rgba(212, 175, 55, 0.8); }
-}
-
-.player-position.current-player .player-info {
-  border-color: #1e3a8a;
-  background: 
-    linear-gradient(135deg, rgba(30, 58, 138, 0.7) 0%, rgba(30, 58, 138, 0.4) 100%);
-}
-
-/* Cartas dos jogadores */
-.player-cards {
-  display: flex;
-  gap: 0.2rem;
-  max-width: 300px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.my-hand {
-  display: flex;
-  gap: 0.3rem;
-  flex-wrap: wrap;
-  max-width: 350px;
-  justify-content: center;
-}
-
-.my-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  margin: 0.1rem;
-}
-
-.my-card.card-revealed {
-  transform: scale(1.05);
-  z-index: 10;
-}
-
-.opponent-hand {
-  display: flex;
-  gap: 0.1rem;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.opponent-card {
-  transform: scale(0.7);
-  margin: 0.05rem;
-}
-
-.card-back.small {
-  width: 50px;
-  height: 75px;
-  background: 
-    linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-  border: 2px solid #d4af37;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-}
-
-.card-back.small span {
-  font-size: 1.5rem;
-  color: #eebbc3;
-}
-
-.discard-btn {
-  background: 
-    linear-gradient(135deg, #8b0000 0%, #a00 100%);
-  color: white;
-  border: none;
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
-  font-size: 0.6rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-top: 0.2rem;
-}
-
-.discard-btn:hover {
-  background: 
-    linear-gradient(135deg, #a00 0%, #c00 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 3px 8px rgba(139, 0, 0, 0.5);
+@keyframes flash-score-glow {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
 }
 
 /* Responsividade */
 @media (max-width: 768px) {
+  .flash-player-position {
+    min-width: 100px;
+    max-width: 140px;
+    padding: 0.8rem;
+  }
+  
   .player-info {
-    min-width: 70px;
-    max-width: 90px;
-    padding: 0.5rem;
+    min-width: 80px;
+    max-width: 120px;
+    padding: 0.8rem;
   }
   
-  .player-avatar {
-    width: 35px;
-    height: 35px;
+  .player-avatar-flash {
+    width: 50px;
+    height: 50px;
   }
   
-  .avatar-icon {
-    font-size: 1.2rem;
+  .avatar-icon-flash {
+    font-size: 1.6rem;
   }
   
-  .player-name {
-    font-size: 0.65rem;
-    max-width: 70px;
+  .player-name-flash {
+    font-size: 0.8rem;
+    max-width: 100px;
   }
   
-  .card-count {
-    font-size: 0.55rem;
+  .card-count-flash {
+    font-size: 0.7rem;
   }
   
-  .you-indicator {
-    font-size: 0.5rem;
+  .card-back-flash.small {
+    width: 50px;
+    height: 70px;
+  }
+  
+  .card-symbol {
+    font-size: 1.4rem;
+  }
+  
+  .discard-btn-flash, .react-btn-flash {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.6rem;
+    min-width: 60px;
+    height: 30px;
+  }
+  
+  .player-score-flash {
+    min-width: 60px;
+    padding: 0.6rem;
+  }
+  
+  .score-value-flash {
+    font-size: 1rem;
+  }
+  
+  .you-indicator-flash {
+    font-size: 0.6rem;
   }
   
   .position-left {
