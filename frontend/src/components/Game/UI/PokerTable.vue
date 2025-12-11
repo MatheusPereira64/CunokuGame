@@ -101,113 +101,119 @@ export default {
 </script>
 
 <style scoped>
-/* Container da mesa de poker */
+/* Container da mesa de poker - RESPONSIVO */
 .poker-table-container {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: 100%;
   background: linear-gradient(135deg, #0a4d3a 0%, #1a5f4a 50%, #0d3d2e 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  padding: 3rem;
+  overflow: visible;
+  padding: clamp(0.5rem, 2vw, 1.5rem);
   box-sizing: border-box;
+  margin: 0 auto;
 }
 
-/* Mesa quadrada de poker */
+/* Mesa de poker - TAMANHO COMPACTO PARA CABER JOGADORES */
 .poker-table {
   position: relative;
-  width: 500px;
-  height: 350px;
+  width: clamp(200px, 35vw, 380px);
+  height: clamp(130px, 22vh, 260px);
   background: linear-gradient(135deg, #2d5016 0%, #1a3009 70%, #0d1a05 100%);
-  border: 8px solid #d4af37;
-  border-radius: 20px;
+  border: clamp(3px, 0.4vw, 6px) solid #d4af37;
+  border-radius: clamp(10px, 1.5vw, 16px);
   box-shadow: 
-    inset 0 0 50px rgba(0, 0, 0, 0.5),
-    0 0 30px #d4af37,
-    0 10px 30px rgba(0, 0, 0, 0.3);
+    inset 0 0 clamp(15px, 3vw, 35px) rgba(0, 0, 0, 0.5),
+    0 0 clamp(10px, 1.5vw, 20px) #d4af37,
+    0 clamp(3px, 0.8vw, 8px) clamp(10px, 1.5vw, 20px) rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2;
+  margin: 0 auto;
+  flex-shrink: 0;
 }
 
-/* Container dos jogadores */
+/* Container dos jogadores - POSICIONAMENTO RESPONSIVO */
 .players-container {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(300px, 95vw, 1100px);
+  height: clamp(250px, 85vh, 650px);
   z-index: 3;
   pointer-events: none;
+  display: grid;
+  padding: clamp(0.25rem, 0.5vw, 0.5rem);
 }
 
-/* Posicionamento dos jogadores ao redor da mesa */
+/* Posicionamento dos jogadores - GRID RESPONSIVO */
 [data-player-count="2"] .players-container {
   display: grid;
   grid-template-areas:
-    ". . ."
-    ". . ."
-    ". player-0 ."
-    ". . ."
     ". player-1 ."
-    ". . .";
-  grid-template-rows: 1fr 1fr 1fr 1fr 1fr 1fr;
+    ". . ."
+    ". player-0 .";
+  grid-template-rows: auto 1fr auto;
   grid-template-columns: 1fr 1fr 1fr;
+  gap: clamp(0.25rem, 1vh, 0.5rem);
+  align-items: center;
+  justify-items: center;
 }
 
 [data-player-count="3"] .players-container {
   display: grid;
   grid-template-areas:
     ". player-1 ."
-    ". . ."
     "player-2 . player-0"
-    ". . ."
-    ". . ."
     ". . .";
-  grid-template-rows: 1fr 1fr 1fr 1fr 1fr 1fr;
+  grid-template-rows: auto 1fr auto;
   grid-template-columns: 1fr 1fr 1fr;
+  gap: clamp(0.25rem, 1vh, 0.5rem);
+  align-items: center;
+  justify-items: center;
 }
 
 [data-player-count="4"] .players-container {
   display: grid;
   grid-template-areas:
     ". player-1 ."
-    ". . ."
     "player-2 . player-0"
-    ". . ."
-    ". player-3 ."
-    ". . .";
-  grid-template-rows: 1fr 1fr 1fr 1fr 1fr 1fr;
+    ". player-3 .";
+  grid-template-rows: auto 1fr auto;
   grid-template-columns: 1fr 1fr 1fr;
+  gap: clamp(0.25rem, 1vh, 0.5rem);
+  align-items: center;
+  justify-items: center;
 }
 
 [data-player-count="5"] .players-container {
   display: grid;
   grid-template-areas:
     "player-1 . player-2"
-    ". . ."
     "player-3 . player-0"
-    ". . ."
-    ". player-4 ."
-    ". . .";
-  grid-template-rows: 1fr 1fr 1fr 1fr 1fr 1fr;
+    ". player-4 .";
+  grid-template-rows: auto 1fr auto;
   grid-template-columns: 1fr 1fr 1fr;
+  gap: clamp(0.25rem, 1vh, 0.5rem);
+  align-items: center;
+  justify-items: center;
 }
 
 [data-player-count="6"] .players-container {
   display: grid;
   grid-template-areas:
     "player-1 . player-2"
-    ". . ."
     "player-3 . player-0"
-    ". . ."
-    "player-4 . player-5"
-    ". . .";
-  grid-template-rows: 1fr 1fr 1fr 1fr 1fr 1fr;
+    "player-4 . player-5";
+  grid-template-rows: auto 1fr auto;
   grid-template-columns: 1fr 1fr 1fr;
+  gap: clamp(0.25rem, 1vh, 0.5rem);
+  align-items: center;
+  justify-items: center;
 }
 
 /* Efeitos de fundo da mesa */
@@ -257,9 +263,10 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2rem;
+  gap: clamp(0.5rem, 2vw, 1.2rem);
   width: 100%;
   height: 100%;
+  padding: clamp(0.15rem, 0.5vw, 0.35rem);
 }
 
 /* Área do baralho */
@@ -267,50 +274,51 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: clamp(0.1rem, 0.3vh, 0.25rem);
 }
 
 .deck-stack {
   position: relative;
-  width: 60px;
-  height: 90px;
+  width: clamp(28px, 4.5vw, 42px);
+  height: clamp(40px, 7vw, 60px);
 }
 
 .card-back {
   position: absolute;
-  width: 60px;
-  height: 90px;
+  width: clamp(28px, 4.5vw, 42px);
+  height: clamp(40px, 7vw, 60px);
   background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
-  border: 2px solid #d4af37;
-  border-radius: 8px;
+  border: clamp(1px, 0.15vw, 2px) solid #d4af37;
+  border-radius: clamp(3px, 0.6vw, 6px);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 clamp(1px, 0.3vw, 3px) clamp(2px, 0.6vw, 5px) rgba(0, 0, 0, 0.3);
 }
 
 .card-symbol {
-  font-size: 24px;
+  font-size: clamp(10px, 2vw, 16px);
   color: #d4af37;
 }
 
 .deck-label, .discard-label {
-  font-size: 12px;
+  font-size: clamp(6px, 1vw, 9px);
   color: #d4af37;
   text-align: center;
   font-weight: bold;
+  white-space: nowrap;
 }
 
 .empty-deck, .empty-discard {
-  width: 60px;
-  height: 90px;
+  width: clamp(28px, 4.5vw, 42px);
+  height: clamp(40px, 7vw, 60px);
   background: rgba(0, 0, 0, 0.3);
-  border: 2px dashed #d4af37;
-  border-radius: 8px;
+  border: clamp(1px, 0.15vw, 2px) dashed #d4af37;
+  border-radius: clamp(3px, 0.6vw, 6px);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: clamp(5px, 0.9vw, 7px);
   color: #d4af37;
 }
 
@@ -319,18 +327,18 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: clamp(0.1rem, 0.3vh, 0.25rem);
 }
 
 .discard-container {
   position: relative;
-  width: 60px;
-  height: 90px;
+  width: clamp(28px, 4.5vw, 42px);
+  height: clamp(40px, 7vw, 60px);
 }
 
 .top-discard-card {
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  border-radius: clamp(4px, 0.8vw, 8px);
+  box-shadow: 0 clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px) rgba(0, 0, 0, 0.3);
 }
 
 /* Info do jogo */
@@ -338,31 +346,32 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: clamp(0.15rem, 0.5vh, 0.4rem);
 }
 
 .turn-indicator {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: clamp(0.1rem, 0.3vh, 0.2rem);
 }
 
 .turn-text {
-  font-size: 16px;
+  font-size: clamp(8px, 1.5vw, 12px);
   color: #d4af37;
   font-weight: bold;
+  white-space: nowrap;
 }
 
 .endgame-warning {
   background: rgba(220, 38, 38, 0.2);
-  border: 2px solid #dc2626;
-  border-radius: 8px;
-  padding: 0.5rem;
+  border: 1px solid #dc2626;
+  border-radius: clamp(3px, 0.6vw, 6px);
+  padding: clamp(0.1rem, 0.3vw, 0.25rem);
 }
 
 .warning-text {
-  font-size: 12px;
+  font-size: clamp(6px, 1vw, 9px);
   color: #fca5a5;
   text-align: center;
 }
@@ -370,19 +379,20 @@ export default {
 /* Banner de reação */
 .reaction-banner {
   position: absolute;
-  top: -40px;
+  top: clamp(-30px, -5vh, -40px);
   left: 50%;
   transform: translateX(-50%);
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  border: 2px solid #fca5a5;
-  border-radius: 20px;
-  padding: 0.5rem 1rem;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  border: clamp(1px, 0.2vw, 2px) solid #fca5a5;
+  border-radius: clamp(12px, 2vw, 20px);
+  padding: clamp(0.25rem, 0.5vw, 0.5rem) clamp(0.5rem, 1vw, 1rem);
+  box-shadow: 0 clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px) rgba(0, 0, 0, 0.3);
   animation: pulse-red 2s infinite;
+  white-space: nowrap;
 }
 
 .reaction-text {
-  font-size: 14px;
+  font-size: clamp(9px, 1.5vw, 13px);
   color: #fca5a5;
   font-weight: bold;
 }
@@ -390,19 +400,20 @@ export default {
 /* Banner de fim de jogo */
 .endgame-banner {
   position: absolute;
-  top: -80px;
+  top: clamp(-60px, -10vh, -80px);
   left: 50%;
   transform: translateX(-50%);
   background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
-  border: 2px solid #c4b5fd;
-  border-radius: 20px;
-  padding: 0.5rem 1rem;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  border: clamp(1px, 0.2vw, 2px) solid #c4b5fd;
+  border-radius: clamp(12px, 2vw, 20px);
+  padding: clamp(0.25rem, 0.5vw, 0.5rem) clamp(0.5rem, 1vw, 1rem);
+  box-shadow: 0 clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px) rgba(0, 0, 0, 0.3);
   animation: pulse-purple 2s infinite;
+  white-space: nowrap;
 }
 
 .endgame-text {
-  font-size: 14px;
+  font-size: clamp(9px, 1.5vw, 13px);
   color: #c4b5fd;
   font-weight: bold;
 }
@@ -415,5 +426,73 @@ export default {
 @keyframes pulse-purple {
   0%, 100% { box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); }
   50% { box-shadow: 0 4px 15px rgba(124, 58, 237, 0.5); }
+}
+
+/* Responsividade para tablets */
+@media (max-width: 1024px) {
+  .poker-table {
+    width: clamp(250px, 55vw, 450px);
+    height: clamp(160px, 28vh, 280px);
+  }
+  
+  .players-container {
+    width: clamp(300px, 90vw, 850px);
+    height: clamp(260px, 65vh, 600px);
+  }
+}
+
+/* Responsividade para celulares */
+@media (max-width: 768px) {
+  .poker-table-container {
+    padding: clamp(0.25rem, 1vw, 0.75rem);
+  }
+  
+  .poker-table {
+    width: clamp(220px, 60vw, 380px);
+    height: clamp(140px, 25vh, 240px);
+    border-width: 3px;
+  }
+  
+  .players-container {
+    width: clamp(280px, 95vw, 700px);
+    height: clamp(240px, 60vh, 500px);
+  }
+  
+  .table-center {
+    gap: clamp(0.5rem, 2vw, 1rem);
+  }
+}
+
+/* Responsividade para celulares pequenos */
+@media (max-width: 480px) {
+  .poker-table {
+    width: clamp(180px, 70vw, 300px);
+    height: clamp(120px, 22vh, 200px);
+    border-width: 2px;
+  }
+  
+  .players-container {
+    width: 98vw;
+    height: clamp(220px, 55vh, 450px);
+  }
+}
+
+/* Landscape em dispositivos móveis */
+@media (max-height: 500px) and (orientation: landscape) {
+  .poker-table {
+    width: clamp(200px, 35vw, 350px);
+    height: clamp(130px, 50vh, 250px);
+  }
+  
+  .players-container {
+    width: clamp(350px, 60vw, 700px);
+    height: clamp(200px, 85vh, 400px);
+  }
+  
+  .reaction-banner,
+  .endgame-banner {
+    top: auto;
+    bottom: clamp(-25px, -3vh, -35px);
+  }
 }
 </style>

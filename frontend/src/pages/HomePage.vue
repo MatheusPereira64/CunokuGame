@@ -227,7 +227,7 @@ const iniciarContraBotsWithSound = () => {
   backdrop-filter: blur(2px);
 }
 
-/* Container principal elegante */
+/* Container principal - RESPONSIVO */
 .home-container {
   position: relative;
   z-index: 2;
@@ -235,12 +235,13 @@ const iniciarContraBotsWithSound = () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2.5rem;
-  padding: 2rem;
+  gap: clamp(1rem, 3vh, 2rem);
+  padding: clamp(1rem, 2vh, 2rem);
   max-width: min(700px, 95vw);
   margin: 0 auto;
   text-align: center;
   width: 100%;
+  min-height: 100%;
 }
 
 /* Título principal estilizado */

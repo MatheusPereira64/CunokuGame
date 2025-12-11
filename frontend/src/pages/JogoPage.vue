@@ -231,43 +231,107 @@ function criarBaralhoLocal() {
 </script>
 
 <style scoped>
+/* Container do jogo - TELA CHEIA E RESPONSIVO */
 .jogo-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  justify-content: center;
+  gap: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
 }
+
 .info-jogador {
-  font-size: 1.2rem;
+  font-size: clamp(0.85rem, 1.5vw, 1.1rem);
   color: #eebbc3;
-  margin-bottom: 1rem;
+  margin-bottom: clamp(0.3rem, 1vh, 0.75rem);
 }
+
 .turno-msg {
-  font-size: 1.4rem;
+  font-size: clamp(0.9rem, 1.8vw, 1.3rem);
   color: #ffe082;
   background: #232946;
-  padding: 1rem 2rem;
-  border-radius: 12px;
-  border: 2px solid #d4af37;
+  padding: clamp(0.5rem, 1.5vh, 0.9rem) clamp(1rem, 3vw, 1.8rem);
+  border-radius: clamp(6px, 1vw, 12px);
+  border: clamp(1px, 0.2vw, 2px) solid #d4af37;
   box-shadow: 0 2px 8px #0007;
-  margin-bottom: 1.5rem;
+  margin-bottom: clamp(0.5rem, 1.5vh, 1rem);
 }
+
 .lobby-jogadores {
-  margin-bottom: 1rem;
+  margin-bottom: clamp(0.3rem, 1vh, 0.75rem);
   background: #232946;
-  border-radius: 8px;
-  padding: 1rem 2rem;
+  border-radius: clamp(4px, 0.8vw, 8px);
+  padding: clamp(0.5rem, 1.5vh, 0.9rem) clamp(1rem, 3vw, 1.8rem);
   color: #eebbc3;
   box-shadow: 0 1px 8px #0003;
 }
+
 .lobby-jogadores ul {
   margin: 0;
-  padding-left: 1.2rem;
+  padding-left: clamp(0.75rem, 2vw, 1.2rem);
 }
+
 .aguardando-msg {
   color: #ffe082;
-  font-size: 1.2rem;
-  margin-top: 1rem;
+  font-size: clamp(0.85rem, 1.5vw, 1.1rem);
+  margin-top: clamp(0.3rem, 1vh, 0.75rem);
   text-align: center;
+}
+
+/* Responsividade para tablets */
+@media (max-width: 1024px) {
+  .jogo-container {
+    gap: clamp(0.4rem, 1.2vh, 0.8rem);
+  }
+}
+
+/* Responsividade para celulares */
+@media (max-width: 768px) {
+  .jogo-container {
+    gap: clamp(0.3rem, 1vh, 0.6rem);
+  }
+  
+  .info-jogador {
+    font-size: clamp(0.75rem, 2vw, 0.95rem);
+  }
+  
+  .turno-msg {
+    padding: clamp(0.4rem, 1.2vh, 0.7rem) clamp(0.75rem, 2.5vw, 1.4rem);
+    font-size: clamp(0.8rem, 2vw, 1rem);
+  }
+  
+  .lobby-jogadores {
+    padding: clamp(0.4rem, 1.2vh, 0.7rem) clamp(0.75rem, 2.5vw, 1.4rem);
+  }
+}
+
+/* Responsividade para celulares pequenos */
+@media (max-width: 480px) {
+  .jogo-container {
+    gap: clamp(0.25rem, 0.8vh, 0.5rem);
+  }
+}
+
+/* Landscape em dispositivos móveis */
+@media (max-height: 500px) and (orientation: landscape) {
+  .jogo-container {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: clamp(0.25rem, 0.8vw, 0.5rem);
+  }
 }
 </style> 

@@ -299,7 +299,7 @@ const setSFXVolumeWithSound = (volume) => {
     <div v-if="aguardandoInteracao" class="overlay-musica" @click="iniciarMusica">
       <div class="msg-musica flash-glow-pulse flash-text-glow">{{ t('gameStart') }} 🎵</div>
     </div>
-    <nav class="menu">
+    <nav class="menu" :class="{ 'hidden-on-game': pagina === 'jogo' }">
       <Tooltip :title="'Início'" :content="'Voltar para a página inicial do jogo'" position="bottom">
         <button :class="{ ativo: pagina === 'inicio' }" @click="navigateTo('inicio')" class="flash-button flash-hover-scale">{{ t('gameStart') }}</button>
       </Tooltip>
@@ -401,11 +401,23 @@ const setSFXVolumeWithSound = (volume) => {
 </template>
 
 <style scoped>
-/* Layout principal do aplicativo com tema cassino japonês */
+/* Layout principal do aplicativo */
 .app-layout {
   min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
   background: var(--casino-gradient);
   position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Quando estiver no jogo - tela cheia */
+.app-layout:has(main:has(.jogo-container)) {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
 }
 
 /* Overlay para ativação de música */
@@ -444,22 +456,29 @@ const setSFXVolumeWithSound = (volume) => {
   100% { transform: scale(1.02); box-shadow: 0 12px 40px rgba(212, 175, 55, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
 }
 
-/* Menu de navegação elegante */
+/* Menu de navegação - COMPACTO E RESPONSIVO */
 .menu {
   display: flex;
-  gap: 1.5rem;
+  gap: clamp(0.5rem, 1.5vw, 1.5rem);
   background: 
     linear-gradient(135deg, rgba(25, 25, 112, 0.95) 0%, rgba(28, 28, 28, 0.95) 100%);
   backdrop-filter: blur(10px);
-  padding: 1.5rem 2rem;
-  border-radius: 0 0 24px 24px;
+  padding: clamp(0.5rem, 1.5vh, 1rem) clamp(0.75rem, 2vw, 2rem);
+  border-radius: 0 0 clamp(12px, 2vw, 24px) clamp(12px, 2vw, 24px);
   box-shadow: 
     0 4px 20px rgba(0, 0, 0, 0.6),
     0 0 0 1px rgba(212, 175, 55, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   justify-content: space-between;
   align-items: center;
-  border-top: 3px solid var(--primary-gold);
+  border-top: clamp(2px, 0.3vw, 3px) solid var(--primary-gold);
+  flex-shrink: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Esconder menu quando estiver no jogo */
+.menu.hidden-on-game {
+  display: none;
 }
 
 .language-selector-nav {
@@ -564,18 +583,18 @@ const setSFXVolumeWithSound = (volume) => {
 
 .menu button {
   background: var(--card-gradient);
-  border: 2px solid var(--primary-gold);
+  border: clamp(1px, 0.2vw, 2px) solid var(--primary-gold);
   color: var(--pearl-white);
-  font-size: 1.15rem;
+  font-size: clamp(0.7rem, 1.2vw, 1rem);
   font-family: 'Cinzel', serif;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 0.8rem 2.5rem;
-  border-radius: 12px;
+  letter-spacing: 0.3px;
+  padding: clamp(0.4rem, 1vh, 0.7rem) clamp(0.8rem, 2vw, 2rem);
+  border-radius: clamp(6px, 1vw, 12px);
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  margin: 0 0.3rem;
+  margin: 0 clamp(0.1rem, 0.3vw, 0.3rem);
   box-shadow: 
     0 2px 8px rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -613,23 +632,47 @@ const setSFXVolumeWithSound = (volume) => {
   transform: translateY(0);
 }
 
-/* Container principal */
+/* Container principal - RESPONSIVO */
 main {
-  max-width: min(1200px, 98vw);
-  margin: 1rem auto;
+  max-width: min(1400px, 99vw);
+  margin: clamp(0.25rem, 0.5vh, 0.75rem) auto;
   background: 
     linear-gradient(135deg, rgba(25, 25, 112, 0.9) 0%, rgba(28, 28, 28, 0.9) 100%);
   backdrop-filter: blur(15px);
-  border-radius: 24px;
+  border-radius: clamp(12px, 2vw, 24px);
   box-shadow: 
     0 12px 40px rgba(0, 0, 0, 0.6),
-    0 0 0 2px var(--primary-gold),
+    0 0 0 clamp(1px, 0.2vw, 2px) var(--primary-gold),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  padding: clamp(1rem, 3vw, 2rem);
+  padding: clamp(0.5rem, 1.5vw, 1.5rem);
   position: relative;
   flex: 1;
   overflow-y: auto;
-  max-height: calc(100vh - 120px);
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+/* Quando estiver na página de jogo - TELA CHEIA */
+main:has(.jogo-container) {
+  max-width: 100vw;
+  width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+main:has(.jogo-container)::before {
+  display: none;
 }
 
 /* Transições de página estilo Flash */
@@ -749,11 +792,29 @@ main::before {
   left: 100%;
 }
 
+/* Responsividade para tablets */
+@media (max-width: 1024px) {
+  .menu {
+    padding: clamp(0.4rem, 1vh, 0.8rem) clamp(0.6rem, 1.5vw, 1.5rem);
+    gap: clamp(0.4rem, 1vw, 1rem);
+  }
+  
+  .menu button {
+    padding: clamp(0.3rem, 0.8vh, 0.55rem) clamp(0.6rem, 1.5vw, 1.5rem);
+    font-size: clamp(0.6rem, 1vw, 0.85rem);
+  }
+  
+  main {
+    margin: clamp(0.2rem, 0.4vh, 0.5rem) auto;
+    padding: clamp(0.2rem, 0.8vw, 0.75rem);
+  }
+}
+
 /* Responsividade móvel */
 @media (max-width: 768px) {
   .menu {
-    padding: 1rem;
-    gap: 1rem;
+    padding: clamp(0.3rem, 0.8vh, 0.6rem) clamp(0.5rem, 1.2vw, 1rem);
+    gap: clamp(0.3rem, 0.8vw, 0.75rem);
     flex-wrap: wrap;
     justify-content: center;
   }
@@ -762,66 +823,104 @@ main::before {
     order: -1;
     width: 100%;
     justify-content: center;
-    margin-bottom: 0.5rem;
+    margin-bottom: clamp(0.2rem, 0.5vh, 0.4rem);
   }
   
   .menu button {
-    padding: 0.6rem 1.5rem;
-    font-size: 1rem;
-    margin: 0.2rem;
+    padding: clamp(0.25rem, 0.6vh, 0.45rem) clamp(0.5rem, 1.2vw, 1.2rem);
+    font-size: clamp(0.55rem, 0.9vw, 0.75rem);
+    margin: clamp(0.05rem, 0.15vw, 0.15rem);
   }
   
   main {
-    margin: 1rem auto;
-    padding: 1.5rem;
+    margin: clamp(0.15rem, 0.3vh, 0.4rem) auto;
+    padding: clamp(0.15rem, 0.6vw, 0.5rem);
+    border-radius: clamp(8px, 1.5vw, 16px);
   }
   
   .player-musica {
-    right: 16px;
-    bottom: 16px;
-    padding: 0.8rem 1rem;
+    right: clamp(8px, 2vw, 16px);
+    bottom: clamp(8px, 2vw, 16px);
+    padding: clamp(0.4rem, 1vh, 0.7rem) clamp(0.5rem, 1.2vw, 0.9rem);
   }
   
   .btn-musica {
-    padding: 0.4rem 1rem;
-    font-size: 0.9rem;
+    padding: clamp(0.2rem, 0.5vh, 0.35rem) clamp(0.5rem, 1.2vw, 0.9rem);
+    font-size: clamp(0.7rem, 1.2vw, 0.85rem);
   }
   
   .msg-musica {
-    padding: 1.5rem 2rem;
-    font-size: 1.1rem;
-    margin: 1rem;
+    padding: clamp(0.75rem, 2vh, 1.25rem) clamp(1rem, 3vw, 1.75rem);
+    font-size: clamp(0.85rem, 1.5vw, 1rem);
+    margin: clamp(0.5rem, 1.5vw, 0.9rem);
+  }
+  
+  .audio-controls {
+    padding: clamp(0.25rem, 0.6vh, 0.4rem) clamp(0.4rem, 1vw, 0.75rem);
+  }
+  
+  .audio-btn, .theme-btn {
+    width: clamp(28px, 5vw, 36px);
+    height: clamp(28px, 5vw, 36px);
+    font-size: clamp(0.85rem, 1.5vw, 1.05rem);
+  }
+  
+  .volume-controls {
+    display: none; /* Esconde sliders em telas pequenas */
   }
 }
 
 @media (max-width: 480px) {
   .menu {
-    padding: 0.8rem;
-    border-radius: 0 0 16px 16px;
-    gap: 0.5rem;
+    padding: clamp(0.2rem, 0.6vh, 0.45rem);
+    border-radius: 0 0 clamp(8px, 1.2vw, 12px) clamp(8px, 1.2vw, 12px);
+    gap: clamp(0.2rem, 0.6vw, 0.45rem);
   }
   
   .language-selector-nav {
-    margin-bottom: 0.3rem;
+    margin-bottom: clamp(0.1rem, 0.3vh, 0.25rem);
   }
   
   .menu button {
-    padding: 0.5rem 1rem;
-    font-size: 0.9rem;
-    width: 100%;
-    max-width: 200px;
+    padding: clamp(0.2rem, 0.5vh, 0.35rem) clamp(0.4rem, 1vw, 0.9rem);
+    font-size: clamp(0.5rem, 0.8vw, 0.65rem);
   }
   
   main {
-    margin: 0.5rem auto;
-    padding: 1rem;
-    border-radius: 16px;
+    margin: clamp(0.1rem, 0.2vh, 0.25rem) auto;
+    padding: clamp(0.1rem, 0.4vw, 0.35rem);
+    border-radius: clamp(6px, 1vw, 12px);
   }
   
   .player-musica {
-    right: 8px;
-    bottom: 8px;
-    padding: 0.6rem 0.8rem;
+    right: clamp(4px, 1.5vw, 8px);
+    bottom: clamp(4px, 1.5vw, 8px);
+    padding: clamp(0.3rem, 0.8vh, 0.5rem) clamp(0.4rem, 1vw, 0.7rem);
+  }
+}
+
+/* Landscape em dispositivos móveis */
+@media (max-height: 500px) and (orientation: landscape) {
+  .menu {
+    padding: clamp(0.15rem, 0.4vh, 0.35rem) clamp(0.5rem, 1.2vw, 1rem);
+    flex-wrap: nowrap;
+    gap: clamp(0.3rem, 0.8vw, 0.6rem);
+  }
+  
+  .language-selector-nav {
+    order: 0;
+    width: auto;
+    margin-bottom: 0;
+  }
+  
+  .menu button {
+    padding: clamp(0.15rem, 0.4vh, 0.3rem) clamp(0.4rem, 1vw, 0.8rem);
+    font-size: clamp(0.5rem, 0.8vw, 0.65rem);
+  }
+  
+  main {
+    margin: clamp(0.1rem, 0.2vh, 0.2rem) auto;
+    padding: clamp(0.1rem, 0.3vw, 0.25rem);
   }
 }
 

@@ -190,26 +190,25 @@ export default {
 </script>
 
 <style scoped>
-/* Área de ações Flash */
+/* Área de ações Flash - RESPONSIVA SEM SCROLL */
 .flash-action-area {
-  position: fixed;
-  top: 60%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.8rem;
+  gap: clamp(0.3rem, 1vh, 0.6rem);
   z-index: 100;
-  max-width: 90vw;
-  max-height: 80vh;
-  overflow-y: auto;
+  max-width: 95vw;
+  max-height: clamp(100px, 25vh, 200px);
+  overflow: hidden;
   background: var(--flash-dark-gradient);
-  padding: 1rem 1.5rem;
-  border-radius: 20px;
-  border: 3px solid var(--flash-gold);
+  padding: clamp(0.5rem, 1.5vh, 1rem) clamp(0.75rem, 2vw, 1.5rem);
+  border-radius: clamp(12px, 2vw, 20px);
+  border: clamp(2px, 0.3vw, 3px) solid var(--flash-gold);
   backdrop-filter: blur(15px);
   box-shadow: var(--flash-glow-strong), var(--flash-shadow-strong);
+  margin-top: clamp(0.25rem, 1vh, 0.75rem);
+  flex-shrink: 0;
 }
 
 .flash-action-area::before {
@@ -664,42 +663,292 @@ export default {
   }
 }
 
-/* Responsividade */
-@media (max-width: 768px) {
+/* Botões Flash - RESPONSIVOS */
+.flash-action-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, 0.8vw, 8px);
+  padding: clamp(6px, 1.5vh, 12px) clamp(12px, 2.5vw, 24px);
+  font-family: 'Arial Black', Arial, sans-serif;
+  font-weight: bold;
+  font-size: clamp(10px, 1.5vw, 14px);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--japanese-black);
+  background: var(--flash-gold-gradient);
+  border: none;
+  border-radius: clamp(15px, 2.5vw, 25px);
+  cursor: pointer;
+  overflow: hidden;
+  transition: all var(--flash-normal) var(--flash-ease);
+  box-shadow: var(--flash-shadow);
+  text-decoration: none;
+  min-width: clamp(80px, 15vw, 140px);
+  height: clamp(32px, 6vh, 50px);
+}
+
+.action-icon {
+  font-size: clamp(12px, 2vw, 18px);
+  animation: flash-icon-bounce 2s ease-in-out infinite;
+}
+
+/* Painel de ações de carta - RESPONSIVO */
+.card-action-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.5rem, 1.5vh, 1rem);
+  background: var(--flash-dark-gradient);
+  padding: clamp(0.75rem, 2vh, 1.5rem);
+  border-radius: clamp(12px, 2vw, 20px);
+  border: clamp(2px, 0.3vw, 3px) solid var(--flash-gold);
+  backdrop-filter: blur(15px);
+  max-width: 95vw;
+  position: relative;
+  overflow: hidden;
+}
+
+.flash-modal-title {
+  color: var(--flash-gold);
+  margin: 0;
+  font-size: clamp(0.8rem, 1.8vw, 1.1rem);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.bought-card-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.3rem, 1vh, 0.75rem);
+}
+
+.drawn-card-flash {
+  transform: scale(clamp(0.6, 0.08 * 100vw / 100, 1));
+  transition: transform var(--flash-normal) var(--flash-ease);
+  animation: flash-card-enter 0.5s var(--flash-bounce);
+}
+
+.action-buttons {
+  display: flex;
+  gap: clamp(0.4rem, 1vw, 0.8rem);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Interface de substituição - RESPONSIVA */
+.substitute-interface {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.5rem, 1.5vh, 1rem);
+  background: var(--flash-dark-gradient);
+  padding: clamp(0.75rem, 2vh, 1.5rem);
+  border-radius: clamp(12px, 2vw, 20px);
+  border: clamp(1px, 0.2vw, 2px) solid var(--flash-gold);
+  position: relative;
+  overflow: hidden;
+}
+
+.hand-selection {
+  display: flex;
+  gap: clamp(0.4rem, 1vw, 0.8rem);
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
+}
+
+.card-back-flash {
+  width: clamp(35px, 7vw, 55px);
+  height: clamp(52px, 10.5vw, 82px);
+  background: var(--flash-dark-gradient);
+  border: clamp(2px, 0.3vw, 3px) solid var(--flash-gold);
+  border-radius: clamp(6px, 1.2vw, 12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--flash-glow), var(--flash-shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-symbol {
+  font-size: clamp(1rem, 2.5vw, 1.8rem);
+  color: var(--flash-gold);
+  text-shadow: 0 0 10px currentColor;
+}
+
+.card-number-flash {
+  background: var(--flash-gold-gradient);
+  color: var(--japanese-black);
+  padding: clamp(0.15rem, 0.4vw, 0.25rem) clamp(0.3rem, 0.8vw, 0.5rem);
+  border-radius: clamp(4px, 0.8vw, 8px);
+  font-size: clamp(0.6rem, 1vw, 0.75rem);
+  font-weight: bold;
+  box-shadow: var(--flash-shadow);
+}
+
+/* Estado de espera - RESPONSIVO */
+.waiting-turn {
+  text-align: center;
+  padding: clamp(0.75rem, 2vh, 1.5rem);
+  background: var(--flash-dark-gradient);
+  border: clamp(2px, 0.3vw, 3px) solid var(--flash-gold);
+  border-radius: clamp(12px, 2vw, 20px);
+  position: relative;
+  overflow: hidden;
+}
+
+.waiting-icon {
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  margin-bottom: clamp(0.3rem, 1vh, 0.75rem);
+  display: block;
+}
+
+.waiting-text {
+  color: var(--flash-gold);
+  font-size: clamp(0.8rem, 1.5vw, 1.1rem);
+  font-weight: bold;
+  margin-bottom: clamp(0.3rem, 1vh, 0.75rem);
+}
+
+.player-name {
+  color: var(--flash-neon-blue);
+  font-size: clamp(0.75rem, 1.3vw, 1rem);
+  font-weight: bold;
+}
+
+.loading-dots span {
+  width: clamp(5px, 1vw, 8px);
+  height: clamp(5px, 1vw, 8px);
+  background: var(--flash-gold);
+  border-radius: 50%;
+  animation: flash-dot-bounce 1.4s ease-in-out infinite both;
+}
+
+/* Seção de fim de jogo */
+.endgame-section {
+  margin-top: clamp(0.25rem, 0.75vh, 0.5rem);
+}
+
+/* Responsividade para tablets */
+@media (max-width: 1024px) {
   .flash-action-area {
-    padding: 0.8rem 1rem;
-    gap: 0.6rem;
-    top: 65%;
-    max-width: 98vw;
+    max-height: clamp(90px, 22vh, 180px);
+    padding: clamp(0.4rem, 1.2vh, 0.8rem) clamp(0.6rem, 1.5vw, 1.2rem);
   }
   
   .flash-action-btn {
-    padding: 10px 16px;
-    font-size: 14px;
-    min-width: 120px;
-    height: 45px;
+    min-width: clamp(70px, 14vw, 120px);
+    height: clamp(28px, 5vh, 42px);
+    font-size: clamp(9px, 1.3vw, 12px);
+  }
+}
+
+/* Responsividade para celulares */
+@media (max-width: 768px) {
+  .flash-action-area {
+    padding: clamp(0.35rem, 1vh, 0.65rem) clamp(0.5rem, 1.2vw, 1rem);
+    gap: clamp(0.25rem, 0.8vh, 0.5rem);
+    max-width: 98vw;
+    max-height: clamp(80px, 20vh, 150px);
+  }
+  
+  .flash-action-btn {
+    padding: clamp(5px, 1.2vh, 10px) clamp(10px, 2vw, 18px);
+    font-size: clamp(8px, 1.2vw, 11px);
+    min-width: clamp(60px, 18vw, 100px);
+    height: clamp(26px, 4.5vh, 38px);
+    gap: clamp(3px, 0.6vw, 6px);
+  }
+  
+  .action-icon {
+    font-size: clamp(10px, 1.8vw, 14px);
   }
   
   .card-action-panel {
-    padding: 1.5rem;
-    gap: 1rem;
+    padding: clamp(0.5rem, 1.5vh, 1rem);
+    gap: clamp(0.4rem, 1vh, 0.75rem);
   }
   
   .action-buttons {
-    gap: 0.8rem;
+    gap: clamp(0.3rem, 0.8vw, 0.6rem);
   }
   
   .hand-selection {
-    gap: 0.8rem;
+    gap: clamp(0.3rem, 0.8vw, 0.6rem);
   }
   
   .card-back-flash {
-    width: 50px;
-    height: 75px;
+    width: clamp(28px, 8vw, 42px);
+    height: clamp(42px, 12vw, 63px);
   }
   
   .card-symbol {
-    font-size: 1.5rem;
+    font-size: clamp(0.8rem, 2vw, 1.3rem);
+  }
+  
+  .waiting-turn {
+    padding: clamp(0.5rem, 1.5vh, 1rem);
+  }
+  
+  .waiting-icon {
+    font-size: clamp(1.2rem, 3.5vw, 2rem);
+  }
+  
+  .waiting-text {
+    font-size: clamp(0.7rem, 1.3vw, 0.95rem);
+  }
+}
+
+/* Responsividade para celulares pequenos */
+@media (max-width: 480px) {
+  .flash-action-area {
+    max-height: clamp(70px, 18vh, 120px);
+    padding: clamp(0.25rem, 0.8vh, 0.5rem) clamp(0.4rem, 1vw, 0.75rem);
+  }
+  
+  .flash-action-btn {
+    min-width: clamp(50px, 22vw, 85px);
+    height: clamp(22px, 4vh, 32px);
+    font-size: clamp(7px, 1.5vw, 10px);
+    padding: clamp(4px, 1vh, 8px) clamp(8px, 1.8vw, 14px);
+  }
+  
+  .card-back-flash {
+    width: clamp(22px, 10vw, 35px);
+    height: clamp(33px, 15vw, 52px);
+  }
+}
+
+/* Landscape em dispositivos móveis */
+@media (max-height: 500px) and (orientation: landscape) {
+  .flash-action-area {
+    flex-direction: row;
+    max-height: clamp(60px, 15vh, 100px);
+    max-width: 60vw;
+    padding: clamp(0.25rem, 0.8vh, 0.5rem) clamp(0.5rem, 1.5vw, 1rem);
+  }
+  
+  .current-player-actions {
+    flex-direction: row;
+  }
+  
+  .card-action-panel {
+    flex-direction: row;
+    padding: clamp(0.4rem, 1vh, 0.75rem);
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    gap: clamp(0.2rem, 0.5vw, 0.4rem);
+  }
+  
+  .waiting-turn {
+    padding: clamp(0.4rem, 1vh, 0.75rem);
   }
 }
 </style>

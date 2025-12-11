@@ -179,24 +179,26 @@ export default {
 </script>
 
 <style scoped>
-/* Container do jogador */
+/* Container do jogador - RESPONSIVO */
 .player-position {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
+  gap: clamp(0.2rem, 0.5vh, 0.4rem);
+  padding: clamp(0.35rem, 1vw, 0.65rem);
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border: 3px solid #d4af37;
-  border-radius: 15px;
+  border: clamp(2px, 0.3vw, 3px) solid #d4af37;
+  border-radius: clamp(8px, 1.5vw, 15px);
   box-shadow: 
-    0 4px 8px rgba(0, 0, 0, 0.3),
-    0 0 20px rgba(212, 175, 55, 0.3);
-  min-width: 150px;
-  max-width: 200px;
+    0 clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px) rgba(0, 0, 0, 0.3),
+    0 0 clamp(10px, 2vw, 20px) rgba(212, 175, 55, 0.3);
+  min-width: clamp(80px, 15vw, 140px);
+  max-width: clamp(100px, 18vw, 170px);
   pointer-events: auto;
   z-index: 4;
+  justify-self: center;
+  align-self: center;
 }
 
 /* Posições usando grid-area */
@@ -245,24 +247,25 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: clamp(0.15rem, 0.4vh, 0.35rem);
   z-index: 2;
 }
 
 .player-avatar {
   position: relative;
-  width: 50px;
-  height: 50px;
+  width: clamp(28px, 5vw, 45px);
+  height: clamp(28px, 5vw, 45px);
   background: linear-gradient(135deg, #d4af37 0%, #ffd700 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px) rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
 }
 
 .avatar-icon {
-  font-size: 24px;
+  font-size: clamp(14px, 2.5vw, 22px);
   color: #1a1a2e;
 }
 
@@ -275,11 +278,11 @@ export default {
 
 .turn-indicator-ring {
   position: absolute;
-  top: -5px;
-  left: -5px;
-  right: -5px;
-  bottom: -5px;
-  border: 3px solid #00ff00;
+  top: clamp(-3px, -0.5vw, -5px);
+  left: clamp(-3px, -0.5vw, -5px);
+  right: clamp(-3px, -0.5vw, -5px);
+  bottom: clamp(-3px, -0.5vw, -5px);
+  border: clamp(2px, 0.3vw, 3px) solid #00ff00;
   border-radius: 50%;
   animation: turn-pulse 1s ease-in-out infinite;
 }
@@ -290,26 +293,30 @@ export default {
 }
 
 .player-name {
-  font-size: 14px;
+  font-size: clamp(9px, 1.5vw, 13px);
   color: #d4af37;
   font-weight: bold;
   text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .player-stats {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: clamp(0.1rem, 0.2vh, 0.2rem);
 }
 
 .card-count {
-  font-size: 12px;
+  font-size: clamp(8px, 1.2vw, 11px);
   color: #ffffff;
 }
 
 .you-indicator {
-  font-size: 10px;
+  font-size: clamp(7px, 1vw, 9px);
   color: #00ff00;
   font-weight: bold;
 }
@@ -318,7 +325,7 @@ export default {
 .player-cards {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: clamp(0.1rem, 0.3vw, 0.2rem);
   justify-content: center;
   max-width: 100%;
 }
@@ -326,7 +333,7 @@ export default {
 .my-hand, .opponent-hand {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: clamp(0.1rem, 0.3vw, 0.2rem);
   justify-content: center;
 }
 
@@ -334,7 +341,7 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: clamp(0.05rem, 0.2vh, 0.1rem);
 }
 
 .card-container {
@@ -343,58 +350,59 @@ export default {
 }
 
 .card-container:hover {
-  transform: translateY(-5px);
+  transform: translateY(clamp(-3px, -0.5vh, -5px));
 }
 
 .revealed-card {
-  border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  border-radius: clamp(4px, 0.8vw, 8px);
+  box-shadow: 0 clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px) rgba(0, 0, 0, 0.3);
 }
 
 .card-back {
-  width: 60px;
-  height: 90px;
+  width: clamp(28px, 5vw, 45px);
+  height: clamp(42px, 7.5vw, 68px);
   background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
-  border: 2px solid #d4af37;
-  border-radius: 8px;
+  border: clamp(1px, 0.2vw, 2px) solid #d4af37;
+  border-radius: clamp(4px, 0.8vw, 8px);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px) rgba(0, 0, 0, 0.3);
 }
 
 .opponent-card .card-back {
-  width: 25px;
-  height: 35px;
+  width: clamp(18px, 3vw, 28px);
+  height: clamp(27px, 4.5vw, 42px);
 }
 
 .card-symbol {
-  font-size: 16px;
+  font-size: clamp(10px, 1.8vw, 15px);
   color: #d4af37;
 }
 
 .opponent-card .card-symbol {
-  font-size: 10px;
+  font-size: clamp(7px, 1.2vw, 10px);
 }
 
 /* Botões de ação */
 .player-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: clamp(0.2rem, 0.5vw, 0.4rem);
   flex-wrap: wrap;
   justify-content: center;
 }
 
 .discard-btn, .react-btn {
-  padding: 0.25rem 0.5rem;
-  border: 2px solid #d4af37;
-  border-radius: 5px;
+  padding: clamp(0.1rem, 0.3vw, 0.2rem) clamp(0.2rem, 0.5vw, 0.4rem);
+  border: clamp(1px, 0.2vw, 2px) solid #d4af37;
+  border-radius: clamp(3px, 0.5vw, 5px);
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
   color: #ffffff;
-  font-size: 10px;
+  font-size: clamp(7px, 1vw, 9px);
   font-weight: bold;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .react-btn {
@@ -402,8 +410,8 @@ export default {
 }
 
 .discard-btn:hover, .react-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  transform: translateY(clamp(-1px, -0.2vh, -2px));
+  box-shadow: 0 clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px) rgba(0, 0, 0, 0.3);
 }
 
 /* Pontuação */
@@ -411,20 +419,20 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: clamp(0.1rem, 0.2vh, 0.2rem);
   background: rgba(0, 0, 0, 0.3);
-  padding: 0.5rem;
-  border-radius: 8px;
-  border: 1px solid #d4af37;
+  padding: clamp(0.2rem, 0.5vw, 0.4rem);
+  border-radius: clamp(4px, 0.8vw, 8px);
+  border: clamp(1px, 0.15vw, 1px) solid #d4af37;
 }
 
 .score-label {
-  font-size: 10px;
+  font-size: clamp(7px, 1vw, 9px);
   color: #d4af37;
 }
 
 .score-value {
-  font-size: 16px;
+  font-size: clamp(10px, 1.5vw, 14px);
   color: #ffffff;
   font-weight: bold;
 }
@@ -433,42 +441,101 @@ export default {
 .active-turn {
   border-color: #00ff00;
   box-shadow: 
-    0 4px 8px rgba(0, 0, 0, 0.3),
-    0 0 20px rgba(0, 255, 0, 0.5);
+    0 clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px) rgba(0, 0, 0, 0.3),
+    0 0 clamp(10px, 2vw, 20px) rgba(0, 255, 0, 0.5);
 }
 
 .current-player {
   border-color: #ffd700;
   box-shadow: 
-    0 4px 8px rgba(0, 0, 0, 0.3),
-    0 0 20px rgba(255, 215, 0, 0.5);
+    0 clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px) rgba(0, 0, 0, 0.3),
+    0 0 clamp(10px, 2vw, 20px) rgba(255, 215, 0, 0.5);
 }
 
-/* Responsividade */
+/* Responsividade para tablets */
+@media (max-width: 1024px) {
+  .player-position {
+    min-width: clamp(75px, 14vw, 120px);
+    max-width: clamp(95px, 17vw, 150px);
+  }
+}
+
+/* Responsividade para celulares */
 @media (max-width: 768px) {
   .player-position {
-    min-width: 120px;
-    max-width: 150px;
-    padding: 0.5rem;
+    min-width: clamp(65px, 18vw, 100px);
+    max-width: clamp(80px, 22vw, 120px);
+    padding: clamp(0.25rem, 0.8vw, 0.5rem);
+    gap: clamp(0.15rem, 0.4vh, 0.3rem);
   }
   
   .player-avatar {
-    width: 40px;
-    height: 40px;
+    width: clamp(22px, 6vw, 35px);
+    height: clamp(22px, 6vw, 35px);
   }
   
   .avatar-icon {
-    font-size: 20px;
+    font-size: clamp(12px, 3vw, 18px);
   }
   
   .card-back {
-    width: 50px;
-    height: 75px;
+    width: clamp(22px, 6vw, 35px);
+    height: clamp(33px, 9vw, 52px);
   }
   
   .opponent-card .card-back {
-    width: 20px;
-    height: 28px;
+    width: clamp(15px, 4vw, 22px);
+    height: clamp(22px, 6vw, 33px);
+  }
+  
+  .player-name {
+    font-size: clamp(8px, 2vw, 11px);
+  }
+  
+  .card-count {
+    font-size: clamp(7px, 1.5vw, 9px);
+  }
+}
+
+/* Responsividade para celulares pequenos */
+@media (max-width: 480px) {
+  .player-position {
+    min-width: clamp(55px, 20vw, 85px);
+    max-width: clamp(70px, 25vw, 100px);
+    padding: clamp(0.2rem, 0.6vw, 0.4rem);
+  }
+  
+  .player-avatar {
+    width: clamp(18px, 7vw, 28px);
+    height: clamp(18px, 7vw, 28px);
+  }
+  
+  .card-back {
+    width: clamp(18px, 7vw, 28px);
+    height: clamp(27px, 10.5vw, 42px);
+  }
+  
+  .opponent-card .card-back {
+    width: clamp(12px, 5vw, 18px);
+    height: clamp(18px, 7.5vw, 27px);
+  }
+}
+
+/* Landscape em dispositivos móveis */
+@media (max-height: 500px) and (orientation: landscape) {
+  .player-position {
+    min-width: clamp(70px, 12vw, 110px);
+    max-width: clamp(90px, 15vw, 140px);
+    flex-direction: row;
+    gap: clamp(0.3rem, 1vw, 0.5rem);
+  }
+  
+  .player-info {
+    flex-direction: column;
+  }
+  
+  .player-cards {
+    flex-direction: column;
   }
 }
 </style>

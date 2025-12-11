@@ -290,17 +290,19 @@ button:active {
   transform: translateY(0);
 }
 
-/* Container principal responsivo */
+/* Container principal - RESPONSIVO */
 #app {
-  max-width: min(1400px, 98vw);
+  max-width: min(1400px, 99vw);
+  width: 100%;
   margin: 0 auto;
-  padding: clamp(0.5rem, 2vw, 1.5rem);
+  padding: clamp(0.25rem, 1vw, 1rem);
   text-align: center;
   position: relative;
   z-index: 2;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .card {
@@ -313,54 +315,91 @@ button:active {
   border: 1px solid rgba(212, 175, 55, 0.3);
 }
 
+/* Responsividade para tablets */
+@media (max-width: 1024px) {
+  #app {
+    padding: clamp(0.2rem, 0.8vw, 0.75rem);
+  }
+  
+  .app-layout, .jogo-page, .cunoku-game {
+    border-radius: clamp(10px, 1.5vw, 18px);
+    margin: clamp(0.2rem, 0.5vw, 0.4rem);
+  }
+}
+
 /* Responsividade móvel */
 @media (max-width: 768px) {
   body::before {
     background-size: 150px;
   }
   
+  #app {
+    padding: clamp(0.15rem, 0.6vw, 0.5rem);
+  }
+  
   .app-layout, .jogo-page, .cunoku-game {
-    border-radius: 16px;
-    margin: 0.5rem;
+    border-radius: clamp(8px, 1.2vw, 16px);
+    margin: clamp(0.15rem, 0.4vw, 0.35rem);
   }
   
   .app-layout::before, .jogo-page::before, .cunoku-game::before {
-    border-radius: 16px;
+    border-radius: clamp(8px, 1.2vw, 16px);
   }
   
   h1 {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+    margin-bottom: clamp(0.5rem, 1.5vh, 1rem);
   }
   
   .btn-principal {
-    padding: 0.7rem 1.5rem;
-    font-size: 1rem;
+    padding: clamp(0.4rem, 1vh, 0.65rem) clamp(0.8rem, 2vw, 1.4rem);
+    font-size: clamp(0.75rem, 1.3vw, 0.95rem);
     width: 100%;
-    max-width: 300px;
+    max-width: clamp(200px, 50vw, 300px);
   }
   
   button {
-    min-height: 48px; /* Área de toque adequada */
+    min-height: clamp(36px, 6vh, 48px); /* Área de toque adequada */
   }
 }
 
 @media (max-width: 480px) {
   #app {
-    padding: 0.5rem;
+    padding: clamp(0.1rem, 0.4vw, 0.35rem);
   }
   
   .card {
-    padding: 1rem;
+    padding: clamp(0.5rem, 1.5vw, 0.9rem);
   }
   
   h1 {
-    font-size: 2rem;
+    font-size: clamp(1.2rem, 3.5vw, 1.8rem);
   }
   
   .btn-principal {
-    font-size: 0.9rem;
-    padding: 0.6rem 1.2rem;
+    font-size: clamp(0.65rem, 1.2vw, 0.85rem);
+    padding: clamp(0.35rem, 0.8vh, 0.55rem) clamp(0.6rem, 1.5vw, 1.1rem);
+  }
+}
+
+/* Landscape em dispositivos móveis */
+@media (max-height: 500px) and (orientation: landscape) {
+  #app {
+    padding: clamp(0.1rem, 0.3vw, 0.25rem);
+  }
+  
+  h1 {
+    font-size: clamp(1rem, 3vw, 1.5rem);
+    margin-bottom: clamp(0.25rem, 0.8vh, 0.5rem);
+  }
+  
+  .btn-principal {
+    padding: clamp(0.25rem, 0.6vh, 0.4rem) clamp(0.5rem, 1.2vw, 0.9rem);
+    font-size: clamp(0.6rem, 1vw, 0.75rem);
+  }
+  
+  button {
+    min-height: clamp(28px, 5vh, 38px);
   }
 }
 

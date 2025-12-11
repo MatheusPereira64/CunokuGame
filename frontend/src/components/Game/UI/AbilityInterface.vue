@@ -285,7 +285,7 @@ export default {
 </script>
 
 <style scoped>
-/* Interface de habilidades Flash */
+/* Interface de habilidades Flash - COMPACTA */
 .flash-ability-interface {
   position: fixed;
   top: 50%;
@@ -293,15 +293,15 @@ export default {
   transform: translate(-50%, -50%);
   z-index: 160;
   background: var(--flash-dark-gradient);
-  border: 4px solid var(--flash-gold);
-  border-radius: 30px;
-  padding: 2.5rem;
-  backdrop-filter: blur(25px);
+  border: clamp(2px, 0.3vw, 3px) solid var(--flash-gold);
+  border-radius: clamp(12px, 2vw, 20px);
+  padding: clamp(0.75rem, 2vh, 1.5rem);
+  backdrop-filter: blur(15px);
   box-shadow: var(--flash-glow-strong), var(--flash-shadow-strong);
-  position: relative;
   overflow: hidden;
-  max-width: 90vw;
-  max-height: 90vh;
+  max-width: min(500px, 85vw);
+  max-height: min(400px, 70vh);
+  overflow-y: auto;
   animation: flash-modal-enter var(--flash-slow) var(--flash-bounce);
 }
 
@@ -541,35 +541,35 @@ export default {
   50% { opacity: 0.5; }
 }
 
-/* Header da habilidade Flash */
+/* Header da habilidade Flash - COMPACTO */
 .ability-header-flash {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+  gap: clamp(0.5rem, 1vw, 1rem);
+  margin-bottom: clamp(0.5rem, 1vh, 1rem);
   z-index: 2;
   position: relative;
-  padding: 1rem;
+  padding: clamp(0.4rem, 0.8vh, 0.7rem);
   background: var(--flash-dark-gradient);
-  border-radius: 20px;
-  border: 2px solid var(--flash-gold);
+  border-radius: clamp(8px, 1.5vw, 12px);
+  border: 1px solid var(--flash-gold);
   box-shadow: var(--flash-glow-medium);
 }
 
 .ability-icon-flash {
-  font-size: 3rem;
+  font-size: clamp(1.5rem, 3vw, 2rem);
   animation: flash-ability-icon-pulse 2s ease-in-out infinite;
-  text-shadow: 0 0 20px currentColor;
+  text-shadow: 0 0 10px currentColor;
 }
 
 .ability-title-flash {
   color: var(--flash-gold);
   margin: 0;
-  font-size: 1.5rem;
+  font-size: clamp(0.8rem, 1.5vw, 1.1rem);
   text-transform: uppercase;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   font-weight: bold;
-  text-shadow: 0 0 10px var(--flash-gold);
+  text-shadow: 0 0 5px var(--flash-gold);
 }
 
 .ability-glow-effect {
@@ -597,7 +597,7 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
+  gap: clamp(0.5rem, 1vh, 1rem);
   z-index: 2;
   position: relative;
 }
@@ -606,26 +606,25 @@ export default {
   color: var(--flash-text-light);
   text-align: center;
   margin: 0;
-  font-size: 1.1rem;
-  line-height: 1.6;
-  text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+  font-size: clamp(0.7rem, 1.2vw, 0.9rem);
+  line-height: 1.4;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.3);
 }
 
 .ability-content-flash {
   width: 100%;
-  max-width: 700px;
+  max-width: 100%;
 }
 
 .hand-selection-flash {
   display: flex;
-  gap: 1.5rem;
+  gap: clamp(0.4rem, 0.8vw, 0.8rem);
   flex-wrap: wrap;
   justify-content: center;
-  padding: 1rem;
+  padding: clamp(0.4rem, 0.8vh, 0.7rem);
   background: var(--flash-dark-gradient);
-  border-radius: 20px;
-  border: 2px solid var(--flash-gold);
-  box-shadow: var(--flash-glow-medium);
+  border-radius: clamp(8px, 1.5vw, 12px);
+  border: 1px solid var(--flash-gold);
 }
 
 .hand-card-flash {
@@ -633,31 +632,31 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.8rem;
+  gap: clamp(0.2rem, 0.4vh, 0.4rem);
   cursor: pointer;
   transition: all var(--flash-fast) var(--flash-bounce);
   background: none;
   border: none;
   z-index: 2;
-  padding: 0.5rem;
-  border-radius: 15px;
+  padding: clamp(0.2rem, 0.4vw, 0.3rem);
+  border-radius: 8px;
 }
 
 .hand-card-flash:hover {
-  transform: translateY(-12px) scale(1.1);
+  transform: translateY(-5px) scale(1.05);
   background: rgba(255, 215, 0, 0.1);
 }
 
 .hand-card-flash:active {
-  transform: translateY(-6px) scale(0.95);
+  transform: translateY(-2px) scale(0.98);
 }
 
 .card-back-flash {
-  width: 70px;
-  height: 100px;
+  width: clamp(35px, 6vw, 50px);
+  height: clamp(50px, 9vw, 72px);
   background: var(--flash-card-gradient);
-  border: 3px solid var(--flash-gold);
-  border-radius: 12px;
+  border: clamp(1px, 0.2vw, 2px) solid var(--flash-gold);
+  border-radius: clamp(6px, 1vw, 8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -667,19 +666,19 @@ export default {
 }
 
 .card-back-flash.small {
-  width: 50px;
-  height: 75px;
+  width: clamp(28px, 5vw, 40px);
+  height: clamp(40px, 7.5vw, 58px);
 }
 
 .card-symbol {
-  font-size: 2.5rem;
+  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
   color: var(--flash-gold);
-  text-shadow: 0 0 10px var(--flash-gold);
+  text-shadow: 0 0 5px var(--flash-gold);
   z-index: 2;
 }
 
 .card-back-flash.small .card-symbol {
-  font-size: 1.5rem;
+  font-size: clamp(0.8rem, 1.5vw, 1.1rem);
 }
 
 .card-shine {
@@ -701,30 +700,30 @@ export default {
 .card-number-flash {
   background: var(--flash-gold);
   color: var(--flash-dark);
-  padding: 0.4rem 0.8rem;
-  border-radius: 12px;
-  font-size: 0.9rem;
+  padding: clamp(0.15rem, 0.3vh, 0.25rem) clamp(0.3rem, 0.6vw, 0.5rem);
+  border-radius: clamp(4px, 0.8vw, 8px);
+  font-size: clamp(0.6rem, 1vw, 0.75rem);
   font-weight: bold;
   text-shadow: none;
-  box-shadow: var(--flash-glow-small);
 }
 
 .players-selection-flash {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 1rem;
+  gap: clamp(0.5rem, 1vh, 0.8rem);
+  padding: clamp(0.4rem, 0.8vh, 0.7rem);
   background: var(--flash-dark-gradient);
-  border-radius: 20px;
-  border: 2px solid var(--flash-gold);
-  box-shadow: var(--flash-glow-medium);
+  border-radius: clamp(8px, 1.5vw, 12px);
+  border: 1px solid var(--flash-gold);
+  max-height: clamp(150px, 30vh, 250px);
+  overflow-y: auto;
 }
 
 .player-option-flash {
   background: var(--flash-dark-gradient);
-  border: 2px solid var(--flash-gold);
-  border-radius: 15px;
-  padding: 1.5rem;
+  border: 1px solid var(--flash-gold);
+  border-radius: clamp(6px, 1vw, 10px);
+  padding: clamp(0.4rem, 0.8vh, 0.7rem);
   cursor: pointer;
   transition: all var(--flash-fast) var(--flash-bounce);
   position: relative;
@@ -734,37 +733,35 @@ export default {
 .player-option-flash:hover {
   border-color: var(--flash-neon-blue);
   background: rgba(0, 255, 255, 0.1);
-  box-shadow: var(--flash-glow-medium);
-  transform: translateY(-5px);
+  transform: translateY(-2px);
 }
 
 .player-info-flash {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: clamp(0.3rem, 0.6vh, 0.5rem);
 }
 
 .player-name-flash {
   color: var(--flash-gold);
   font-weight: bold;
-  font-size: 1.1rem;
-  text-shadow: 0 0 10px var(--flash-gold);
+  font-size: clamp(0.7rem, 1.2vw, 0.9rem);
+  text-shadow: 0 0 5px var(--flash-gold);
 }
 
 .card-count-flash {
-  color: var(--flash-text-light);
-  font-size: 1rem;
+  font-size: clamp(0.6rem, 1vw, 0.75rem);
   background: var(--flash-gold);
   color: var(--flash-dark);
-  padding: 0.3rem 0.8rem;
-  border-radius: 10px;
+  padding: clamp(0.1rem, 0.2vh, 0.2rem) clamp(0.3rem, 0.5vw, 0.5rem);
+  border-radius: clamp(4px, 0.8vw, 6px);
   font-weight: bold;
 }
 
 .player-cards-flash {
   display: flex;
-  gap: 0.8rem;
+  gap: clamp(0.3rem, 0.5vw, 0.5rem);
   flex-wrap: wrap;
   justify-content: center;
 }
@@ -863,31 +860,29 @@ export default {
 .ability-actions-flash {
   display: flex;
   justify-content: center;
-  gap: 2rem;
-  margin-top: 2rem;
-  padding: 1rem;
+  gap: clamp(0.5rem, 1vw, 1rem);
+  margin-top: clamp(0.5rem, 1vh, 1rem);
+  padding: clamp(0.3rem, 0.6vh, 0.5rem);
   background: var(--flash-dark-gradient);
-  border-radius: 20px;
-  border: 2px solid var(--flash-gold);
-  box-shadow: var(--flash-glow-medium);
+  border-radius: clamp(8px, 1.5vw, 12px);
+  border: 1px solid var(--flash-gold);
 }
 
 .flash-action-btn {
   background: var(--flash-red-gradient);
   color: var(--flash-text-light);
-  border: 2px solid var(--flash-red);
-  padding: 1.2rem 2.5rem;
-  border-radius: 15px;
-  font-size: 1.1rem;
+  border: 1px solid var(--flash-red);
+  padding: clamp(0.4rem, 0.8vh, 0.6rem) clamp(0.8rem, 1.5vw, 1.2rem);
+  border-radius: clamp(6px, 1vw, 10px);
+  font-size: clamp(0.7rem, 1.2vw, 0.9rem);
   font-weight: bold;
   cursor: pointer;
   transition: all var(--flash-fast) var(--flash-bounce);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  box-shadow: var(--flash-glow-medium);
+  gap: clamp(0.3rem, 0.5vw, 0.5rem);
   position: relative;
   overflow: hidden;
 }
