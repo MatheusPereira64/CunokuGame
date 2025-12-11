@@ -404,20 +404,25 @@ const setSFXVolumeWithSound = (volume) => {
 /* Layout principal do aplicativo */
 .app-layout {
   min-height: 100vh;
-  height: 100vh;
-  max-height: 100vh;
   background: var(--casino-gradient);
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 /* Quando estiver no jogo - tela cheia */
 .app-layout:has(main:has(.jogo-container)) {
-  height: 100vh;
-  max-height: 100vh;
-  overflow: hidden;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+/* Quando estiver na página inicial - layout normal */
+.app-layout:has(main:has(.home-container)) {
+  min-height: 100vh;
+  height: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 /* Overlay para ativação de música */
@@ -650,29 +655,60 @@ main {
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Quando estiver na página de jogo - TELA CHEIA */
 main:has(.jogo-container) {
-  max-width: 100vw;
-  width: 100vw;
-  height: 100vh;
-  max-height: 100vh;
-  margin: 0;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  overflow: hidden;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  max-width: 100vw !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
 }
 
 main:has(.jogo-container)::before {
-  display: none;
+  display: none !important;
+}
+
+/* Garantir que a página inicial tenha o estilo normal */
+main:has(.home-container) {
+  max-width: min(1400px, 99vw) !important;
+  width: auto !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: clamp(0.25rem, 0.5vh, 0.75rem) auto !important;
+  padding: clamp(0.5rem, 1.5vw, 1.5rem) !important;
+  border-radius: clamp(12px, 2vw, 24px) !important;
+  background: 
+    linear-gradient(135deg, rgba(25, 25, 112, 0.9) 0%, rgba(28, 28, 28, 0.9) 100%) !important;
+  backdrop-filter: blur(15px) !important;
+  box-shadow: 
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 clamp(1px, 0.2vw, 2px) var(--primary-gold),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+}
+
+main:has(.home-container)::before {
+  display: block !important;
 }
 
 /* Transições de página estilo Flash */

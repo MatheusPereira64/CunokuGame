@@ -241,7 +241,8 @@ const iniciarContraBotsWithSound = () => {
   margin: 0 auto;
   text-align: center;
   width: 100%;
-  min-height: 100%;
+  min-height: auto;
+  height: auto;
 }
 
 /* Título principal estilizado */

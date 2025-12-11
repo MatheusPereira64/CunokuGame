@@ -99,7 +99,29 @@ body::before {
 }
 
 /* Layouts principais com tema cassino japonês */
-.app-layout, .jogo-page, .cunoku-game {
+.app-layout {
+  background: var(--casino-gradient);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Quando estiver no jogo - tela cheia */
+.app-layout:has(main:has(.jogo-container)) {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.jogo-page, .cunoku-game {
   background: 
     linear-gradient(135deg, rgba(25, 25, 112, 0.95) 0%, rgba(28, 28, 28, 0.95) 50%, rgba(15, 20, 25, 0.95) 100%);
   backdrop-filter: blur(10px);
@@ -292,10 +314,9 @@ button:active {
 
 /* Container principal - RESPONSIVO */
 #app {
-  max-width: min(1400px, 99vw);
   width: 100%;
-  margin: 0 auto;
-  padding: clamp(0.25rem, 1vw, 1rem);
+  margin: 0;
+  padding: 0;
   text-align: center;
   position: relative;
   z-index: 2;
@@ -303,6 +324,14 @@ button:active {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* Quando não estiver no jogo - layout normal */
+#app:not(:has(.jogo-container)) {
+  max-width: min(1400px, 99vw);
+  margin: 0 auto;
+  padding: clamp(0.25rem, 1vw, 1rem);
 }
 
 .card {
