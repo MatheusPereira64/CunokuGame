@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene';
 import { MenuScene } from './scenes/MenuScene';
+import { BotSetupScene } from './scenes/BotSetupScene';
+import { TableScene } from './scenes/TableScene';
 
 /**
  * Configuração principal do jogo Phaser
@@ -11,7 +13,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 720,
   parent: 'game-container',
   backgroundColor: '#1a1a2e',
-  scene: [BootScene, MenuScene],
+  scene: [BootScene, MenuScene, BotSetupScene, TableScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

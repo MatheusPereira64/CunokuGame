@@ -19,6 +19,22 @@ export default defineConfig({
     target: 'es2020',
     outDir: 'dist',
     assetsDir: 'assets',
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: false, // Manter console.log para debug
+        drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'phaser': ['phaser'],
+        },
+      },
+    },
+    sourcemap: false, // Desabilitar em produção para menor tamanho
+    chunkSizeWarningLimit: 1000,
   },
 });
 
