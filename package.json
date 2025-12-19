@@ -1,20 +1,23 @@
 {
   "name": "cunoku-game",
-  "version": "1.0.0",
-  "description": "Jogo Cunoku - Jogo de cartas multiplayer com Vue.js e Node.js",
+  "version": "2.0.0",
+  "description": "Jogo Cunoku - Jogo de cartas com Phaser 3 e TypeScript",
   "private": true,
+  "type": "module",
   "scripts": {
-    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
-    "dev": "concurrently --names \"FRONTEND,BACKEND,SIGNALING\" --prefix-colors \"cyan,green,yellow\" \"cd frontend && npm run dev\" \"cd backend && npm run start\" \"cd backend && npm run signaling\"",
-    "start": "npm run dev",
-    "build": "cd frontend && npm run build",
-    "build:backend": "cd backend && npm install --production",
-    "build:all": "npm run build && npm run build:backend"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
-  "keywords": ["game", "cunoku", "multiplayer", "vue", "node", "websocket"],
+  "keywords": ["game", "cunoku", "phaser", "typescript", "vite"],
   "author": "",
   "license": "ISC",
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
   "devDependencies": {
-    "concurrently": "^9.2.0"
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11"
   }
 }
