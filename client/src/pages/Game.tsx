@@ -9,6 +9,7 @@ import { GameState, Card, Player } from "@shared/schema";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Copy, Eye, RefreshCw, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
