@@ -1,40 +1,41 @@
-import { defineConfig } from 'vite';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// https://vitejs.dev/config/
 export default defineConfig({
+  plugins: [
+    react(),
+    runtimeErrorOverlay(),
+    ...(process.env.NODE_ENV !== "production" &&
+    process.env.REPL_ID !== undefined
+      ? [
+          await import("@replit/vite-plugin-cartographer").then((m) =>
+            m.cartographer(),
+          ),
+          await import("@replit/vite-plugin-dev-banner").then((m) =>
+            m.devBanner(),
+          ),
+        ]
+      : []),
+  ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src'),
+      "@": path.resolve(import.meta.dirname, "client", "src"),
+      "@shared": path.resolve(import.meta.dirname, "shared"),
+      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
+  },
+  root: path.resolve(import.meta.dirname, "client"),
+  build: {
+    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    emptyOutDir: true,
   },
   server: {
-    host: '0.0.0.0',
-    port: 5173,
-  },
-  build: {
-    target: 'es2020',
-    outDir: 'dist',
-    assetsDir: 'assets',
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: false, // Manter console.log para debug
-        drop_debugger: true,
-      },
+    fs: {
+      strict: true,
+      deny: ["**/.*"],
     },
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'phaser': ['phaser'],
-        },
-      },
-    },
-    sourcemap: false, // Desabilitar em produção para menor tamanho
-    chunkSizeWarningLimit: 1000,
   },
 });
 
