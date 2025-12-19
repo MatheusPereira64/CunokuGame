@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/Button";
@@ -10,8 +10,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createOfflineGame } from "@/utils/localGame";
+import { audioManager } from "@/utils/audioManager";
 
 export default function Home() {
+  // Toca música do menu ao carregar a página
+  useEffect(() => {
+    audioManager.playMenuMusic();
+    
+    // Cleanup ao desmontar
+    return () => {
+      audioManager.stopAllMusic();
+    };
+  }, []);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [name, setName] = useState("");
@@ -43,10 +53,17 @@ export default function Home() {
         sessionStorage.setItem(`offline_player_${playerId}`, playerId);
         sessionStorage.setItem(`offline_difficulty_${playerId}`, botDifficulty);
         
-        console.log("Offline game created:", { playerId, players: gameState.players.length });
+        console.log("Offline game created:", { 
+          playerId, 
+          players: gameState.players.length,
+          state: gameState
+        });
         
-        // Redireciona para tela de jogo offline
-        setLocation(`/game/offline?player=${playerId}&mode=offline`);
+        // Pequeno delay para garantir que o sessionStorage foi salvo
+        setTimeout(() => {
+          // Redireciona para tela de jogo offline
+          setLocation(`/game/offline?player=${playerId}&mode=offline`);
+        }, 100);
       } catch (err: any) {
         console.error("Error creating offline game:", err);
         toast({ title: "Error", description: err.message || "Failed to start offline game", variant: "destructive" });

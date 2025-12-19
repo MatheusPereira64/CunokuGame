@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Copy, Eye, RefreshCw, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { audioManager } from "@/utils/audioManager";
 import {
   Dialog,
   DialogContent,
@@ -52,15 +53,18 @@ export default function Game() {
             }
             console.log("Offline game state loaded:", { 
               players: parsedState.players.length,
-              currentPlayer: parsedState.currentPlayerIndex 
+              currentPlayer: parsedState.currentPlayerIndex,
+              state: parsedState
             });
+            setIsLoadingOffline(false);
           } else {
-            console.error("Invalid game state structure");
+            console.error("Invalid game state structure:", parsedState);
             toast({ 
               title: "Error", 
               description: "Invalid game state. Please start a new game.", 
               variant: "destructive" 
             });
+            setIsLoadingOffline(false);
           }
         } catch (e) {
           console.error("Failed to parse offline game state:", e);
@@ -69,17 +73,19 @@ export default function Game() {
             description: "Failed to load game. Please start a new game.", 
             variant: "destructive" 
           });
+          setIsLoadingOffline(false);
         }
       } else {
         console.error("No saved game state found for player:", playerId);
+        console.log("Available sessionStorage keys:", Object.keys(sessionStorage));
         toast({ 
           title: "Error", 
           description: "Game not found. Please start a new game.", 
           variant: "destructive" 
         });
+        setIsLoadingOffline(false);
       }
-      setIsLoadingOffline(false);
-    } else {
+    } else if (!isOffline) {
       setIsLoadingOffline(false);
     }
   }, [isOffline, playerId, toast]);
@@ -103,6 +109,34 @@ export default function Game() {
   const gameState = isOffline ? offlineGameStateFromHook : onlineGameState;
   const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
 
+  const me = gameState?.players.find(p => p.id === playerId);
+  const isMyTurn = gameState?.players[gameState.currentPlayerIndex]?.id === playerId;
+  const phase = gameState?.turnPhase;
+
+  // Toca música da partida quando o jogo começa
+  useEffect(() => {
+    if (gameState && !gameState.winnerId) {
+      audioManager.playGameMusic();
+    }
+    
+    // Cleanup ao sair da partida
+    return () => {
+      audioManager.stopAllMusic();
+    };
+  }, [gameState?.winnerId]);
+
+  // Detecta quando o jogo termina e toca som de vitória/derrota
+  useEffect(() => {
+    if (gameState?.winnerId && me) {
+      if (gameState.winnerId === playerId) {
+        audioManager.playGameWon();
+      } else {
+        audioManager.playGameLost();
+      }
+    }
+  }, [gameState?.winnerId, playerId, me]);
+
+  // Early returns APÓS todos os hooks
   if (!playerId || (!isOffline && !roomCode)) {
     return <div className="h-screen flex items-center justify-center">Invalid game URL</div>;
   }
@@ -115,10 +149,6 @@ export default function Game() {
       </div>
     );
   }
-
-  const me = gameState?.players.find(p => p.id === playerId);
-  const isMyTurn = gameState?.players[gameState.currentPlayerIndex]?.id === playerId;
-  const phase = gameState?.turnPhase;
 
   // Helpers
   const handleCopyCode = () => {
