@@ -108,7 +108,17 @@ export default function Game() {
   const [selectedTargetPlayer, setSelectedTargetPlayer] = useState<string | null>(null);
   const [selectedTargetCard, setSelectedTargetCard] = useState<number | null>(null);
   const [selectedTargetCard2, setSelectedTargetCard2] = useState<number | null>(null);
+  const [selectedTargetPlayer2, setSelectedTargetPlayer2] = useState<string | null>(null);
+  const [swapMode, setSwapMode] = useState<"me_and_other" | "two_others">("me_and_other");
   const [privateCardInfo, setPrivateCardInfo] = useState<{ card: Card; playerName: string } | null>(null);
+  const [peekTimers, setPeekTimers] = useState<Map<number, NodeJS.Timeout>>(new Map());
+  
+  // Cleanup timers ao desmontar
+  useEffect(() => {
+    return () => {
+      peekTimers.forEach(timer => clearTimeout(timer));
+    };
+  }, []);
 
   // Usa estado offline se estiver em modo offline, senão usa online
   const gameState = isOffline ? offlineGameStateFromHook : onlineGameState;
@@ -162,7 +172,28 @@ export default function Game() {
   };
 
   const handleCardClick = (cardIndex: number, isMyHand: boolean) => {
-    if (!isMyTurn || !isMyHand) return;
+    if (!isMyHand) return;
+
+    // Descarte reativo: se não é meu turno mas posso descartar carta igual
+    if (!isMyTurn && gameState && me) {
+      const matchInfo = canMatchDiscard();
+      if (matchInfo.canMatch && matchInfo.matchingCards.includes(cardIndex)) {
+        sendAction({ type: 'matched_discard', cardIndex });
+        return;
+      }
+    }
+
+    if (!isMyTurn) return;
+
+    // Descarte direto da mão: se é meu turno e a carta é conhecida, pode tentar descartar
+    // Se corresponder ao topo da pilha, descarta normalmente; se não, recebe punição
+    if (phase === 'draw' && gameState && me) {
+      const discardInfo = canDiscardFromHand();
+      if (discardInfo.canDiscard && discardInfo.allKnownCards.includes(cardIndex)) {
+        sendAction({ type: 'discard_from_hand', cardIndex });
+        return;
+      }
+    }
 
     if (phase === 'action' && gameState?.drawnCard) {
       // Replace phase
@@ -178,6 +209,49 @@ export default function Game() {
   const hasSpecialAbility = (card: Card | null): boolean => {
     if (!card) return false;
     return ["5", "6", "7", "8", "9", "10"].includes(card.rank);
+  };
+
+  // Verifica se o jogador pode descartar uma carta igual à última descartada (reativo)
+  const canMatchDiscard = (): { canMatch: boolean; matchingCards: number[] } => {
+    if (!gameState || !me || gameState.discardPile.length === 0) {
+      return { canMatch: false, matchingCards: [] };
+    }
+    
+    const lastDiscarded = gameState.discardPile[gameState.discardPile.length - 1];
+    const matchingCards: number[] = [];
+    
+    me.hand.forEach((card, index) => {
+      if (card.rank === lastDiscarded.rank && me.knownCards[index.toString()]) {
+        matchingCards.push(index);
+      }
+    });
+    
+    return { canMatch: matchingCards.length > 0, matchingCards };
+  };
+
+  // Verifica se o jogador pode descartar carta da mão diretamente (durante seu turno)
+  // Permite descartar qualquer carta conhecida - se corresponder, descarta; se não, recebe punição
+  const canDiscardFromHand = (): { canDiscard: boolean; matchingCards: number[]; allKnownCards: number[] } => {
+    if (!gameState || !me || !isMyTurn || phase !== 'draw' || gameState.discardPile.length === 0) {
+      return { canDiscard: false, matchingCards: [], allKnownCards: [] };
+    }
+    
+    const topDiscard = gameState.discardPile[gameState.discardPile.length - 1];
+    const matchingCards: number[] = [];
+    const allKnownCards: number[] = [];
+    
+    me.hand.forEach((card, index) => {
+      // Se a carta é conhecida, pode tentar descartar
+      if (me.knownCards[index.toString()]) {
+        allKnownCards.push(index);
+        // Se corresponde ao topo da pilha, é um descarte seguro
+        if (card.rank === topDiscard.rank) {
+          matchingCards.push(index);
+        }
+      }
+    });
+    
+    return { canDiscard: allKnownCards.length > 0, matchingCards, allKnownCards };
   };
 
   const getAbilityDescription = (rank: string): string => {
@@ -216,7 +290,7 @@ export default function Game() {
     
     const rank = gameState.drawnCard.rank;
     
-    // Cartas 7 e 8: ver própria carta
+    // Cartas 7 e 8: ver própria carta (fica visível por 20 segundos)
     if (rank === "7" || rank === "8") {
       if (selectedHandIndex === null) {
         toast({ 
@@ -232,6 +306,33 @@ export default function Game() {
         ability: rank === "7" ? "peek_own" : "peek_own",
         targetPlayerId: playerId,
         targetCardIndex: selectedHandIndex
+      });
+      
+      // Timer de 20 segundos para virar a carta novamente
+      const timer = setTimeout(() => {
+        if (me && me.knownCards[selectedHandIndex.toString()]) {
+          // Remove do knownCards após 20 segundos
+          const updatedKnownCards = { ...me.knownCards };
+          delete updatedKnownCards[selectedHandIndex.toString()];
+          // Atualiza o estado local (o servidor não precisa saber, é apenas visual)
+          if (gameState) {
+            const playerIndex = gameState.players.findIndex(p => p.id === playerId);
+            if (playerIndex !== -1) {
+              gameState.players[playerIndex].knownCards = updatedKnownCards;
+            }
+          }
+          setPeekTimers(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(selectedHandIndex);
+            return newMap;
+          });
+        }
+      }, 20000);
+      
+      setPeekTimers(prev => {
+        const newMap = new Map(prev);
+        newMap.set(selectedHandIndex, timer);
+        return newMap;
       });
     }
     
@@ -266,29 +367,54 @@ export default function Game() {
     
     // Cartas 9 e 10: trocar cartas
     if (rank === "9" || rank === "10") {
-      if (!selectedTargetPlayer || selectedHandIndex === null || selectedTargetCard === null) {
-        toast({ 
-          title: "Selecione cartas", 
-          description: "Selecione sua carta, o jogador alvo e a carta dele",
-          variant: "destructive" 
+      if (swapMode === "me_and_other") {
+        // Troca entre próprio jogador e outro
+        if (!selectedTargetPlayer || selectedHandIndex === null || selectedTargetCard === null) {
+          toast({ 
+            title: "Selecione cartas", 
+            description: "Selecione sua carta, o jogador alvo e a carta dele",
+            variant: "destructive" 
+          });
+          return;
+        }
+        
+        sendAction({ 
+          type: 'use_ability', 
+          ability: "swap",
+          targetPlayerId: playerId,
+          targetCardIndex: selectedHandIndex,
+          targetPlayerId2: selectedTargetPlayer,
+          targetCardIndex3: selectedTargetCard
         });
-        return;
+      } else {
+        // Troca entre dois outros jogadores
+        if (!selectedTargetPlayer || !selectedTargetPlayer2 || selectedTargetCard === null || selectedTargetCard2 === null) {
+          toast({ 
+            title: "Selecione cartas", 
+            description: "Selecione os dois jogadores e suas cartas",
+            variant: "destructive" 
+          });
+          return;
+        }
+        
+        sendAction({ 
+          type: 'use_ability', 
+          ability: "swap",
+          targetPlayerId: selectedTargetPlayer,
+          targetCardIndex: selectedTargetCard,
+          targetPlayerId2: selectedTargetPlayer2,
+          targetCardIndex3: selectedTargetCard2
+        });
       }
-      
-      sendAction({ 
-        type: 'use_ability', 
-        ability: "swap",
-        targetPlayerId: selectedTargetPlayer,
-        targetCardIndex: selectedHandIndex,
-        targetCardIndex2: selectedTargetCard
-      });
     }
     
     setAbilityModalOpen(false);
     setSelectedTargetPlayer(null);
+    setSelectedTargetPlayer2(null);
     setSelectedTargetCard(null);
     setSelectedTargetCard2(null);
     setSelectedHandIndex(null);
+    setSwapMode("me_and_other");
   };
 
   const renderPlayer = (player: Player, index: number, totalPlayers: number) => {
@@ -402,6 +528,80 @@ export default function Game() {
         </div>
       </div>
 
+      {/* Your Turn Banner - Top Center */}
+      {isMyTurn && (
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none">
+          <motion.div 
+            initial={{ y: -20, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -20, opacity: 0 }}
+            className="bg-gradient-to-r from-yellow-500/90 to-yellow-600/90 backdrop-blur-md px-8 py-3 rounded-full border-2 border-yellow-400 shadow-2xl flex items-center gap-4"
+          >
+            <span className="text-yellow-900 font-bold text-lg">YOUR TURN</span>
+            {phase === 'draw' && <span className="text-yellow-100 text-sm">Draw from Deck or Discard</span>}
+            {phase === 'action' && <span className="text-yellow-100 text-sm">Select a card to replace or Discard drawn</span>}
+          </motion.div>
+        </div>
+      )}
+
+      {/* Ability Hint - Left Side */}
+      {isMyTurn && phase === 'action' && gameState.drawnCard && hasSpecialAbility(gameState.drawnCard) && !gameState.drawnFromDiscard && (
+        <div className="absolute left-8 top-1/2 transform -translate-y-1/2 z-40 pointer-events-none">
+          <motion.div
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -20, opacity: 0 }}
+            className="bg-gradient-to-br from-yellow-500/95 to-yellow-600/95 backdrop-blur-md px-6 py-4 rounded-2xl border-2 border-yellow-400 shadow-2xl max-w-[280px]"
+          >
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">⚡</div>
+              <div className="flex-1">
+                <div className="text-yellow-900 font-bold text-sm mb-1">
+                  Habilidade da Carta
+                </div>
+                <div className="text-yellow-950 font-semibold text-base leading-tight">
+                  {getAbilityDescription(gameState.drawnCard!.rank)}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-yellow-400/30">
+              <div className="text-yellow-900 text-xs font-medium">
+                Clique no botão "Use Ability" para ativar
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Replace Card Hint - Right Side */}
+      {isMyTurn && phase === 'action' && gameState.drawnCard && (
+        <div className="absolute right-8 top-1/2 transform -translate-y-1/2 z-40 pointer-events-none">
+          <motion.div
+            initial={{ x: 20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 20, opacity: 0 }}
+            className="bg-gradient-to-br from-green-600/95 to-green-700/95 backdrop-blur-md px-6 py-4 rounded-2xl border-2 border-green-400 shadow-2xl max-w-[280px]"
+          >
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">✨</div>
+              <div className="flex-1">
+                <div className="text-green-100 font-bold text-sm mb-1">
+                  Dica de Jogada
+                </div>
+                <div className="text-white font-semibold text-base leading-tight">
+                  Clique em uma carta da sua mão para substituir pela carta puxada
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-green-400/30">
+              <div className="text-green-200 text-xs">
+                As cartas da sua mão estão destacadas em verde
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Main Game Table */}
       <div className="flex-1 flex items-center justify-center p-4 md:p-8 relative">
         <div className="w-full max-w-6xl aspect-[16/9] relative rounded-[100px] felt-table shadow-2xl flex items-center justify-center">
@@ -415,15 +615,39 @@ export default function Game() {
           <div className="flex items-center gap-12 z-10">
             {/* Deck */}
             <div className="relative group">
-              {gameState.deck.length > 0 && (
-                <div onClick={() => isMyTurn && phase === 'draw' && sendAction({ type: 'draw_deck' })}>
+              {gameState.deck.length > 0 ? (
+                <div 
+                  onClick={() => isMyTurn && phase === 'draw' && sendAction({ type: 'draw_deck' })}
+                  className={isMyTurn && phase === 'draw' ? "cursor-pointer" : ""}
+                >
                   <PlayingCard 
                     hidden 
-                    className={isMyTurn && phase === 'draw' ? "cursor-pointer hover:ring-4 ring-white/50" : "opacity-80"} 
+                    className={cn(
+                      "transition-all",
+                      isMyTurn && phase === 'draw' 
+                        ? "cursor-pointer hover:ring-4 ring-white/50 hover:scale-105" 
+                        : "opacity-80"
+                    )} 
                   />
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <span className="font-bold text-white/80">DECK</span>
+                    <span className={cn(
+                      "font-bold transition-all",
+                      isMyTurn && phase === 'draw' ? "text-white text-lg" : "text-white/80"
+                    )}>
+                      DECK
+                    </span>
                   </div>
+                  {isMyTurn && phase === 'draw' && (
+                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-center">
+                      <div className="text-xs text-yellow-400 font-bold animate-pulse">
+                        Click to Draw
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="w-24 h-36 border-2 border-white/10 rounded-xl flex items-center justify-center opacity-50">
+                  <span className="text-white/20 text-xs">EMPTY</span>
                 </div>
               )}
             </div>
@@ -444,8 +668,8 @@ export default function Game() {
                    
                    {isMyTurn && phase === 'action' && (
                      <div className="absolute -bottom-20 left-1/2 -translate-x-1/2 flex flex-col gap-2 items-center">
-                       <div className="flex gap-2">
-                         {hasSpecialAbility(gameState.drawnCard) && (
+                       <div className="flex gap-2 flex-wrap justify-center">
+                         {hasSpecialAbility(gameState.drawnCard) && !gameState.drawnFromDiscard && (
                            <Button 
                              size="sm" 
                              variant="primary" 
@@ -459,9 +683,9 @@ export default function Game() {
                            Discard
                          </Button>
                        </div>
-                       {hasSpecialAbility(gameState.drawnCard) && (
-                         <div className="text-xs text-yellow-400 text-center max-w-[200px]">
-                           {getAbilityDescription(gameState.drawnCard!.rank)}
+                       {gameState.drawnFromDiscard && (
+                         <div className="text-xs text-orange-400 text-center max-w-[200px]">
+                           Carta da pilha de descarte - não pode usar habilidade
                          </div>
                        )}
                      </div>
@@ -473,10 +697,10 @@ export default function Game() {
             {/* Discard Pile */}
             <div className="relative">
               {gameState.discardPile.length > 0 ? (
-                <div onClick={() => isMyTurn && phase === 'draw' && sendAction({ type: 'draw_discard' })}>
+                <div>
                   <PlayingCard 
                     card={gameState.discardPile[gameState.discardPile.length - 1]} 
-                    className={isMyTurn && phase === 'draw' ? "cursor-pointer hover:ring-4 ring-white/50" : "brightness-90"}
+                    className="brightness-90"
                   />
                   <div className="absolute -bottom-8 w-full text-center text-xs font-bold text-white/50 uppercase tracking-widest">
                     Discard Pile
@@ -494,45 +718,90 @@ export default function Game() {
           {me && (
             <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center">
               
-              {/* Action Controls */}
-              <div className="mb-8 h-12 flex items-center justify-center">
-                {isMyTurn && (
-                  <motion.div 
-                    initial={{ y: 20, opacity: 0 }} 
-                    animate={{ y: 0, opacity: 1 }}
-                    className="bg-black/60 backdrop-blur px-6 py-2 rounded-full border border-yellow-500/50 flex gap-4"
-                  >
-                    <span className="text-yellow-400 font-bold mr-2">YOUR TURN</span>
-                    {phase === 'draw' && <span className="text-white">Draw from Deck or Discard</span>}
-                    {phase === 'action' && <span className="text-white">Select a card to replace or Discard drawn</span>}
-                  </motion.div>
-                )}
-              </div>
-
               {/* My Hand */}
-              <div className="flex gap-4">
-                {me.hand.map((card, i) => (
-                  <motion.div 
-                    key={card.id || i}
-                    whileHover={isMyTurn ? { y: -20 } : {}}
-                    onClick={() => handleCardClick(i, true)}
-                  >
-                    <PlayingCard 
-                      card={card}
-                      // Show if peeked, or if it's the end game, or if I just drew it (though drew logic handled differently usually)
-                      hidden={!gameState.winnerId && !me.knownCards[i]}
-                      selected={selectedHandIndex === i}
-                      className={cn(
-                         "w-24 h-36 md:w-32 md:h-48 transition-all",
-                         isMyTurn && phase === 'action' && gameState.drawnCard ? "cursor-pointer hover:ring-4 ring-green-400" : ""
+              <div className="flex gap-4 items-start">
+                {me.hand.map((card, i) => {
+                  const matchInfo = canMatchDiscard();
+                  const discardInfo = canDiscardFromHand();
+                  const canMatchThisCard = !isMyTurn && matchInfo.canMatch && matchInfo.matchingCards.includes(i);
+                  const isKnownCard = me.knownCards[i.toString()] || me.knownCards[i];
+                  // Botões aparecem para TODAS as cartas durante o turno na fase draw (mesmo desconhecidas)
+                  const canQuickDiscard = isMyTurn && phase === 'draw' && gameState.discardPile.length > 0;
+                  const isSafeDiscard = canQuickDiscard && discardInfo.matchingCards.includes(i);
+                  
+                  return (
+                    <motion.div 
+                      key={card.id || i}
+                      className="flex flex-col items-center min-w-[120px]"
+                      whileHover={(isMyTurn || canMatchThisCard || canQuickDiscard) ? { y: -20 } : {}}
+                    >
+                      <div onClick={() => handleCardClick(i, true)} className="w-full">
+                        <PlayingCard 
+                          card={card}
+                          // Show if peeked, or if it's the end game, or if I just drew it (though drew logic handled differently usually)
+                          hidden={!gameState.winnerId && !isKnownCard}
+                          selected={selectedHandIndex === i}
+                          className={cn(
+                             "w-24 h-36 md:w-32 md:h-48 transition-all mx-auto",
+                             isMyTurn && phase === 'action' && gameState.drawnCard ? "cursor-pointer hover:ring-4 ring-green-400 ring-4 ring-green-400/50" : "",
+                             canMatchThisCard ? "cursor-pointer hover:ring-4 ring-orange-400" : "",
+                             canQuickDiscard ? "cursor-pointer hover:ring-4 ring-blue-400" : ""
+                          )}
+                        />
+                      </div>
+                      
+                      {/* Labels acima da carta */}
+                      {isKnownCard && (
+                         <div className="text-center mt-2 text-xs font-bold text-yellow-400 uppercase tracking-wider">Known</div>
                       )}
-                    />
-                    {me.knownCards[i] && (
-                       <div className="text-center mt-2 text-xs font-bold text-yellow-400 uppercase tracking-wider">Known</div>
-                    )}
-                  </motion.div>
-                ))}
+                      {canMatchThisCard && (
+                         <div className="text-center mt-1 text-xs font-bold text-orange-400 uppercase tracking-wider animate-pulse">
+                           Match!
+                         </div>
+                      )}
+                      
+                      {/* Botão de Descarte Rápido abaixo da carta */}
+                      {canQuickDiscard && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-3 w-full px-2"
+                        >
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            className="w-full text-xs px-2 py-2 h-auto rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white border-red-800 shadow-lg"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              sendAction({ type: 'discard_from_hand', cardIndex: i });
+                            }}
+                          >
+                            {isSafeDiscard ? "✓ Descartar" : "⚠ Tentar Descartar"}
+                          </Button>
+                          {!isSafeDiscard && (
+                            <div className="text-center mt-1 text-xs text-red-400 font-semibold">
+                              Risco de punição!
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </motion.div>
+                  );
+                })}
               </div>
+              
+              {/* Indicador de descarte reativo */}
+              {!isMyTurn && canMatchDiscard().canMatch && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="absolute -top-12 left-1/2 -translate-x-1/2 bg-orange-500/90 backdrop-blur px-4 py-2 rounded-full border-2 border-orange-400"
+                >
+                  <span className="text-white font-bold text-sm">
+                    Você pode descartar uma carta igual!
+                  </span>
+                </motion.div>
+              )}
 
               {/* My Avatar */}
               <div className="absolute bottom-4 right-12 hidden md:block">
@@ -540,7 +809,7 @@ export default function Game() {
               </div>
 
               {/* Cunoku Button */}
-              {isMyTurn && phase === 'draw' && (
+              {isMyTurn && phase === 'draw' && gameState.round >= 5 && (
                 <div className="absolute right-12 bottom-32">
                   <Button 
                     variant="destructive" 
@@ -549,6 +818,23 @@ export default function Game() {
                   >
                     CUNOKU
                   </Button>
+                  <div className="text-center mt-2 text-xs text-white/60">
+                    Round {gameState.round}
+                  </div>
+                </div>
+              )}
+              {isMyTurn && phase === 'draw' && gameState.round < 5 && (
+                <div className="absolute right-12 bottom-32">
+                  <div className="bg-black/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-yellow-500/50 shadow-xl">
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-yellow-400 mb-1">
+                        Round {gameState.round}/5
+                      </div>
+                      <div className="text-xs text-white/80">
+                        Cunoku available after round 5
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -640,61 +926,188 @@ export default function Game() {
               {(gameState.drawnCard.rank === "9" || gameState.drawnCard.rank === "10") && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Selecione sua carta:</label>
-                    <div className="flex gap-2 justify-center">
-                      {me?.hand.map((card, idx) => (
-                        <Button
-                          key={idx}
-                          variant={selectedHandIndex === idx ? "primary" : "outline"}
-                          onClick={() => setSelectedHandIndex(idx)}
-                          className="h-20 w-16"
-                        >
-                          {idx + 1}
-                        </Button>
-                      ))}
+                    <label className="text-sm font-bold text-gray-700">Modo de troca:</label>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={swapMode === "me_and_other" ? "primary" : "outline"}
+                        onClick={() => {
+                          setSwapMode("me_and_other");
+                          setSelectedTargetPlayer(null);
+                          setSelectedTargetPlayer2(null);
+                          setSelectedTargetCard(null);
+                          setSelectedTargetCard2(null);
+                          setSelectedHandIndex(null);
+                        }}
+                        className="flex-1"
+                      >
+                        Entre você e outro
+                      </Button>
+                      <Button
+                        variant={swapMode === "two_others" ? "primary" : "outline"}
+                        onClick={() => {
+                          setSwapMode("two_others");
+                          setSelectedTargetPlayer(null);
+                          setSelectedTargetPlayer2(null);
+                          setSelectedTargetCard(null);
+                          setSelectedTargetCard2(null);
+                          setSelectedHandIndex(null);
+                        }}
+                        className="flex-1"
+                      >
+                        Entre dois outros
+                      </Button>
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Selecione o jogador:</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {gameState.players
-                        .filter(p => p.id !== playerId)
-                        .map(p => (
-                          <Button
-                            key={p.id}
-                            variant={selectedTargetPlayer === p.id ? "primary" : "outline"}
-                            onClick={() => {
-                              setSelectedTargetPlayer(p.id);
-                              setSelectedTargetCard(null);
-                            }}
-                            className="h-auto py-3"
-                          >
-                            <div className="flex flex-col items-center gap-1">
-                              <Avatar name={p.name} className="scale-75" />
-                              <span className="text-xs">{p.name}</span>
-                            </div>
-                          </Button>
-                        ))}
-                    </div>
-                  </div>
-                  
-                  {selectedTargetPlayer && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-bold text-gray-700">Selecione a carta do oponente (1-4):</label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {[0, 1, 2, 3].map(idx => (
-                          <Button
-                            key={idx}
-                            variant={selectedTargetCard === idx ? "primary" : "outline"}
-                            onClick={() => setSelectedTargetCard(idx)}
-                            className="h-16"
-                          >
-                            {idx + 1}
-                          </Button>
-                        ))}
+                  {swapMode === "me_and_other" && (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-700">Sua carta:</label>
+                        <div className="flex gap-2 justify-center">
+                          {me?.hand.map((card, idx) => (
+                            <Button
+                              key={idx}
+                              variant={selectedHandIndex === idx ? "primary" : "outline"}
+                              onClick={() => setSelectedHandIndex(idx)}
+                              className="h-20 w-16"
+                            >
+                              {idx + 1}
+                            </Button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-700">Outro jogador:</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {gameState.players
+                            .filter(p => p.id !== playerId)
+                            .map(p => (
+                              <Button
+                                key={p.id}
+                                variant={selectedTargetPlayer === p.id ? "primary" : "outline"}
+                                onClick={() => {
+                                  setSelectedTargetPlayer(p.id);
+                                  setSelectedTargetCard(null);
+                                }}
+                                className="h-auto py-3"
+                              >
+                                <div className="flex flex-col items-center gap-1">
+                                  <Avatar name={p.name} className="scale-75" />
+                                  <span className="text-xs">{p.name}</span>
+                                </div>
+                              </Button>
+                            ))}
+                        </div>
+                      </div>
+                      
+                      {selectedTargetPlayer && selectedTargetPlayer !== playerId && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-gray-700">Carta do outro jogador (1-4):</label>
+                          <div className="grid grid-cols-4 gap-2">
+                            {[0, 1, 2, 3].map(idx => (
+                              <Button
+                                key={idx}
+                                variant={selectedTargetCard === idx ? "primary" : "outline"}
+                                onClick={() => setSelectedTargetCard(idx)}
+                                className="h-16"
+                              >
+                                {idx + 1}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  
+                  {swapMode === "two_others" && (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-gray-700">Primeiro jogador:</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {gameState.players.map(p => (
+                            <Button
+                              key={p.id}
+                              variant={selectedTargetPlayer === p.id ? "primary" : "outline"}
+                              onClick={() => {
+                                setSelectedTargetPlayer(p.id);
+                                setSelectedTargetCard(null);
+                                setSelectedTargetCard2(null);
+                              }}
+                              className="h-auto py-3"
+                            >
+                              <div className="flex flex-col items-center gap-1">
+                                <Avatar name={p.name} className="scale-75" />
+                                <span className="text-xs">{p.name}</span>
+                              </div>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {selectedTargetPlayer && (
+                        <>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-700">Carta do primeiro jogador (1-4):</label>
+                            <div className="grid grid-cols-4 gap-2">
+                              {[0, 1, 2, 3].map(idx => (
+                                <Button
+                                  key={idx}
+                                  variant={selectedTargetCard === idx ? "primary" : "outline"}
+                                  onClick={() => setSelectedTargetCard(idx)}
+                                  className="h-16"
+                                >
+                                  {idx + 1}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-700">Segundo jogador:</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {gameState.players
+                                .filter(p => p.id !== selectedTargetPlayer)
+                                .map(p => (
+                                  <Button
+                                    key={p.id}
+                                    variant={selectedTargetPlayer2 === p.id ? "primary" : "outline"}
+                                    onClick={() => {
+                                      setSelectedTargetPlayer2(p.id);
+                                      setSelectedTargetCard2(null);
+                                    }}
+                                    className="h-auto py-3"
+                                  >
+                                    <div className="flex flex-col items-center gap-1">
+                                      <Avatar name={p.name} className="scale-75" />
+                                      <span className="text-xs">{p.name}</span>
+                                    </div>
+                                  </Button>
+                                ))}
+                            </div>
+                          </div>
+                          
+                          {selectedTargetPlayer2 && (
+                            <div className="space-y-2">
+                              <label className="text-sm font-bold text-gray-700">Carta do segundo jogador (1-4):</label>
+                              <div className="grid grid-cols-4 gap-2">
+                                {[0, 1, 2, 3].map(idx => (
+                                  <Button
+                                    key={idx}
+                                    variant={selectedTargetCard2 === idx ? "primary" : "outline"}
+                                    onClick={() => setSelectedTargetCard2(idx)}
+                                    className="h-16"
+                                  >
+                                    {idx + 1}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
                   )}
                 </>
               )}

@@ -32,6 +32,7 @@ export function processOfflineAction(
       const drawnCard = newState.deck.pop();
       if (drawnCard) {
         newState.drawnCard = drawnCard;
+        newState.drawnFromDiscard = false; // Puxou do deck, pode usar habilidades
         newState.turnPhase = "action";
       }
       break;
@@ -40,17 +41,34 @@ export function processOfflineAction(
       const discardCard = newState.discardPile.pop();
       if (discardCard) {
         newState.drawnCard = discardCard;
+        newState.drawnFromDiscard = true; // Puxou da pilha de descarte, NÃO pode usar habilidades
         newState.turnPhase = "action";
       }
       break;
       
     case "discard_drawn":
+      // Descarta a carta que acabou de puxar - SEM punição (pode descartar qualquer carta puxada)
       if (newState.drawnCard) {
-        newState.discardPile.push(newState.drawnCard);
+        const discardedCard = newState.drawnCard;
+        newState.discardPile.push(discardedCard);
         newState.drawnCard = null;
+        newState.drawnFromDiscard = false;
         newState.turnPhase = "draw";
-        // Próximo jogador
-        newState.currentPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
+        newState.logs.push(`${player.name} discarded ${discardedCard.rank}`);
+        
+        // Avança turno e incrementa round se necessário
+        const nextPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
+        if (nextPlayerIndex === 0) {
+          newState.round++;
+        }
+        
+        // Verifica se é rodada final e voltou ao declarante
+        if (newState.isFinalRound && newState.finalRoundDeclarerId === playerId) {
+          newState.turnPhase = "finished";
+          calculateFinalScores(newState);
+        } else {
+          newState.currentPlayerIndex = nextPlayerIndex;
+        }
       }
       break;
       
@@ -60,8 +78,10 @@ export function processOfflineAction(
         player.hand[action.handIndex] = newState.drawnCard;
         if (oldCard) {
           newState.discardPile.push(oldCard);
+          newState.logs.push(`${player.name} replaced a card`);
         }
         newState.drawnCard = null;
+        newState.drawnFromDiscard = false;
         newState.turnPhase = "draw";
         // Próximo jogador
         newState.currentPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
@@ -70,6 +90,9 @@ export function processOfflineAction(
       
     case "use_ability":
       if (!newState.drawnCard) break;
+      
+      // Não pode usar habilidades se a carta foi puxada da pilha de descarte
+      if (newState.drawnFromDiscard) break;
       
       const drawnCardForAbility = newState.drawnCard;
       const rank = drawnCardForAbility.rank;
@@ -123,17 +146,164 @@ export function processOfflineAction(
       // Descarta a carta após usar habilidade
       newState.discardPile.push(newState.drawnCard);
       newState.drawnCard = null;
+      newState.drawnFromDiscard = false;
       newState.turnPhase = "draw";
       newState.currentPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
       break;
+    
+    case "matched_discard":
+      // Regra de descarte reativo: descartar carta igual que o jogador sabe que tem
+      if (action.cardIndex !== undefined) {
+        const cardToDiscard = player.hand[action.cardIndex];
+        if (cardToDiscard && player.knownCards[action.cardIndex.toString()]) {
+          // Verifica se a carta descartada anteriormente tem o mesmo rank
+          const lastDiscarded = newState.discardPile[newState.discardPile.length - 1];
+          if (lastDiscarded && lastDiscarded.rank === cardToDiscard.rank) {
+            // Remove a carta da mão e adiciona à pilha de descarte
+            player.hand.splice(action.cardIndex, 1);
+            newState.discardPile.push(cardToDiscard);
+            // Remove do knownCards
+            delete player.knownCards[action.cardIndex.toString()];
+            // Reindexa knownCards
+            const newKnownCards: Record<string, boolean> = {};
+            Object.keys(player.knownCards).forEach(key => {
+              const idx = parseInt(key);
+              if (idx < action.cardIndex!) {
+                newKnownCards[key] = true;
+              } else if (idx > action.cardIndex!) {
+                newKnownCards[(idx - 1).toString()] = true;
+              }
+            });
+            player.knownCards = newKnownCards;
+            newState.logs.push(`${player.name} discarded matching ${cardToDiscard.rank}`);
+          }
+        }
+      }
+      break;
       
     case "declare_finish":
-      // Implementar lógica de fim de jogo
-      newState.turnPhase = "finished";
+      // Verifica se já passaram 5 turnos (round >= 5)
+      if (newState.round < 5) {
+        newState.logs.push(`${player.name} cannot declare finish yet. Need at least 5 rounds.`);
+        return newState;
+      }
+      
+      // Inicia rodada final
+      newState.finalRoundDeclarerId = playerId;
+      newState.isFinalRound = true;
+      newState.turnPhase = "draw";
+      newState.logs.push(`${player.name} declared CUNOKU! Final round begins.`);
+      break;
+    
+    case "discard_from_hand":
+      // Regra: descartar carta da mão se for igual ao topo da pilha de descarte
+      // Se não for igual, aplica punição: compra 2 cartas
+      if (action.cardIndex !== undefined && newState.discardPile.length > 0) {
+        const cardToDiscard = player.hand[action.cardIndex];
+        const topDiscard = newState.discardPile[newState.discardPile.length - 1];
+        
+        if (!cardToDiscard || !topDiscard) {
+          return newState;
+        }
+        
+        if (cardToDiscard.rank === topDiscard.rank) {
+          // Carta corresponde - descarta normalmente
+          player.hand.splice(action.cardIndex, 1);
+          newState.discardPile.push(cardToDiscard);
+          delete player.knownCards[action.cardIndex.toString()];
+          const newKnownCards: Record<string, boolean> = {};
+          Object.keys(player.knownCards).forEach(key => {
+            const idx = parseInt(key);
+            if (idx < action.cardIndex!) {
+              newKnownCards[key] = true;
+            } else if (idx > action.cardIndex!) {
+              newKnownCards[(idx - 1).toString()] = true;
+            }
+          });
+          player.knownCards = newKnownCards;
+          newState.logs.push(`${player.name} discarded ${cardToDiscard.rank} from hand`);
+          
+          // Avança turno e incrementa round se necessário
+          const nextPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
+          if (nextPlayerIndex === 0) {
+            newState.round++;
+          }
+          
+          // Verifica se é rodada final e voltou ao declarante
+          if (newState.isFinalRound && newState.finalRoundDeclarerId === playerId) {
+            newState.turnPhase = "finished";
+            calculateFinalScores(newState);
+          } else {
+            newState.currentPlayerIndex = nextPlayerIndex;
+          }
+        } else {
+          // Carta NÃO corresponde - APLICA PUNIÇÃO
+          // Regra especial: Se jogador tem 6 cartas, apenas perde a vez (não compra 2 cartas)
+          if (player.hand.length >= 6) {
+            // Apenas perde a vez - avança turno
+            newState.logs.push(`${player.name} tried to discard wrong card! Loses turn (has 6 cards).`);
+            
+            // Avança turno e incrementa round se necessário
+            const nextPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
+            if (nextPlayerIndex === 0) {
+              newState.round++;
+            }
+            
+            // Verifica se é rodada final e voltou ao declarante
+            if (newState.isFinalRound && newState.finalRoundDeclarerId === playerId) {
+              newState.turnPhase = "finished";
+              calculateFinalScores(newState);
+            } else {
+              newState.currentPlayerIndex = nextPlayerIndex;
+            }
+          } else {
+            // Punição normal: compra 2 cartas
+            for (let i = 0; i < 2; i++) {
+              if (newState.deck.length === 0) {
+                const topDiscardCard = newState.discardPile.pop();
+                newState.deck = [...newState.discardPile];
+                newState.discardPile = topDiscardCard ? [topDiscardCard] : [];
+                for (let j = newState.deck.length - 1; j > 0; j--) {
+                  const k = Math.floor(Math.random() * (j + 1));
+                  [newState.deck[j], newState.deck[k]] = [newState.deck[k], newState.deck[j]];
+                }
+              }
+              const penaltyCard = newState.deck.pop();
+              if (penaltyCard) {
+                player.hand.push(penaltyCard);
+              }
+            }
+            newState.logs.push(`${player.name} tried to discard wrong card! Draws 2 cards as penalty.`);
+            // NÃO descarta a carta, NÃO avança turno - jogador mantém a carta e recebe punição
+          }
+        }
+      }
       break;
   }
   
   return newState;
+}
+
+/**
+ * Calcula pontuações finais e determina vencedor
+ */
+function calculateFinalScores(state: GameState): void {
+  // Revela todas as cartas
+  state.players.forEach(player => {
+    // Marca todas as cartas como conhecidas para revelação
+    player.hand.forEach((_, index) => {
+      player.knownCards[index.toString()] = true;
+    });
+    
+    // Calcula pontuação total
+    player.score = player.hand.reduce((sum, card) => sum + card.value, 0);
+  });
+  
+  // Encontra o vencedor (menor pontuação)
+  const sortedPlayers = [...state.players].sort((a, b) => a.score - b.score);
+  state.winnerId = sortedPlayers[0].id;
+  
+  state.logs.push(`Game finished! Winner: ${sortedPlayers[0].name} with ${sortedPlayers[0].score} points`);
 }
 
 /**

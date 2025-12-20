@@ -37,9 +37,12 @@ export interface GameState {
   currentPlayerIndex: number;
   turnPhase: "draw" | "action" | "discard" | "finished";
   drawnCard: Card | null; // The card currently drawn but not yet placed/discarded
+  drawnFromDiscard: boolean; // True if drawnCard was taken from discard pile (can't use abilities)
   round: number;
   winnerId: string | null;
   logs: string[];
+  finalRoundDeclarerId?: string | null; // ID do jogador que declarou fim de jogo
+  isFinalRound?: boolean; // Se está na rodada final
 }
 
 // === TABLE DEFINITIONS ===
@@ -78,9 +81,10 @@ export type GameAction =
   | { type: "draw_discard" }
   | { type: "discard_drawn" }
   | { type: "replace_card"; handIndex: number } // Replace hand card with drawn card
-  | { type: "use_ability"; ability: string; targetPlayerId?: string; targetCardIndex?: number; targetCardIndex2?: number }
+  | { type: "use_ability"; ability: string; targetPlayerId?: string; targetCardIndex?: number; targetCardIndex2?: number; targetPlayerId2?: string; targetCardIndex3?: number }
   | { type: "declare_finish" }
-  | { type: "matched_discard"; cardIndex: number }; // Rule: Discard same card out of turn
+  | { type: "matched_discard"; cardIndex: number } // Rule: Discard same card out of turn
+  | { type: "discard_from_hand"; cardIndex: number }; // Rule: Discard card from hand if matches top of discard pile
 
 export type WsPrivateMessage = {
   type: "private_info";

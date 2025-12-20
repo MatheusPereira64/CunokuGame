@@ -123,9 +123,12 @@ export function createOfflineGame(
     currentPlayerIndex: 0,
     turnPhase: "draw",
     drawnCard: null,
+    drawnFromDiscard: false,
     round: 1,
     winnerId: null,
-    logs: [`Game started! ${playerName} vs ${botCount} bot(s)`]
+    logs: [`Game started! ${playerName} vs ${botCount} bot(s)`],
+    finalRoundDeclarerId: null,
+    isFinalRound: false
   };
   
   return { gameState, playerId };
