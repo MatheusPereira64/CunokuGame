@@ -40,6 +40,14 @@ export function useGameSocket(roomCode: string, playerId: string) {
           case "player_action":
             // Optional: Show toast for other player actions
             break;
+          case "cunoku_declared":
+            // Notificação quando alguém declara Cunoku
+            toast({
+              title: "🔥 CUNOKU Declarado!",
+              description: `${message.playerName} declarou fim de jogo! Rodada final iniciada.`,
+              duration: 5000,
+            });
+            break;
           case "private_info":
             // Mensagem privada (para cartas 5 e 6)
             toast({

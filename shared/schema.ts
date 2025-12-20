@@ -74,6 +74,7 @@ export type WsMessage =
   | { type: "game_state"; state: GameState }
   | { type: "player_action"; action: GameAction }
   | { type: "error"; message: string }
+  | { type: "cunoku_declared"; playerName: string }
   | WsPrivateMessage;
 
 export type GameAction =

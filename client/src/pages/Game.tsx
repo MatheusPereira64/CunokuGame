@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useGameSocket } from "@/hooks/use-game-socket";
 import { useOfflineGame } from "@/hooks/use-offline-game";
@@ -110,6 +110,8 @@ export default function Game() {
   const [selectedTargetCard2, setSelectedTargetCard2] = useState<number | null>(null);
   const [selectedTargetPlayer2, setSelectedTargetPlayer2] = useState<string | null>(null);
   const [swapMode, setSwapMode] = useState<"me_and_other" | "two_others">("me_and_other");
+  const [swapStep, setSwapStep] = useState<1 | 2>(1); // Para controlar o passo da seleção no modo "two_others"
+  const [firstPlayerSelection, setFirstPlayerSelection] = useState<{ playerId: string; cardIndex: number } | null>(null);
   const [privateCardInfo, setPrivateCardInfo] = useState<{ card: Card; playerName: string } | null>(null);
   const [peekTimers, setPeekTimers] = useState<Map<number, NodeJS.Timeout>>(new Map());
   
@@ -123,6 +125,25 @@ export default function Game() {
   // Usa estado offline se estiver em modo offline, senão usa online
   const gameState = isOffline ? offlineGameStateFromHook : onlineGameState;
   const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
+
+  // Detecta quando alguém declara Cunoku (para jogo offline)
+  const prevFinalRound = useRef(false);
+  useEffect(() => {
+    if (isOffline && gameState) {
+      // Se acabou de entrar em rodada final e antes não estava
+      if (gameState.isFinalRound && !prevFinalRound.current) {
+        const declarer = gameState.players.find(p => p.id === gameState.finalRoundDeclarerId);
+        if (declarer) {
+          toast({
+            title: "🔥 CUNOKU Declarado!",
+            description: `${declarer.name} declarou fim de jogo! Rodada final iniciada.`,
+            duration: 5000,
+          });
+        }
+      }
+      prevFinalRound.current = gameState.isFinalRound || false;
+    }
+  }, [gameState?.isFinalRound, gameState?.finalRoundDeclarerId, isOffline, toast]);
 
   const me = gameState?.players.find(p => p.id === playerId);
   const isMyTurn = gameState?.players[gameState.currentPlayerIndex]?.id === playerId;
@@ -388,10 +409,10 @@ export default function Game() {
         });
       } else {
         // Troca entre dois outros jogadores
-        if (!selectedTargetPlayer || !selectedTargetPlayer2 || selectedTargetCard === null || selectedTargetCard2 === null) {
+        if (!firstPlayerSelection || !selectedTargetPlayer2 || selectedTargetCard2 === null) {
           toast({ 
             title: "Selecione cartas", 
-            description: "Selecione os dois jogadores e suas cartas",
+            description: "Selecione dois jogadores e suas cartas",
             variant: "destructive" 
           });
           return;
@@ -400,10 +421,10 @@ export default function Game() {
         sendAction({ 
           type: 'use_ability', 
           ability: "swap",
-          targetPlayerId: selectedTargetPlayer,
-          targetCardIndex: selectedTargetCard,
+          targetPlayerId: firstPlayerSelection.playerId,
+          targetCardIndex: firstPlayerSelection.cardIndex,
           targetPlayerId2: selectedTargetPlayer2,
-          targetCardIndex3: selectedTargetCard2
+          targetCardIndex2: selectedTargetCard2
         });
       }
     }
@@ -415,6 +436,8 @@ export default function Game() {
     setSelectedTargetCard2(null);
     setSelectedHandIndex(null);
     setSwapMode("me_and_other");
+    setSwapStep(1);
+    setFirstPlayerSelection(null);
   };
 
   const renderPlayer = (player: Player, index: number, totalPlayers: number) => {
@@ -438,7 +461,7 @@ export default function Game() {
                 card={card} 
                 // Only show my cards if I know them (peeked) or if game ended
                 // Default: hidden for everyone, including me, unless 'knownCards' is true
-                hidden={!gameState.winnerId && !(isMe && player.knownCards[i])} 
+                hidden={!gameState?.winnerId && !(isMe && player.knownCards[i])} 
                 className="w-12 h-16 md:w-16 md:h-24"
                 animate={false}
               />
@@ -455,7 +478,7 @@ export default function Game() {
           name={player.name} 
           isBot={player.isBot} 
           score={player.score} 
-          isActive={gameState.players[gameState.currentPlayerIndex]?.id === player.id}
+          isActive={gameState?.players[gameState.currentPlayerIndex]?.id === player.id}
         />
       </div>
     );
@@ -540,6 +563,32 @@ export default function Game() {
             <span className="text-yellow-900 font-bold text-lg">YOUR TURN</span>
             {phase === 'draw' && <span className="text-yellow-100 text-sm">Draw from Deck or Discard</span>}
             {phase === 'action' && <span className="text-yellow-100 text-sm">Select a card to replace or Discard drawn</span>}
+          </motion.div>
+        </div>
+      )}
+
+      {/* Round Info - Top Left */}
+      {gameState && (
+        <div className="absolute top-20 left-8 z-40 pointer-events-none">
+          <motion.div 
+            initial={{ x: -20, opacity: 0 }} 
+            animate={{ x: 0, opacity: 1 }}
+            className="bg-black/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-yellow-500/50 shadow-xl"
+          >
+            <div className="text-center">
+              <div className="text-lg font-bold text-yellow-400 mb-1">
+                Round {gameState.round}{gameState.round < 5 ? '/5' : ''}
+              </div>
+              {gameState.round < 5 ? (
+                <div className="text-xs text-white/80">
+                  Cunoku available after round 5
+                </div>
+              ) : (
+                <div className="text-xs text-white/80">
+                  Turn: {gameState.players[gameState.currentPlayerIndex]?.name || 'Unknown'}
+                </div>
+              )}
+            </div>
           </motion.div>
         </div>
       )}
@@ -823,20 +872,6 @@ export default function Game() {
                   </div>
                 </div>
               )}
-              {isMyTurn && phase === 'draw' && gameState.round < 5 && (
-                <div className="absolute right-12 bottom-32">
-                  <div className="bg-black/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-yellow-500/50 shadow-xl">
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-yellow-400 mb-1">
-                        Round {gameState.round}/5
-                      </div>
-                      <div className="text-xs text-white/80">
-                        Cunoku available after round 5
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -951,6 +986,8 @@ export default function Game() {
                           setSelectedTargetCard(null);
                           setSelectedTargetCard2(null);
                           setSelectedHandIndex(null);
+                          setSwapStep(1);
+                          setFirstPlayerSelection(null);
                         }}
                         className="flex-1"
                       >
@@ -1023,52 +1060,80 @@ export default function Game() {
                   
                   {swapMode === "two_others" && (
                     <>
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700">Primeiro jogador:</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {gameState.players.map(p => (
-                            <Button
-                              key={p.id}
-                              variant={selectedTargetPlayer === p.id ? "primary" : "outline"}
-                              onClick={() => {
-                                setSelectedTargetPlayer(p.id);
-                                setSelectedTargetCard(null);
-                                setSelectedTargetCard2(null);
-                              }}
-                              className="h-auto py-3"
-                            >
-                              <div className="flex flex-col items-center gap-1">
-                                <Avatar name={p.name} className="scale-75" />
-                                <span className="text-xs">{p.name}</span>
-                              </div>
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {selectedTargetPlayer && (
+                      {swapStep === 1 ? (
                         <>
                           <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-700">Carta do primeiro jogador (1-4):</label>
-                            <div className="grid grid-cols-4 gap-2">
-                              {[0, 1, 2, 3].map(idx => (
+                            <label className="text-sm font-bold text-gray-700">Primeiro jogador:</label>
+                            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                              {gameState.players.map(p => (
                                 <Button
-                                  key={idx}
-                                  variant={selectedTargetCard === idx ? "primary" : "outline"}
-                                  onClick={() => setSelectedTargetCard(idx)}
-                                  className="h-16"
+                                  key={p.id}
+                                  variant={selectedTargetPlayer === p.id ? "primary" : "outline"}
+                                  onClick={() => {
+                                    setSelectedTargetPlayer(p.id);
+                                    setSelectedTargetCard(null);
+                                  }}
+                                  className="h-auto py-2"
                                 >
-                                  {idx + 1}
+                                  <div className="flex flex-col items-center gap-1">
+                                    <Avatar name={p.name} className="scale-75" />
+                                    <span className="text-xs">{p.name}</span>
+                                  </div>
                                 </Button>
                               ))}
                             </div>
                           </div>
                           
+                          {selectedTargetPlayer && (
+                            <div className="space-y-2">
+                              <label className="text-sm font-bold text-gray-700">Carta do primeiro jogador (1-4):</label>
+                              <div className="grid grid-cols-4 gap-2">
+                                {[0, 1, 2, 3].map(idx => (
+                                  <Button
+                                    key={idx}
+                                    variant={selectedTargetCard === idx ? "primary" : "outline"}
+                                    onClick={() => setSelectedTargetCard(idx)}
+                                    className="h-12"
+                                  >
+                                    {idx + 1}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {selectedTargetPlayer && selectedTargetCard !== null && (
+                            <Button
+                              variant="primary"
+                              onClick={() => {
+                                setFirstPlayerSelection({ playerId: selectedTargetPlayer, cardIndex: selectedTargetCard });
+                                setSwapStep(2);
+                                setSelectedTargetPlayer(null);
+                                setSelectedTargetCard(null);
+                                setSelectedTargetPlayer2(null);
+                                setSelectedTargetCard2(null);
+                              }}
+                              className="w-full"
+                            >
+                              Confirmar Primeiro Jogador
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {firstPlayerSelection && (
+                            <div className="bg-gray-100 p-2 rounded mb-2">
+                              <div className="text-xs text-gray-600">
+                                Primeiro jogador: {gameState.players.find(p => p.id === firstPlayerSelection.playerId)?.name} - Carta {firstPlayerSelection.cardIndex + 1}
+                              </div>
+                            </div>
+                          )}
+                          
                           <div className="space-y-2">
                             <label className="text-sm font-bold text-gray-700">Segundo jogador:</label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                               {gameState.players
-                                .filter(p => p.id !== selectedTargetPlayer)
+                                .filter(p => p.id !== firstPlayerSelection?.playerId)
                                 .map(p => (
                                   <Button
                                     key={p.id}
@@ -1077,7 +1142,7 @@ export default function Game() {
                                       setSelectedTargetPlayer2(p.id);
                                       setSelectedTargetCard2(null);
                                     }}
-                                    className="h-auto py-3"
+                                    className="h-auto py-2"
                                   >
                                     <div className="flex flex-col items-center gap-1">
                                       <Avatar name={p.name} className="scale-75" />
@@ -1097,7 +1162,7 @@ export default function Game() {
                                     key={idx}
                                     variant={selectedTargetCard2 === idx ? "primary" : "outline"}
                                     onClick={() => setSelectedTargetCard2(idx)}
-                                    className="h-16"
+                                    className="h-12"
                                   >
                                     {idx + 1}
                                   </Button>
@@ -1105,6 +1170,21 @@ export default function Game() {
                               </div>
                             </div>
                           )}
+                          
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => {
+                                setSwapStep(1);
+                                setFirstPlayerSelection(null);
+                                setSelectedTargetPlayer2(null);
+                                setSelectedTargetCard2(null);
+                              }}
+                              className="flex-1"
+                            >
+                              Voltar
+                            </Button>
+                          </div>
                         </>
                       )}
                     </>
@@ -1118,8 +1198,13 @@ export default function Game() {
                   onClick={() => {
                     setAbilityModalOpen(false);
                     setSelectedTargetPlayer(null);
+                    setSelectedTargetPlayer2(null);
                     setSelectedTargetCard(null);
+                    setSelectedTargetCard2(null);
                     setSelectedHandIndex(null);
+                    setSwapMode("me_and_other");
+                    setSwapStep(1);
+                    setFirstPlayerSelection(null);
                   }}
                   className="flex-1"
                 >
@@ -1135,7 +1220,9 @@ export default function Game() {
                     ((gameState.drawnCard.rank === "7" || gameState.drawnCard.rank === "8") && 
                     selectedHandIndex === null) ||
                     ((gameState.drawnCard.rank === "9" || gameState.drawnCard.rank === "10") && 
-                    (!selectedTargetPlayer || selectedHandIndex === null || selectedTargetCard === null))
+                    swapMode === "me_and_other" && (!selectedTargetPlayer || selectedHandIndex === null || selectedTargetCard === null)) ||
+                    ((gameState.drawnCard.rank === "9" || gameState.drawnCard.rank === "10") && 
+                    swapMode === "two_others" && (!firstPlayerSelection || !selectedTargetPlayer2 || selectedTargetCard2 === null))
                   }
                 >
                   Confirmar

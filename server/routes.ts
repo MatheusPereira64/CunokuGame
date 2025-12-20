@@ -179,6 +179,17 @@ export async function registerRoutes(
           await storage.updateGameState(currentRoom!, result.newState);
           broadcast(currentRoom!, { type: "game_state", state: result.newState });
           
+          // Se alguém declarou Cunoku, envia notificação para todos
+          if (msg.action.type === "declare_finish" && result.newState.isFinalRound) {
+            const declarer = result.newState.players.find(p => p.id === currentPlayer!);
+            if (declarer) {
+              broadcast(currentRoom!, { 
+                type: "cunoku_declared", 
+                playerName: declarer.name 
+              });
+            }
+          }
+          
           // Envia mensagem privada se houver (para cartas 5 e 6)
           if (result.privateMessage) {
             ws.send(JSON.stringify({
