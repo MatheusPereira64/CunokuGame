@@ -70,14 +70,22 @@ export type WsMessage =
   | { type: "connect"; playerId: string; roomCode: string }
   | { type: "game_state"; state: GameState }
   | { type: "player_action"; action: GameAction }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | WsPrivateMessage;
 
 export type GameAction =
   | { type: "draw_deck" }
   | { type: "draw_discard" }
   | { type: "discard_drawn" }
   | { type: "replace_card"; handIndex: number } // Replace hand card with drawn card
-  | { type: "use_ability"; ability: string; targetPlayerId?: string; targetCardIndex?: number }
+  | { type: "use_ability"; ability: string; targetPlayerId?: string; targetCardIndex?: number; targetCardIndex2?: number }
   | { type: "declare_finish" }
   | { type: "matched_discard"; cardIndex: number }; // Rule: Discard same card out of turn
+
+export type WsPrivateMessage = {
+  type: "private_info";
+  message: string;
+  card?: Card;
+  playerName?: string;
+};
 

@@ -166,22 +166,32 @@ export async function registerRoutes(
           }
         }
 
-        if (msg.type === "game_action") {
+        if (msg.type === "player_action") {
           // Handle logic (draw, discard, etc)
           const room = await storage.getRoom(currentRoom!);
           if (!room || !room.gameState) return;
           
           let state = room.gameState as GameState;
           
-          // Simple pass-through for demo + update DB
-          // TODO: Implement GameLogic.processAction(state, msg.action)
+          // Processa ação usando GameLogic.processAction
+          const result = GameLogic.processAction(state, msg.action, currentPlayer!);
           
-          await storage.updateGameState(currentRoom!, state);
-          broadcast(currentRoom!, { type: "game_state", state });
+          await storage.updateGameState(currentRoom!, result.newState);
+          broadcast(currentRoom!, { type: "game_state", state: result.newState });
+          
+          // Envia mensagem privada se houver (para cartas 5 e 6)
+          if (result.privateMessage) {
+            ws.send(JSON.stringify({
+              type: "private_info",
+              message: result.privateMessage.message,
+              card: result.privateMessage.card,
+              playerName: result.privateMessage.playerName
+            }));
+          }
           
           // Check if next player is bot
-          if (state.players[state.currentPlayerIndex]?.isBot) {
-            scheduleNextBotTurn(currentRoom!, state);
+          if (result.newState.players[result.newState.currentPlayerIndex]?.isBot) {
+            scheduleNextBotTurn(currentRoom!, result.newState);
           }
         }
 

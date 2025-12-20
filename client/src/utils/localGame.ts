@@ -91,7 +91,7 @@ export function createOfflineGame(
     isConnected: true,
     hand: [],
     score: 0,
-    knownCards: { "0": true, "1": true } // Conhece 2 cartas iniciais
+    knownCards: {} // Todas as cartas começam viradas conforme as regras
   };
   
   // Cria bots

@@ -68,6 +68,65 @@ export function processOfflineAction(
       }
       break;
       
+    case "use_ability":
+      if (!newState.drawnCard) break;
+      
+      const drawnCardForAbility = newState.drawnCard;
+      const rank = drawnCardForAbility.rank;
+      
+      // 7,8: See own card
+      if (rank === "7" || rank === "8") {
+        if (action.targetCardIndex !== undefined && action.targetPlayerId === playerId) {
+          const cardIdx = action.targetCardIndex;
+          if (cardIdx >= 0 && cardIdx < player.hand.length) {
+            player.knownCards[cardIdx.toString()] = true;
+          }
+        }
+      }
+      
+      // 5,6: See opponent card (informação privada - será tratada no frontend)
+      if (rank === "5" || rank === "6") {
+        if (action.targetPlayerId && action.targetPlayerId !== playerId && action.targetCardIndex !== undefined) {
+          const targetPlayer = newState.players.find(p => p.id === action.targetPlayerId);
+          if (targetPlayer && action.targetCardIndex >= 0 && action.targetCardIndex < targetPlayer.hand.length) {
+            // A informação privada será mostrada via toast no frontend
+            // Não modificamos o estado global, apenas processamos a ação
+          }
+        }
+      }
+      
+      // 9,10: Swap cards between 2 players
+      if (rank === "9" || rank === "10") {
+        if (action.targetPlayerId && action.targetPlayerId !== playerId) {
+          const targetPlayer = newState.players.find(p => p.id === action.targetPlayerId);
+          if (targetPlayer) {
+            const sourceCardIdx = action.targetCardIndex !== undefined ? action.targetCardIndex : Math.floor(Math.random() * player.hand.length);
+            const targetCardIdx = action.targetCardIndex2 !== undefined ? action.targetCardIndex2 : Math.floor(Math.random() * targetPlayer.hand.length);
+            
+            if (sourceCardIdx >= 0 && sourceCardIdx < player.hand.length &&
+                targetCardIdx >= 0 && targetCardIdx < targetPlayer.hand.length) {
+              // Troca as cartas
+              const sourceCard = player.hand[sourceCardIdx];
+              const targetCard = targetPlayer.hand[targetCardIdx];
+              
+              player.hand[sourceCardIdx] = targetCard;
+              targetPlayer.hand[targetCardIdx] = sourceCard;
+              
+              // Reset knownCards para as cartas trocadas
+              delete player.knownCards[sourceCardIdx.toString()];
+              delete targetPlayer.knownCards[targetCardIdx.toString()];
+            }
+          }
+        }
+      }
+      
+      // Descarta a carta após usar habilidade
+      newState.discardPile.push(newState.drawnCard);
+      newState.drawnCard = null;
+      newState.turnPhase = "draw";
+      newState.currentPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
+      break;
+      
     case "declare_finish":
       // Implementar lógica de fim de jogo
       newState.turnPhase = "finished";

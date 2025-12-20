@@ -40,6 +40,15 @@ export function useGameSocket(roomCode: string, playerId: string) {
           case "player_action":
             // Optional: Show toast for other player actions
             break;
+          case "private_info":
+            // Mensagem privada (para cartas 5 e 6)
+            toast({
+              title: "Carta Revelada!",
+              description: message.card 
+                ? `${message.playerName} tem ${message.card.rank} de ${message.card.suit}`
+                : message.message,
+            });
+            break;
         }
       } catch (err) {
         console.error("Failed to parse WS message", err);
