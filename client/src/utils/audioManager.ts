@@ -32,6 +32,12 @@ class AudioManager {
   private setupUserInteraction(): void {
     const enableAudio = () => {
       this.userInteracted = true;
+      // Tenta tocar a música do menu se já estiver configurada para tocar
+      if (this.currentMusic === this.menuMusic && this.menuMusic && this.menuMusic.paused) {
+        this.menuMusic.play().catch(err => {
+          console.warn('Failed to play menu music after interaction:', err);
+        });
+      }
       // Remove listeners após primeira interação
       document.removeEventListener('click', enableAudio);
       document.removeEventListener('keydown', enableAudio);
@@ -47,12 +53,19 @@ class AudioManager {
    * Toca a música do menu
    */
   playMenuMusic(): void {
-    if (this.isMuted || !this.userInteracted) return;
+    if (this.isMuted) return;
     
     this.stopAllMusic();
     if (this.menuMusic) {
+      // Tenta tocar mesmo sem interação do usuário
+      // Se falhar, será tentado novamente após interação
       this.menuMusic.play().catch(err => {
-        console.warn('Failed to play menu music:', err);
+        // Se falhar por falta de interação, marca para tentar novamente
+        if (!this.userInteracted) {
+          console.log('Menu music will play after user interaction');
+        } else {
+          console.warn('Failed to play menu music:', err);
+        }
       });
       this.currentMusic = this.menuMusic;
     }

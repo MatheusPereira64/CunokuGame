@@ -13,8 +13,9 @@ import { createOfflineGame } from "@/utils/localGame";
 import { audioManager } from "@/utils/audioManager";
 
 export default function Home() {
-  // Toca música do menu ao carregar a página
+  // Toca música do menu assim que o componente montar
   useEffect(() => {
+    // Tenta tocar imediatamente
     audioManager.playMenuMusic();
     
     // Cleanup ao desmontar
@@ -30,6 +31,8 @@ export default function Home() {
   const [gameMode, setGameMode] = useState<"multiplayer" | "vs_bots">("multiplayer");
   const [botDifficulty, setBotDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [botCount, setBotCount] = useState<number>(2);
+  const [botCountOpen, setBotCountOpen] = useState(false);
+  const [botDifficultyOpen, setBotDifficultyOpen] = useState(false);
 
   const createRoom = useCreateRoom();
   const joinRoom = useJoinRoom();
@@ -166,12 +169,12 @@ export default function Home() {
                 <Bot className="mr-3 w-6 h-6" /> Play Against Bots
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-md overflow-visible">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-display text-indigo-900">Play Against Bots</DialogTitle>
                 <DialogDescription>Start a game with AI opponents</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="space-y-4 py-4 overflow-visible">
                 <div className="space-y-2">
                   <Label htmlFor="botName">Your Name</Label>
                   <Input 
@@ -184,11 +187,26 @@ export default function Home() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="botCount">Number of Bots</Label>
-                  <Select value={botCount.toString()} onValueChange={(value) => setBotCount(parseInt(value))}>
-                    <SelectTrigger className="text-lg py-6">
+                  <Select 
+                    value={botCount.toString()} 
+                    onValueChange={(value) => {
+                      setBotCount(parseInt(value));
+                      setBotCountOpen(false);
+                    }}
+                    open={botCountOpen}
+                    onOpenChange={(open) => {
+                      setBotCountOpen(open);
+                      if (open) setBotDifficultyOpen(false);
+                    }}
+                  >
+                    <SelectTrigger id="botCount" className="text-lg py-6 w-full">
                       <SelectValue placeholder="Select number of bots" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent 
+                      position="popper"
+                      className="z-[100] auto-height"
+                      sideOffset={5}
+                    >
                       <SelectItem value="1">1 Bot</SelectItem>
                       <SelectItem value="2">2 Bots</SelectItem>
                       <SelectItem value="3">3 Bots</SelectItem>
@@ -199,11 +217,26 @@ export default function Home() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="botDifficulty">Bot Difficulty</Label>
-                  <Select value={botDifficulty} onValueChange={(value: "easy" | "medium" | "hard") => setBotDifficulty(value)}>
-                    <SelectTrigger className="text-lg py-6">
+                  <Select 
+                    value={botDifficulty} 
+                    onValueChange={(value: "easy" | "medium" | "hard") => {
+                      setBotDifficulty(value);
+                      setBotDifficultyOpen(false);
+                    }}
+                    open={botDifficultyOpen}
+                    onOpenChange={(open) => {
+                      setBotDifficultyOpen(open);
+                      if (open) setBotCountOpen(false);
+                    }}
+                  >
+                    <SelectTrigger id="botDifficulty" className="text-lg py-6 w-full">
                       <SelectValue placeholder="Select difficulty" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent 
+                      position="popper"
+                      className="z-[100] auto-height"
+                      sideOffset={5}
+                    >
                       <SelectItem value="easy">Easy</SelectItem>
                       <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="hard">Hard</SelectItem>
