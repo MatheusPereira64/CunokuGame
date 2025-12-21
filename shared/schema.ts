@@ -80,6 +80,7 @@ export type WsMessage =
   | { type: "error"; message: string }
   | { type: "cunoku_declared"; playerName: string }
   | { type: "bot_thinking"; botName: string }
+  | { type: "bot_action"; botName: string; message: string }
   | WsPrivateMessage;
 
 export type GameAction =

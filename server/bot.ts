@@ -122,22 +122,100 @@ export class BotPlayer {
   }
 
   // Decide if bot wants to call "Cunoku" (end game)
+  // Regra: só pode declarar após round 5
+  // Lógica: quanto menor a pontuação (soma das cartas), maior a tendência de declarar
+  // Bots com dificuldade maior são mais propensos a declarar com boas pontuações
   decideFinish(state: GameState, playerIndex: number): boolean {
+    // Regra obrigatória: só pode declarar após round 5
+    if (state.round < 5) {
+      return false;
+    }
+
     const player = state.players[playerIndex];
     const totalScore = player.hand.reduce((sum, card) => sum + card.value, 0);
 
+    // Calcula pontuação média dos outros jogadores (se possível estimar)
+    const otherPlayers = state.players.filter((p, idx) => idx !== playerIndex);
+    const knownScores = otherPlayers
+      .map(p => {
+        // Tenta estimar pontuação baseada em cartas conhecidas
+        const knownCards = Object.entries(p.knownCards)
+          .filter(([_, known]) => known)
+          .map(([idx]) => p.hand[parseInt(idx)]?.value || 0);
+        const knownSum = knownCards.reduce((sum, val) => sum + val, 0);
+        const unknownCount = 4 - knownCards.length;
+        // Estima média de 5 pontos por carta desconhecida (valor médio aproximado)
+        return knownSum + (unknownCount * 5);
+      })
+      .filter(score => score > 0);
+
     if (this.difficulty === "easy") {
-      // Easy: call after round 3
-      return state.round > 3 && totalScore < 15;
+      // Easy: declara apenas com pontuação muito boa e probabilidade baixa
+      // Score < 10: 30% chance
+      // Score < 8: 50% chance
+      // Score < 6: 80% chance
+      if (totalScore >= 10) return false;
+      
+      let probability = 0.3;
+      if (totalScore < 8) probability = 0.5;
+      if (totalScore < 6) probability = 0.8;
+      
+      return Math.random() < probability;
     }
 
     if (this.difficulty === "medium") {
-      // Medium: call if score < 8
-      return totalScore < 8;
+      // Medium: declara com pontuação boa e probabilidade média
+      // Score < 8: 40% chance
+      // Score < 6: 60% chance
+      // Score < 4: 85% chance
+      if (totalScore >= 8) return false;
+      
+      let probability = 0.4;
+      if (totalScore < 6) probability = 0.6;
+      if (totalScore < 4) probability = 0.85;
+      
+      // Se outros jogadores parecem ter pontuação pior, aumenta probabilidade
+      if (knownScores.length > 0) {
+        const avgOtherScore = knownScores.reduce((sum, s) => sum + s, 0) / knownScores.length;
+        if (totalScore < avgOtherScore - 2) {
+          probability += 0.15; // Bônus se está claramente na frente
+        }
+      }
+      
+      return Math.random() < Math.min(probability, 0.95);
     }
 
-    // Hard: call if score is good AND others likely have worse
-    return totalScore < 5;
+    // Hard: declara com pontuação excelente e probabilidade alta
+    // Score < 6: 50% chance
+    // Score < 4: 75% chance
+    // Score < 2: 95% chance
+    // Score <= 0: 100% chance (sempre declara)
+    if (totalScore <= 0) return true; // Sempre declara com pontuação perfeita ou negativa
+    
+    if (totalScore >= 6) return false;
+    
+    let probability = 0.5;
+    if (totalScore < 4) probability = 0.75;
+    if (totalScore < 2) probability = 0.95;
+    
+    // Hard bots são mais agressivos: se outros parecem ter pior pontuação, aumenta significativamente
+    if (knownScores.length > 0) {
+      const avgOtherScore = knownScores.reduce((sum, s) => sum + s, 0) / knownScores.length;
+      if (totalScore < avgOtherScore - 1) {
+        probability += 0.2; // Bônus maior para bots hard
+      }
+      // Se está claramente na frente, aumenta ainda mais
+      if (totalScore < avgOtherScore - 3) {
+        probability += 0.15;
+      }
+    }
+    
+    // Considera também o round: quanto mais rounds passaram, mais propenso a declarar
+    if (state.round >= 7) {
+      probability += 0.1; // Bônus após muitos rounds
+    }
+    
+    return Math.random() < Math.min(probability, 0.98);
   }
 }
 

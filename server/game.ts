@@ -79,7 +79,7 @@ export class GameLogic {
     targetCardIdx?: number,
     targetPlayerId2?: string,
     targetCardIdx2?: number
-  ): { success: boolean; message: string; privateInfo?: { card: Card; playerName: string } } {
+  ): { success: boolean; message: string; privateInfo?: { card: Card; playerName: string }; swapInfo?: { player1Name: string; player1CardIndex: number; player2Name: string; player2CardIndex: number } } {
     const sourcePlayer = state.players.find(p => p.id === sourceId);
     if (!sourcePlayer) return { success: false, message: "Source player not found" };
 
@@ -144,9 +144,16 @@ export class GameLogic {
         delete player1.knownCards[cardIdx1.toString()];
         delete player2.knownCards[cardIdx2.toString()];
         
+        // Retorna mensagem detalhada para log
         return { 
           success: true, 
-          message: `Swapped cards between ${player1.name} and ${player2.name}` 
+          message: `${sourcePlayer.name} swapped card ${cardIdx1 + 1} of ${player1.name} with card ${cardIdx2 + 1} of ${player2.name}`,
+          swapInfo: {
+            player1Name: player1.name,
+            player1CardIndex: cardIdx1 + 1,
+            player2Name: player2.name,
+            player2CardIndex: cardIdx2 + 1
+          }
         };
       } else if (targetId && targetId !== sourceId) {
         // Troca entre sourceId e targetId
@@ -172,9 +179,16 @@ export class GameLogic {
         delete sourcePlayer.knownCards[sourceCardIdx.toString()];
         delete targetPlayer.knownCards[targetCardIdx.toString()];
         
+        // Retorna mensagem detalhada para log
         return { 
           success: true, 
-          message: `Swapped cards with ${targetPlayer.name}` 
+          message: `${sourcePlayer.name} swapped card ${sourceCardIdx + 1} with card ${targetCardIdx + 1} of ${targetPlayer.name}`,
+          swapInfo: {
+            player1Name: sourcePlayer.name,
+            player1CardIndex: sourceCardIdx + 1,
+            player2Name: targetPlayer.name,
+            player2CardIndex: targetCardIdx + 1
+          }
         };
       }
     }
@@ -207,12 +221,14 @@ export class GameLogic {
             const j = Math.floor(Math.random() * (i + 1));
             [newState.deck[i], newState.deck[j]] = [newState.deck[j], newState.deck[i]];
           }
+          newState.logs.push("Baralho reciclado e embaralhado");
         }
         const drawnCard = newState.deck.pop();
         if (drawnCard) {
           newState.drawnCard = drawnCard;
           newState.drawnFromDiscard = false; // Puxou do deck, pode usar habilidades
           newState.turnPhase = "action";
+          newState.logs.push(`${newState.players[playerIndex].name} comprou uma carta do baralho`);
         }
         break;
 
@@ -222,6 +238,7 @@ export class GameLogic {
           newState.drawnCard = discardCard;
           newState.drawnFromDiscard = true; // Puxou da pilha de descarte, NÃO pode usar habilidades
           newState.turnPhase = "action";
+          newState.logs.push(`${newState.players[playerIndex].name} comprou a carta ${discardCard.rank} de ${discardCard.suit} da pilha de descarte`);
         }
         break;
 
@@ -233,7 +250,7 @@ export class GameLogic {
           newState.drawnCard = null;
           newState.drawnFromDiscard = false;
           newState.turnPhase = "draw";
-          newState.logs.push(`${newState.players[playerIndex].name} discarded ${discardedCard.rank}`);
+          newState.logs.push(`${newState.players[playerIndex].name} descartou a carta ${discardedCard.rank} de ${discardedCard.suit}`);
           
           // Avança turno e incrementa round se necessário
           const nextPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
@@ -257,7 +274,7 @@ export class GameLogic {
           player.hand[action.handIndex] = newState.drawnCard;
           if (oldCard) {
             newState.discardPile.push(oldCard);
-            newState.logs.push(`${newState.players[playerIndex].name} replaced a card`);
+            newState.logs.push(`${newState.players[playerIndex].name} substituiu a carta ${action.handIndex + 1} da mão`);
           }
           newState.drawnCard = null;
           newState.drawnFromDiscard = false;
@@ -299,6 +316,21 @@ export class GameLogic {
         );
         
         if (abilityResult.success) {
+          // Adiciona log detalhado baseado no tipo de habilidade
+          if (abilityResult.swapInfo) {
+            // Troca de cartas - log público detalhado
+            newState.logs.push(`${newState.players[playerIndex].name} trocou a carta ${abilityResult.swapInfo.player1CardIndex} de ${abilityResult.swapInfo.player1Name} com a carta ${abilityResult.swapInfo.player2CardIndex} de ${abilityResult.swapInfo.player2Name}`);
+          } else if (rank === "7" || rank === "8") {
+            // Ver própria carta - log simples
+            newState.logs.push(`${newState.players[playerIndex].name} usou habilidade para ver uma de suas cartas`);
+          } else if (rank === "5" || rank === "6") {
+            // Ver carta de oponente - log simples (detalhes são privados)
+            const targetPlayer = newState.players.find(p => p.id === action.targetPlayerId);
+            if (targetPlayer) {
+              newState.logs.push(`${newState.players[playerIndex].name} usou habilidade para ver uma carta de ${targetPlayer.name}`);
+            }
+          }
+          
           // Descarta a carta após usar habilidade
           newState.discardPile.push(newState.drawnCard);
           newState.drawnCard = null;
@@ -360,7 +392,7 @@ export class GameLogic {
                 }
               });
               player.knownCards = newKnownCards;
-              newState.logs.push(`${player.name} discarded matching ${cardToDiscard.rank}`);
+              newState.logs.push(`${player.name} descartou a carta ${cardToDiscard.rank} de ${cardToDiscard.suit} (corresponde ao descarte)`);
             }
           }
         }
@@ -377,7 +409,7 @@ export class GameLogic {
         newState.finalRoundDeclarerId = playerId;
         newState.isFinalRound = true;
         newState.turnPhase = "draw";
-        newState.logs.push(`${newState.players[playerIndex].name} declared CUNOKU! Final round begins.`);
+        newState.logs.push(`${newState.players[playerIndex].name} declarou CUNOKU! Rodada final iniciada.`);
         // Não avança turno ainda - o declarante ainda pode jogar
         break;
       
@@ -408,7 +440,7 @@ export class GameLogic {
               }
             });
             player.knownCards = newKnownCards;
-            newState.logs.push(`${newState.players[playerIndex].name} discarded ${cardToDiscard.rank} from hand`);
+            newState.logs.push(`${newState.players[playerIndex].name} descartou a carta ${cardToDiscard.rank} de ${cardToDiscard.suit} da mão`);
             
             // Avança turno e incrementa round se necessário
             const nextPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
@@ -428,7 +460,7 @@ export class GameLogic {
             // Regra especial: Se jogador tem 6 cartas, apenas perde a vez (não compra 2 cartas)
             if (player.hand.length >= 6) {
               // Apenas perde a vez - avança turno
-              newState.logs.push(`${newState.players[playerIndex].name} tried to discard wrong card! Loses turn (has 6 cards).`);
+              newState.logs.push(`${newState.players[playerIndex].name} tentou descartar carta errada! Perde a vez (tem 6 cartas).`);
               
               // Avança turno e incrementa round se necessário
               const nextPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
@@ -462,7 +494,7 @@ export class GameLogic {
                   player.hand.push(penaltyCard);
                 }
               }
-              newState.logs.push(`${newState.players[playerIndex].name} tried to discard wrong card! Draws 2 cards as penalty.`);
+              newState.logs.push(`${newState.players[playerIndex].name} tentou descartar carta errada! Compra 2 cartas como punição.`);
               // NÃO descarta a carta, NÃO avança turno - jogador mantém a carta e recebe punição
             }
           }

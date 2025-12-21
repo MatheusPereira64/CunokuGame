@@ -452,19 +452,77 @@ export async function registerRoutes(
       let updatedState = room.gameState as GameState;
       const playerIdx = updatedState.players.findIndex(p => p.id === currentPlayer.id);
       
-      // Make a decision
-      const action = bot.decideTurn(updatedState, playerIdx);
-      
-      // TODO: Apply action to state
-      // updatedState = GameLogic.processAction(updatedState, action)
-      
-      // Check if should finish
-      if (bot.decideFinish(updatedState, playerIdx)) {
-        // TODO: Process finish action
+      // Check if should finish (antes de decidir a ação normal)
+      // Se o bot decidir declarar fim de jogo, faz isso na fase de draw
+      if (updatedState.turnPhase === "draw" && 
+          !updatedState.isFinalRound && 
+          bot.decideFinish(updatedState, playerIdx)) {
+        console.log(`Bot ${currentPlayer.name} (${bot.difficulty}) decidiu declarar fim de jogo. Round: ${updatedState.round}, Score: ${updatedState.players[playerIdx].hand.reduce((sum, card) => sum + card.value, 0)}`);
+        const logsBefore = [...updatedState.logs]; // Salva logs antes da ação
+        const finishAction = { type: "declare_finish" as const };
+        const finishResult = GameLogic.processAction(updatedState, finishAction, currentPlayer.id);
+        updatedState = finishResult.newState;
+        
+        // Envia notificação de ação do bot
+        const newLogs = updatedState.logs.slice(logsBefore.length);
+        const botLogs = newLogs.filter(log => log.includes(currentPlayer.name));
+        if (botLogs.length > 0) {
+          const lastBotLog = botLogs[botLogs.length - 1];
+          const botActionMessage = lastBotLog.replace(`${currentPlayer.name} `, "");
+          broadcast(roomCode, {
+            type: "bot_action",
+            botName: currentPlayer.name,
+            message: botActionMessage
+          });
+        }
+        
+        await storage.updateGameState(roomCode, updatedState);
+        broadcast(roomCode, { type: "game_state", state: updatedState });
+        
+        // Se alguém declarou Cunoku, envia notificação
+        if (updatedState.isFinalRound) {
+          const declarer = updatedState.players.find(p => p.id === currentPlayer.id);
+          if (declarer) {
+            broadcast(roomCode, { 
+              type: "cunoku_declared", 
+              playerName: declarer.name 
+            });
+          }
+        }
+      } else {
+        // Make a decision (ação normal)
+        const logsBefore = [...updatedState.logs]; // Salva logs antes da ação
+        const action = bot.decideTurn(updatedState, playerIdx);
+        const result = GameLogic.processAction(updatedState, action, currentPlayer.id);
+        updatedState = result.newState;
+        
+        // Envia mensagem privada se houver (para cartas 5 e 6)
+        if (result.privateMessage) {
+          // Para bots, não precisamos enviar mensagem privada, mas podemos logar
+          console.log(`Bot ${currentPlayer.name} used ability: ${result.privateMessage.message}`);
+        }
+        
+        // Envia notificação de ação do bot baseada nos logs
+        // Procura pelos logs mais recentes que mencionam o bot
+        const newLogs = updatedState.logs.slice(logsBefore.length);
+        
+        // Procura por logs que mencionam o bot (especialmente trocas de cartas)
+        const botLogs = newLogs.filter(log => log.includes(currentPlayer.name));
+        if (botLogs.length > 0) {
+          // Pega o último log do bot (geralmente o mais relevante)
+          const lastBotLog = botLogs[botLogs.length - 1];
+          // Extrai a mensagem do log (remove o nome do bot do início)
+          const botActionMessage = lastBotLog.replace(`${currentPlayer.name} `, "");
+          broadcast(roomCode, {
+            type: "bot_action",
+            botName: currentPlayer.name,
+            message: botActionMessage
+          });
+        }
+        
+        await storage.updateGameState(roomCode, updatedState);
+        broadcast(roomCode, { type: "game_state", state: updatedState });
       }
-
-      await storage.updateGameState(roomCode, updatedState);
-      broadcast(roomCode, { type: "game_state", state: updatedState });
 
       // Schedule next bot if applicable
       if (updatedState.players[updatedState.currentPlayerIndex]?.isBot) {

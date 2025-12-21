@@ -3,6 +3,7 @@ import { GameState, GameAction, Player } from "@shared/schema";
 import { processOfflineAction } from "@/utils/offlineGameLogic";
 import { BotPlayer } from "@/utils/botPlayer";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/contexts/i18n-context";
 
 export function useOfflineGame(
   initialGameState: GameState | null,
@@ -10,6 +11,7 @@ export function useOfflineGame(
   botDifficulty: "easy" | "medium" | "hard"
 ) {
   const { toast } = useToast();
+  const { translateBotMessage } = useI18n();
   const [gameState, setGameState] = useState<GameState | null>(initialGameState);
   const [botPlayers, setBotPlayers] = useState<Map<string, BotPlayer>>(new Map());
   const processingRef = useRef(false);
@@ -62,8 +64,24 @@ export function useOfflineGame(
         
         // Espera 3 segundos antes de executar a ação
         setTimeout(() => {
+          const logsBefore = [...state.logs];
           const action = bot.decideTurn(state, state.currentPlayerIndex);
           state = processOfflineAction(state, action, currentPlayer.id);
+          
+          // Detecta novos logs e mostra notificação
+          const newLogs = state.logs.slice(logsBefore.length);
+          if (newLogs.length > 0) {
+            const lastLog = newLogs[newLogs.length - 1];
+            if (lastLog && lastLog.includes(currentPlayer.name)) {
+              const botActionMessage = lastLog.replace(`${currentPlayer.name} `, "");
+              const translatedMessage = translateBotMessage(botActionMessage);
+              toast({
+                title: currentPlayer.name,
+                description: translatedMessage,
+                duration: 4000,
+              });
+            }
+          }
           
           // Salva estado
           setGameState(state);
@@ -79,7 +97,7 @@ export function useOfflineGame(
     };
     
     processNextBot();
-  }, [playerId]);
+  }, [playerId, toast]);
 
   // Inicializa bots quando o estado do jogo é carregado
   useEffect(() => {

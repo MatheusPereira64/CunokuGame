@@ -5,7 +5,8 @@ export type Language = "pt" | "es" | "en";
 interface I18nContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string>) => string;
+  translateBotMessage: (message: string) => string;
 }
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
@@ -21,13 +22,112 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("cunoku_language", lang);
   };
 
-  const t = (key: string): string => {
+  const t = (key: string, params?: Record<string, string>): string => {
     const translations = getTranslations(language);
-    return translations[key] || key;
+    let translation = translations[key] || key;
+    
+    // Substitui placeholders se houver
+    if (params) {
+      Object.entries(params).forEach(([paramKey, paramValue]) => {
+        translation = translation.replace(`{${paramKey}}`, paramValue);
+      });
+    }
+    
+    return translation;
+  };
+  
+  // Função helper para traduzir mensagens de ações dos bots
+  const translateBotMessage = (message: string): string => {
+    const translations = getTranslations(language);
+    
+    // Padrões de mensagens dos bots e suas traduções
+    // Troca de cartas: "trocou a carta X de Y com a carta Z de W"
+    const swapMatch = message.match(/trocou a carta (\d+) de (.+?) com a carta (\d+) de (.+?)$/);
+    if (swapMatch) {
+      return translations["bot.swappedCard"]
+        .replace("{card1}", swapMatch[1])
+        .replace("{player1}", swapMatch[2])
+        .replace("{card2}", swapMatch[3])
+        .replace("{player2}", swapMatch[4]);
+    }
+    
+    // Descarte: "descartou a carta X de Y"
+    const discardMatch = message.match(/descartou a carta (.+?) de (.+?)$/);
+    if (discardMatch && !message.includes("da mão")) {
+      return translations["bot.discardedCard"]
+        .replace("{rank}", discardMatch[1])
+        .replace("{suit}", discardMatch[2]);
+    }
+    
+    // Descarte da mão: "descartou a carta X de Y da mão"
+    const discardHandMatch = message.match(/descartou a carta (.+?) de (.+?) da mão/);
+    if (discardHandMatch) {
+      return translations["bot.discardedFromHand"]
+        .replace("{rank}", discardHandMatch[1])
+        .replace("{suit}", discardHandMatch[2]);
+    }
+    
+    // Substituição: "substituiu a carta X da mão"
+    const replaceMatch = message.match(/substituiu a carta (\d+) da mão/);
+    if (replaceMatch) {
+      return translations["bot.replacedCard"]
+        .replace("{index}", replaceMatch[1]);
+    }
+    
+    // Habilidade ver própria carta
+    if (message.includes("usou habilidade para ver uma de suas cartas")) {
+      return translations["bot.usedAbilityPeekOwn"];
+    }
+    
+    // Habilidade ver carta de oponente: "usou habilidade para ver uma carta de X"
+    const peekOpponentMatch = message.match(/usou habilidade para ver uma carta de (.+?)$/);
+    if (peekOpponentMatch) {
+      return translations["bot.usedAbilityPeekOpponent"]
+        .replace("{player}", peekOpponentMatch[1]);
+    }
+    
+    // Declaração de Cunoku: "declarou CUNOKU! Rodada final iniciada."
+    if (message.includes("declarou CUNOKU") || message.includes("declared CUNOKU") || (message.includes("CUNOKU") && (message.includes("Rodada final") || message.includes("Final round")))) {
+      return translations["bot.declaredCunoku"];
+    }
+    
+    // Compra do baralho
+    if (message.includes("comprou uma carta do baralho")) {
+      return translations["bot.drewFromDeck"];
+    }
+    
+    // Compra da pilha de descarte: "comprou a carta X de Y da pilha de descarte"
+    const drawDiscardMatch = message.match(/comprou a carta (.+?) de (.+?) da pilha de descarte/);
+    if (drawDiscardMatch) {
+      return translations["bot.drewFromDiscard"]
+        .replace("{rank}", drawDiscardMatch[1])
+        .replace("{suit}", drawDiscardMatch[2]);
+    }
+    
+    // Descarte correspondente: "descartou a carta X de Y (corresponde ao descarte)"
+    const matchingDiscardMatch = message.match(/descartou a carta (.+?) de (.+?) \(corresponde ao descarte\)/);
+    if (matchingDiscardMatch) {
+      return translations["bot.discardedMatching"]
+        .replace("{rank}", matchingDiscardMatch[1])
+        .replace("{suit}", matchingDiscardMatch[2]);
+    }
+    
+    // Punição: "tentou descartar carta errada! Compra 2 cartas como punição."
+    if (message.includes("tentou descartar carta errada") && message.includes("Compra 2 cartas")) {
+      return translations["bot.punishmentWrongCard"];
+    }
+    
+    // Punição perde vez: "tentou descartar carta errada! Perde a vez (tem 6 cartas)."
+    if (message.includes("tentou descartar carta errada") && message.includes("Perde a vez")) {
+      return translations["bot.punishmentLoseTurn"];
+    }
+    
+    // Se não encontrou padrão, retorna a mensagem original
+    return message;
   };
 
   return (
-    <I18nContext.Provider value={{ language, setLanguage, t }}>
+    <I18nContext.Provider value={{ language, setLanguage, t, translateBotMessage }}>
       {children}
     </I18nContext.Provider>
   );
@@ -219,6 +319,20 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.errorFailedToLoad": "Falha ao carregar partida. Por favor, inicie uma nova partida.",
       "game.errorNotFound": "Partida não encontrada. Por favor, inicie uma nova partida.",
       
+      // Bot Actions - Notificações
+      "bot.swappedCard": "trocou a carta {card1} de {player1} com a carta {card2} de {player2}",
+      "bot.discardedCard": "descartou a carta {rank} de {suit}",
+      "bot.discardedFromHand": "descartou a carta {rank} de {suit} da mão",
+      "bot.replacedCard": "substituiu a carta {index} da mão",
+      "bot.usedAbilityPeekOwn": "usou habilidade para ver uma de suas cartas",
+      "bot.usedAbilityPeekOpponent": "usou habilidade para ver uma carta de {player}",
+      "bot.declaredCunoku": "declarou CUNOKU! Rodada final iniciada.",
+      "bot.drewFromDeck": "comprou uma carta do baralho",
+      "bot.drewFromDiscard": "comprou a carta {rank} de {suit} da pilha de descarte",
+      "bot.discardedMatching": "descartou a carta {rank} de {suit} (corresponde ao descarte)",
+      "bot.punishmentWrongCard": "tentou descartar carta errada! Compra 2 cartas como punição.",
+      "bot.punishmentLoseTurn": "tentou descartar carta errada! Perde a vez (tem 6 cartas).",
+      
       // Idiomas
       "lang.pt": "Português",
       "lang.es": "Español",
@@ -400,6 +514,20 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.errorFailedToLoad": "Error al cargar partida. Por favor, inicia una nueva partida.",
       "game.errorNotFound": "Partida no encontrada. Por favor, inicia una nueva partida.",
       
+      // Bot Actions - Notificaciones
+      "bot.swappedCard": "intercambió la carta {card1} de {player1} con la carta {card2} de {player2}",
+      "bot.discardedCard": "descartó la carta {rank} de {suit}",
+      "bot.discardedFromHand": "descartó la carta {rank} de {suit} de la mano",
+      "bot.replacedCard": "reemplazó la carta {index} de la mano",
+      "bot.usedAbilityPeekOwn": "usó habilidad para ver una de sus cartas",
+      "bot.usedAbilityPeekOpponent": "usó habilidad para ver una carta de {player}",
+      "bot.declaredCunoku": "¡declaró CUNOKU! Ronda final iniciada.",
+      "bot.drewFromDeck": "robó una carta del mazo",
+      "bot.drewFromDiscard": "robó la carta {rank} de {suit} de la pila de descarte",
+      "bot.discardedMatching": "descartó la carta {rank} de {suit} (coincide con el descarte)",
+      "bot.punishmentWrongCard": "¡intentó descartar carta incorrecta! Roba 2 cartas como castigo.",
+      "bot.punishmentLoseTurn": "¡intentó descartar carta incorrecta! Pierde el turno (tiene 6 cartas).",
+      
       // Idiomas
       "lang.pt": "Português",
       "lang.es": "Español",
@@ -580,6 +708,20 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.errorInvalidState": "Invalid game state. Please start a new game.",
       "game.errorFailedToLoad": "Failed to load game. Please start a new game.",
       "game.errorNotFound": "Game not found. Please start a new game.",
+      
+      // Bot Actions - Notifications
+      "bot.swappedCard": "swapped card {card1} of {player1} with card {card2} of {player2}",
+      "bot.discardedCard": "discarded card {rank} of {suit}",
+      "bot.discardedFromHand": "discarded card {rank} of {suit} from hand",
+      "bot.replacedCard": "replaced card {index} from hand",
+      "bot.usedAbilityPeekOwn": "used ability to see one of their cards",
+      "bot.usedAbilityPeekOpponent": "used ability to see a card from {player}",
+      "bot.declaredCunoku": "declared CUNOKU! Final round begins.",
+      "bot.drewFromDeck": "drew a card from deck",
+      "bot.drewFromDiscard": "drew card {rank} of {suit} from discard pile",
+      "bot.discardedMatching": "discarded card {rank} of {suit} (matches discard)",
+      "bot.punishmentWrongCard": "tried to discard wrong card! Draws 2 cards as punishment.",
+      "bot.punishmentLoseTurn": "tried to discard wrong card! Loses turn (has 6 cards).",
       
       // Languages
       "lang.pt": "Português",

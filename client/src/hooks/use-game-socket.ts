@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { type GameState, type WsMessage, type GameAction, type Card } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { useI18n } from "@/contexts/i18n-context";
 
 export function useGameSocket(roomCode: string, playerId: string) {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
+  const { translateBotMessage } = useI18n();
   const [revealedCard, setRevealedCard] = useState<{ card: Card; playerName: string; targetPlayerId?: string; targetCardIndex?: number } | null>(null);
 
   useEffect(() => {
@@ -104,6 +106,16 @@ export function useGameSocket(roomCode: string, playerId: string) {
               title: `${(message as any).botName} está pensando...`,
               description: "O bot está analisando sua jogada",
               duration: 3000,
+            });
+            break;
+          case "bot_action":
+            // Notificação quando um bot executa uma ação
+            const botMessage = (message as any).message;
+            const translatedMessage = translateBotMessage(botMessage);
+            toast({
+              title: `${(message as any).botName}`,
+              description: translatedMessage,
+              duration: 4000,
             });
             break;
           case "private_info":
