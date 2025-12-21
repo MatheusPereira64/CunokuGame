@@ -11,6 +11,7 @@ import { ArrowLeft, Copy, Eye, RefreshCw, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { audioManager } from "@/utils/audioManager";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,7 @@ export default function Game() {
   const [match, params] = useRoute("/game/:code");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const roomCode = params?.code || "";
   
   // Extract player ID and mode from query string
@@ -453,8 +455,14 @@ export default function Game() {
     // For now, simple list or grid
     
     return (
-      <div key={player.id} className="flex flex-col items-center gap-2 p-2 rounded-xl transition-all">
-        <div className="flex gap-1 justify-center mb-2">
+      <div key={player.id} className={cn(
+        "flex flex-col items-center rounded-xl transition-all",
+        isMobile ? "gap-1 p-1" : "gap-2 p-2"
+      )}>
+        <div className={cn(
+          "flex justify-center",
+          isMobile ? "gap-0.5 mb-1" : "gap-1 mb-2"
+        )}>
           {player.hand.map((card, i) => (
             <div key={i} className="relative">
               <PlayingCard 
@@ -462,13 +470,18 @@ export default function Game() {
                 // Only show my cards if I know them (peeked) or if game ended
                 // Default: hidden for everyone, including me, unless 'knownCards' is true
                 hidden={!gameState?.winnerId && !(isMe && player.knownCards[i])} 
-                className="w-12 h-16 md:w-16 md:h-24"
+                className={cn(
+                  isMobile ? "w-8 h-12" : "w-12 h-16 md:w-16 md:h-24"
+                )}
                 animate={false}
               />
               {/* Eye icon marker if I know this card */}
               {isMe && player.knownCards[i] && (
-                <div className="absolute -top-2 -right-2 bg-yellow-400 rounded-full p-1 shadow">
-                  <Eye className="w-3 h-3 text-yellow-900" />
+                <div className={cn(
+                  "absolute bg-yellow-400 rounded-full shadow",
+                  isMobile ? "-top-1 -right-1 p-0.5" : "-top-2 -right-2 p-1"
+                )}>
+                  <Eye className={cn("text-yellow-900", isMobile ? "w-2 h-2" : "w-3 h-3")} />
                 </div>
               )}
             </div>
@@ -479,6 +492,7 @@ export default function Game() {
           isBot={player.isBot} 
           score={player.score} 
           isActive={gameState?.players[gameState.currentPlayerIndex]?.id === player.id}
+          className={isMobile ? "scale-75" : ""}
         />
       </div>
     );
@@ -538,53 +552,91 @@ export default function Game() {
   return (
     <div className="min-h-screen bg-neutral-900 text-white relative overflow-hidden flex flex-col">
       {/* Top Bar */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-50 pointer-events-none">
-        <Button variant="outline" size="sm" className="pointer-events-auto bg-black/20 text-white border-white/20 backdrop-blur-sm" onClick={() => setLocation("/")}>
-          <ArrowLeft className="mr-2 w-4 h-4" /> Exit
+      <div className={cn(
+        "absolute top-0 left-0 right-0 z-50 pointer-events-none",
+        isMobile ? "p-2 flex flex-col gap-2" : "p-4 flex justify-between items-start"
+      )}>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className={cn(
+            "pointer-events-auto bg-black/20 text-white border-white/20 backdrop-blur-sm",
+            isMobile ? "text-xs px-2 py-1" : ""
+          )}
+          onClick={() => setLocation("/")}
+        >
+          <ArrowLeft className={cn("w-4 h-4", isMobile ? "mr-1" : "mr-2")} /> 
+          {isMobile ? "" : "Exit"}
         </Button>
         
-        <div className="bg-black/40 backdrop-blur-md px-6 py-2 rounded-full border border-white/10 flex flex-col items-center">
-          <div className="text-xs text-white/60 font-mono">ROOM CODE</div>
-          <div className="text-xl font-bold tracking-widest font-mono flex items-center gap-2 pointer-events-auto cursor-pointer" onClick={handleCopyCode}>
-            {roomCode} <Copy className="w-3 h-3" />
+        <div className={cn(
+          "bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center pointer-events-auto cursor-pointer",
+          isMobile ? "px-3 py-1.5" : "px-6 py-2"
+        )} onClick={handleCopyCode}>
+          <div className={cn("text-white/60 font-mono", isMobile ? "text-[10px]" : "text-xs")}>ROOM CODE</div>
+          <div className={cn(
+            "font-bold tracking-widest font-mono flex items-center gap-2",
+            isMobile ? "text-sm" : "text-xl"
+          )}>
+            {roomCode} <Copy className={cn(isMobile ? "w-2.5 h-2.5" : "w-3 h-3")} />
           </div>
         </div>
       </div>
 
       {/* Your Turn Banner - Top Center */}
       {isMyTurn && (
-        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none">
+        <div className={cn(
+          "absolute z-40 pointer-events-none",
+          isMobile ? "top-16 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)]" : "top-20 left-1/2 transform -translate-x-1/2"
+        )}>
           <motion.div 
             initial={{ y: -20, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -20, opacity: 0 }}
-            className="bg-gradient-to-r from-yellow-500/90 to-yellow-600/90 backdrop-blur-md px-8 py-3 rounded-full border-2 border-yellow-400 shadow-2xl flex items-center gap-4"
+            className={cn(
+              "bg-gradient-to-r from-yellow-500/90 to-yellow-600/90 backdrop-blur-md rounded-full border-2 border-yellow-400 shadow-2xl flex items-center",
+              isMobile ? "px-3 py-2 gap-2 flex-col" : "px-8 py-3 gap-4"
+            )}
           >
-            <span className="text-yellow-900 font-bold text-lg">YOUR TURN</span>
-            {phase === 'draw' && <span className="text-yellow-100 text-sm">Draw from Deck or Discard</span>}
-            {phase === 'action' && <span className="text-yellow-100 text-sm">Select a card to replace or Discard drawn</span>}
+            <span className={cn("text-yellow-900 font-bold", isMobile ? "text-xs" : "text-lg")}>YOUR TURN</span>
+            {phase === 'draw' && (
+              <span className={cn("text-yellow-100 text-center", isMobile ? "text-[10px]" : "text-sm")}>
+                {isMobile ? "Draw from Deck/Discard" : "Draw from Deck or Discard"}
+              </span>
+            )}
+            {phase === 'action' && (
+              <span className={cn("text-yellow-100 text-center", isMobile ? "text-[10px]" : "text-sm")}>
+                {isMobile ? "Replace card or Discard" : "Select a card to replace or Discard drawn"}
+              </span>
+            )}
           </motion.div>
         </div>
       )}
 
       {/* Round Info - Top Left */}
       {gameState && (
-        <div className="absolute top-20 left-8 z-40 pointer-events-none">
+        <div className={cn(
+          "absolute z-40 pointer-events-none",
+          isMobile ? "top-28 left-2" : "top-20 left-8"
+        )}>
           <motion.div 
-            initial={{ x: -20, opacity: 0 }} 
+            initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            className="bg-black/60 backdrop-blur-md px-6 py-3 rounded-xl border-2 border-yellow-500/50 shadow-xl"
+            className={cn(
+              "bg-black/60 backdrop-blur-md rounded-xl border-2 border-yellow-500/50 shadow-xl",
+              isMobile ? "px-3 py-2" : "px-6 py-3"
+            )}
           >
             <div className="text-center">
-              <div className="text-lg font-bold text-yellow-400 mb-1">
+              <div className={cn("font-bold text-yellow-400 mb-1", isMobile ? "text-sm" : "text-lg")}>
                 Round {gameState.round}{gameState.round < 5 ? '/5' : ''}
               </div>
               {gameState.round < 5 ? (
-                <div className="text-xs text-white/80">
-                  Cunoku available after round 5
+                <div className={cn("text-white/80", isMobile ? "text-[10px]" : "text-xs")}>
+                  {isMobile ? "Cunoku after R5" : "Cunoku available after round 5"}
                 </div>
               ) : (
-                <div className="text-xs text-white/80">
+                <div className={cn("text-white/80", isMobile ? "text-[10px]" : "text-xs")}>
                   Turn: {gameState.players[gameState.currentPlayerIndex]?.name || 'Unknown'}
                 </div>
               )}
@@ -594,7 +646,7 @@ export default function Game() {
       )}
 
       {/* Ability Hint - Left Side */}
-      {isMyTurn && phase === 'action' && gameState.drawnCard && hasSpecialAbility(gameState.drawnCard) && !gameState.drawnFromDiscard && (
+      {isMyTurn && phase === 'action' && gameState.drawnCard && hasSpecialAbility(gameState.drawnCard) && !gameState.drawnFromDiscard && !isMobile && (
         <div className="absolute left-8 top-1/2 transform -translate-y-1/2 z-40 pointer-events-none">
           <motion.div
             initial={{ x: -20, opacity: 0 }}
@@ -623,7 +675,7 @@ export default function Game() {
       )}
 
       {/* Replace Card Hint - Right Side */}
-      {isMyTurn && phase === 'action' && gameState.drawnCard && (
+      {isMyTurn && phase === 'action' && gameState.drawnCard && !isMobile && (
         <div className="absolute right-8 top-1/2 transform -translate-y-1/2 z-40 pointer-events-none">
           <motion.div
             initial={{ x: 20, opacity: 0 }}
@@ -652,16 +704,28 @@ export default function Game() {
       )}
 
       {/* Main Game Table */}
-      <div className="flex-1 flex items-center justify-center p-4 md:p-8 relative">
-        <div className="w-full max-w-6xl aspect-[16/9] relative rounded-[100px] felt-table shadow-2xl flex items-center justify-center">
+      <div className={cn(
+        "flex-1 flex items-center justify-center relative",
+        isMobile ? "p-2" : "p-4 md:p-8"
+      )}>
+        <div className={cn(
+          "w-full relative felt-table shadow-2xl flex items-center justify-center",
+          isMobile ? "rounded-3xl min-h-[calc(100vh-200px)]" : "max-w-6xl aspect-[16/9] rounded-[100px]"
+        )}>
           
           {/* Opponents (Top) */}
-          <div className="absolute top-0 left-0 right-0 h-1/3 flex justify-center items-start pt-8 gap-12">
+          <div className={cn(
+            "absolute top-0 left-0 right-0 flex justify-center items-start",
+            isMobile ? "h-auto pt-4 gap-2 flex-wrap" : "h-1/3 pt-8 gap-12"
+          )}>
             {gameState.players.filter(p => p.id !== playerId).map((p, i) => renderPlayer(p, i, gameState.players.length))}
           </div>
 
           {/* Center Area: Deck & Discard */}
-          <div className="flex items-center gap-12 z-10">
+          <div className={cn(
+            "flex items-center z-10",
+            isMobile ? "gap-3" : "gap-12"
+          )}>
             {/* Deck */}
             <div className="relative group">
               {gameState.deck.length > 0 ? (
@@ -673,6 +737,7 @@ export default function Game() {
                     hidden 
                     className={cn(
                       "transition-all",
+                      isMobile ? "w-16 h-24" : "",
                       isMyTurn && phase === 'draw' 
                         ? "cursor-pointer hover:ring-4 ring-white/50 hover:scale-105" 
                         : "opacity-80"
@@ -681,12 +746,13 @@ export default function Game() {
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <span className={cn(
                       "font-bold transition-all",
+                      isMobile ? "text-xs" : "",
                       isMyTurn && phase === 'draw' ? "text-white text-lg" : "text-white/80"
                     )}>
                       DECK
                     </span>
                   </div>
-                  {isMyTurn && phase === 'draw' && (
+                  {isMyTurn && phase === 'draw' && !isMobile && (
                     <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-center">
                       <div className="text-xs text-yellow-400 font-bold animate-pulse">
                         Click to Draw
@@ -695,8 +761,11 @@ export default function Game() {
                   )}
                 </div>
               ) : (
-                <div className="w-24 h-36 border-2 border-white/10 rounded-xl flex items-center justify-center opacity-50">
-                  <span className="text-white/20 text-xs">EMPTY</span>
+                <div className={cn(
+                  "border-2 border-white/10 rounded-xl flex items-center justify-center opacity-50",
+                  isMobile ? "w-16 h-24" : "w-24 h-36"
+                )}>
+                  <span className={cn("text-white/20", isMobile ? "text-[10px]" : "text-xs")}>EMPTY</span>
                 </div>
               )}
             </div>
@@ -710,31 +779,53 @@ export default function Game() {
                   exit={{ scale: 0, opacity: 0 }}
                   className="relative z-20"
                 >
-                   <div className="absolute -top-12 left-0 right-0 text-center font-bold text-yellow-400 drop-shadow-md whitespace-nowrap">
-                     DRAWN CARD
-                   </div>
-                   <PlayingCard card={gameState.drawnCard} />
+                   {!isMobile && (
+                     <div className="absolute -top-12 left-0 right-0 text-center font-bold text-yellow-400 drop-shadow-md whitespace-nowrap text-sm">
+                       DRAWN CARD
+                     </div>
+                   )}
+                   <PlayingCard 
+                     card={gameState.drawnCard} 
+                     className={cn(isMobile && "w-16 h-24")}
+                   />
                    
                    {isMyTurn && phase === 'action' && (
-                     <div className="absolute -bottom-20 left-1/2 -translate-x-1/2 flex flex-col gap-2 items-center">
-                       <div className="flex gap-2 flex-wrap justify-center">
+                     <div className={cn(
+                       "absolute flex flex-col gap-2 items-center",
+                       isMobile ? "-bottom-16 left-1/2 -translate-x-1/2 w-full" : "-bottom-20 left-1/2 -translate-x-1/2"
+                     )}>
+                       <div className={cn(
+                         "flex flex-wrap justify-center",
+                         isMobile ? "gap-1" : "gap-2"
+                       )}>
                          {hasSpecialAbility(gameState.drawnCard) && !gameState.drawnFromDiscard && (
                            <Button 
-                             size="sm" 
+                             size={isMobile ? "sm" : "sm"}
                              variant="primary" 
                              onClick={handleUseAbility}
-                             className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold"
+                             className={cn(
+                               "bg-yellow-500 hover:bg-yellow-600 text-black font-bold",
+                               isMobile && "text-xs px-2 py-1"
+                             )}
                            >
-                             Use Ability
+                             {isMobile ? "Ability" : "Use Ability"}
                            </Button>
                          )}
-                         <Button size="sm" variant="destructive" onClick={() => sendAction({ type: 'discard_drawn' })}>
+                         <Button 
+                           size={isMobile ? "sm" : "sm"}
+                           variant="destructive" 
+                           onClick={() => sendAction({ type: 'discard_drawn' })}
+                           className={isMobile ? "text-xs px-2 py-1" : ""}
+                         >
                            Discard
                          </Button>
                        </div>
                        {gameState.drawnFromDiscard && (
-                         <div className="text-xs text-orange-400 text-center max-w-[200px]">
-                           Carta da pilha de descarte - não pode usar habilidade
+                         <div className={cn(
+                           "text-orange-400 text-center",
+                           isMobile ? "text-[10px] max-w-[150px]" : "text-xs max-w-[200px]"
+                         )}>
+                           {isMobile ? "Carta do descarte - sem habilidade" : "Carta da pilha de descarte - não pode usar habilidade"}
                          </div>
                        )}
                      </div>
@@ -749,15 +840,20 @@ export default function Game() {
                 <div>
                   <PlayingCard 
                     card={gameState.discardPile[gameState.discardPile.length - 1]} 
-                    className="brightness-90"
+                    className={cn("brightness-90", isMobile && "w-16 h-24")}
                   />
-                  <div className="absolute -bottom-8 w-full text-center text-xs font-bold text-white/50 uppercase tracking-widest">
-                    Discard Pile
-                  </div>
+                  {!isMobile && (
+                    <div className="absolute -bottom-8 w-full text-center text-xs font-bold text-white/50 uppercase tracking-widest">
+                      Discard Pile
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="w-24 h-36 border-2 border-white/10 rounded-xl flex items-center justify-center">
-                  <span className="text-white/20 text-xs">EMPTY</span>
+                <div className={cn(
+                  "border-2 border-white/10 rounded-xl flex items-center justify-center",
+                  isMobile ? "w-16 h-24" : "w-24 h-36"
+                )}>
+                  <span className={cn("text-white/20", isMobile ? "text-[10px]" : "text-xs")}>EMPTY</span>
                 </div>
               )}
             </div>
@@ -765,10 +861,16 @@ export default function Game() {
 
           {/* My Area (Bottom) */}
           {me && (
-            <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center">
+            <div className={cn(
+              "absolute left-0 right-0 flex flex-col items-center",
+              isMobile ? "bottom-2" : "bottom-8"
+            )}>
               
               {/* My Hand */}
-              <div className="flex gap-4 items-start">
+              <div className={cn(
+                "flex items-start",
+                isMobile ? "gap-1 overflow-x-auto pb-2 w-full px-2" : "gap-4"
+              )}>
                 {me.hand.map((card, i) => {
                   const matchInfo = canMatchDiscard();
                   const discardInfo = canDiscardFromHand();
@@ -781,8 +883,11 @@ export default function Game() {
                   return (
                     <motion.div 
                       key={card.id || i}
-                      className="flex flex-col items-center min-w-[120px]"
-                      whileHover={(isMyTurn || canMatchThisCard || canQuickDiscard) ? { y: -20 } : {}}
+                      className={cn(
+                        "flex flex-col items-center",
+                        isMobile ? "min-w-[80px] flex-shrink-0" : "min-w-[120px]"
+                      )}
+                      whileHover={(isMyTurn || canMatchThisCard || canQuickDiscard) && !isMobile ? { y: -20 } : {}}
                     >
                       <div onClick={() => handleCardClick(i, true)} className="w-full">
                         <PlayingCard 
@@ -791,7 +896,8 @@ export default function Game() {
                           hidden={!gameState.winnerId && !isKnownCard}
                           selected={selectedHandIndex === i}
                           className={cn(
-                             "w-24 h-36 md:w-32 md:h-48 transition-all mx-auto",
+                             "transition-all mx-auto",
+                             isMobile ? "w-16 h-24" : "w-24 h-36 md:w-32 md:h-48",
                              isMyTurn && phase === 'action' && gameState.drawnCard ? "cursor-pointer hover:ring-4 ring-green-400 ring-4 ring-green-400/50" : "",
                              canMatchThisCard ? "cursor-pointer hover:ring-4 ring-orange-400" : "",
                              canQuickDiscard ? "cursor-pointer hover:ring-4 ring-blue-400" : ""
@@ -801,10 +907,16 @@ export default function Game() {
                       
                       {/* Labels acima da carta */}
                       {isKnownCard && (
-                         <div className="text-center mt-2 text-xs font-bold text-yellow-400 uppercase tracking-wider">Known</div>
+                         <div className={cn(
+                           "text-center mt-1 font-bold text-yellow-400 uppercase tracking-wider",
+                           isMobile ? "text-[10px]" : "text-xs mt-2"
+                         )}>Known</div>
                       )}
                       {canMatchThisCard && (
-                         <div className="text-center mt-1 text-xs font-bold text-orange-400 uppercase tracking-wider animate-pulse">
+                         <div className={cn(
+                           "text-center mt-1 font-bold text-orange-400 uppercase tracking-wider animate-pulse",
+                           isMobile ? "text-[10px]" : "text-xs"
+                         )}>
                            Match!
                          </div>
                       )}
@@ -814,20 +926,26 @@ export default function Game() {
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="mt-3 w-full px-2"
+                          className={cn("mt-2 w-full", isMobile ? "px-1" : "mt-3 px-2")}
                         >
                           <Button
                             size="sm"
                             variant="primary"
-                            className="w-full text-xs px-2 py-2 h-auto rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white border-red-800 shadow-lg"
+                            className={cn(
+                              "w-full h-auto rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white border-red-800 shadow-lg",
+                              isMobile ? "text-[10px] px-1 py-1" : "text-xs px-2 py-2"
+                            )}
                             onClick={(e) => {
                               e.stopPropagation();
                               sendAction({ type: 'discard_from_hand', cardIndex: i });
                             }}
                           >
-                            {isSafeDiscard ? "✓ Descartar" : "⚠ Tentar Descartar"}
+                            {isMobile 
+                              ? (isSafeDiscard ? "✓" : "⚠") 
+                              : (isSafeDiscard ? "✓ Descartar" : "⚠ Tentar Descartar")
+                            }
                           </Button>
-                          {!isSafeDiscard && (
+                          {!isSafeDiscard && !isMobile && (
                             <div className="text-center mt-1 text-xs text-red-400 font-semibold">
                               Risco de punição!
                             </div>
@@ -844,32 +962,48 @@ export default function Game() {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="absolute -top-12 left-1/2 -translate-x-1/2 bg-orange-500/90 backdrop-blur px-4 py-2 rounded-full border-2 border-orange-400"
+                  className={cn(
+                    "absolute left-1/2 -translate-x-1/2 bg-orange-500/90 backdrop-blur rounded-full border-2 border-orange-400",
+                    isMobile ? "-top-10 px-2 py-1" : "-top-12 px-4 py-2"
+                  )}
                 >
-                  <span className="text-white font-bold text-sm">
-                    Você pode descartar uma carta igual!
+                  <span className={cn(
+                    "text-white font-bold",
+                    isMobile ? "text-[10px]" : "text-sm"
+                  )}>
+                    {isMobile ? "Pode descartar igual!" : "Você pode descartar uma carta igual!"}
                   </span>
                 </motion.div>
               )}
 
               {/* My Avatar */}
-              <div className="absolute bottom-4 right-12 hidden md:block">
-                <Avatar name={me.name} score={me.score} isActive={isMyTurn} position="left" />
-              </div>
+              {!isMobile && (
+                <div className="absolute bottom-4 right-12 hidden md:block">
+                  <Avatar name={me.name} score={me.score} isActive={isMyTurn} position="left" />
+                </div>
+              )}
 
               {/* Cunoku Button */}
               {isMyTurn && phase === 'draw' && gameState.round >= 5 && (
-                <div className="absolute right-12 bottom-32">
+                <div className={cn(
+                  "absolute",
+                  isMobile ? "right-2 bottom-20" : "right-12 bottom-32"
+                )}>
                   <Button 
                     variant="destructive" 
-                    className="rounded-full w-24 h-24 text-xl shadow-xl shadow-red-900/50 font-black border-4 border-red-400"
+                    className={cn(
+                      "rounded-full shadow-xl shadow-red-900/50 font-black border-4 border-red-400",
+                      isMobile ? "w-16 h-16 text-sm" : "w-24 h-24 text-xl"
+                    )}
                     onClick={() => sendAction({ type: 'declare_finish' })}
                   >
-                    CUNOKU
+                    {isMobile ? "CUN" : "CUNOKU"}
                   </Button>
-                  <div className="text-center mt-2 text-xs text-white/60">
-                    Round {gameState.round}
-                  </div>
+                  {!isMobile && (
+                    <div className="text-center mt-2 text-xs text-white/60">
+                      Round {gameState.round}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -879,24 +1013,35 @@ export default function Game() {
 
       {/* Ability Modal */}
       <Dialog open={abilityModalOpen} onOpenChange={setAbilityModalOpen}>
-        <DialogContent className="sm:max-w-md bg-white">
+        <DialogContent className={cn(
+          "bg-white",
+          isMobile ? "max-w-[95vw] max-h-[90vh] overflow-y-auto" : "sm:max-w-md"
+        )}>
           <DialogHeader>
-            <DialogTitle className="text-2xl font-display text-indigo-900">
+            <DialogTitle className={cn(
+              "font-display text-indigo-900",
+              isMobile ? "text-lg" : "text-2xl"
+            )}>
               Usar Habilidade
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className={isMobile ? "text-sm" : ""}>
               {gameState?.drawnCard && getAbilityDescription(gameState.drawnCard.rank)}
             </DialogDescription>
           </DialogHeader>
           
           {gameState?.drawnCard && (
-            <div className="py-4 space-y-4">
+            <div className={cn("space-y-4", isMobile ? "py-2" : "py-4")}>
               {/* Cartas 5 e 6: Ver carta de oponente */}
               {(gameState.drawnCard.rank === "5" || gameState.drawnCard.rank === "6") && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Selecione o jogador:</label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
+                      Selecione o jogador:
+                    </label>
+                    <div className={cn(
+                      "grid gap-2",
+                      isMobile ? "grid-cols-1" : "grid-cols-2"
+                    )}>
                       {gameState.players
                         .filter(p => p.id !== playerId)
                         .map(p => (
@@ -907,11 +1052,11 @@ export default function Game() {
                               setSelectedTargetPlayer(p.id);
                               setSelectedTargetCard(null);
                             }}
-                            className="h-auto py-3"
+                            className={cn("h-auto", isMobile ? "py-2" : "py-3")}
                           >
                             <div className="flex flex-col items-center gap-1">
-                              <Avatar name={p.name} className="scale-75" />
-                              <span className="text-xs">{p.name}</span>
+                              <Avatar name={p.name} className={isMobile ? "scale-50" : "scale-75"} />
+                              <span className={cn(isMobile ? "text-[10px]" : "text-xs")}>{p.name}</span>
                             </div>
                           </Button>
                         ))}
@@ -920,14 +1065,16 @@ export default function Game() {
                   
                   {selectedTargetPlayer && (
                     <div className="space-y-2">
-                      <label className="text-sm font-bold text-gray-700">Selecione a carta (1-4):</label>
-                      <div className="grid grid-cols-4 gap-2">
+                      <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
+                        Selecione a carta (1-4):
+                      </label>
+                      <div className={cn("grid gap-2", isMobile ? "grid-cols-4" : "grid-cols-4")}>
                         {[0, 1, 2, 3].map(idx => (
                           <Button
                             key={idx}
                             variant={selectedTargetCard === idx ? "primary" : "outline"}
                             onClick={() => setSelectedTargetCard(idx)}
-                            className="h-16"
+                            className={cn(isMobile ? "h-12 text-xs" : "h-16")}
                           >
                             {idx + 1}
                           </Button>
@@ -941,14 +1088,21 @@ export default function Game() {
               {/* Cartas 7 e 8: Ver própria carta */}
               {(gameState.drawnCard.rank === "7" || gameState.drawnCard.rank === "8") && (
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-700">Selecione sua carta para ver:</label>
-                  <div className="flex gap-2 justify-center">
+                  <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
+                    Selecione sua carta para ver:
+                  </label>
+                  <div className={cn(
+                    "flex gap-2 justify-center",
+                    isMobile ? "flex-wrap" : ""
+                  )}>
                     {me?.hand.map((card, idx) => (
                       <Button
                         key={idx}
                         variant={selectedHandIndex === idx ? "primary" : "outline"}
                         onClick={() => setSelectedHandIndex(idx)}
-                        className="h-20 w-16"
+                        className={cn(
+                          isMobile ? "h-12 w-12 text-xs" : "h-20 w-16"
+                        )}
                       >
                         {idx + 1}
                       </Button>
@@ -961,8 +1115,13 @@ export default function Game() {
               {(gameState.drawnCard.rank === "9" || gameState.drawnCard.rank === "10") && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">Modo de troca:</label>
-                    <div className="flex gap-2">
+                    <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
+                      Modo de troca:
+                    </label>
+                    <div className={cn(
+                      "flex gap-2",
+                      isMobile ? "flex-col" : ""
+                    )}>
                       <Button
                         variant={swapMode === "me_and_other" ? "primary" : "outline"}
                         onClick={() => {
@@ -973,9 +1132,9 @@ export default function Game() {
                           setSelectedTargetCard2(null);
                           setSelectedHandIndex(null);
                         }}
-                        className="flex-1"
+                        className={cn("flex-1", isMobile && "text-xs py-2")}
                       >
-                        Entre você e outro
+                        {isMobile ? "Você e outro" : "Entre você e outro"}
                       </Button>
                       <Button
                         variant={swapMode === "two_others" ? "primary" : "outline"}
@@ -989,9 +1148,9 @@ export default function Game() {
                           setSwapStep(1);
                           setFirstPlayerSelection(null);
                         }}
-                        className="flex-1"
+                        className={cn("flex-1", isMobile && "text-xs py-2")}
                       >
-                        Entre dois outros
+                        {isMobile ? "Dois outros" : "Entre dois outros"}
                       </Button>
                     </div>
                   </div>
@@ -1192,7 +1351,10 @@ export default function Game() {
                 </>
               )}
               
-              <div className="flex gap-2 pt-4">
+              <div className={cn(
+                "flex gap-2",
+                isMobile ? "pt-2" : "pt-4"
+              )}>
                 <Button 
                   variant="destructive" 
                   onClick={() => {
@@ -1206,14 +1368,14 @@ export default function Game() {
                     setSwapStep(1);
                     setFirstPlayerSelection(null);
                   }}
-                  className="flex-1"
+                  className={cn("flex-1", isMobile && "text-xs py-2")}
                 >
                   Cancelar
                 </Button>
                 <Button 
                   variant="primary" 
                   onClick={confirmAbilityUse}
-                  className="flex-1"
+                  className={cn("flex-1", isMobile && "text-xs py-2")}
                   disabled={
                     ((gameState.drawnCard.rank === "5" || gameState.drawnCard.rank === "6") && 
                     (!selectedTargetPlayer || selectedTargetCard === null)) ||
@@ -1235,13 +1397,19 @@ export default function Game() {
 
       {/* Game Over Modal */}
       <Dialog open={!!gameState.winnerId}>
-        <DialogContent className="sm:max-w-md bg-white text-center">
+        <DialogContent className={cn(
+          "bg-white text-center",
+          isMobile ? "max-w-[95vw] max-h-[90vh] overflow-y-auto" : "sm:max-w-md"
+        )}>
           <DialogHeader>
-            <DialogTitle className="text-4xl font-display text-indigo-900 mb-4 flex items-center justify-center gap-3">
-              <Trophy className="w-10 h-10 text-yellow-500" />
+            <DialogTitle className={cn(
+              "font-display text-indigo-900 flex items-center justify-center gap-3",
+              isMobile ? "text-2xl mb-2" : "text-4xl mb-4"
+            )}>
+              <Trophy className={cn("text-yellow-500", isMobile ? "w-6 h-6" : "w-10 h-10")} />
               Game Over
             </DialogTitle>
-            <DialogDescription className="text-lg">
+            <DialogDescription className={cn(isMobile ? "text-sm" : "text-lg")}>
               The winner is <span className="font-bold text-indigo-900">{gameState.players.find(p => p.id === gameState.winnerId)?.name}</span>!
             </DialogDescription>
           </DialogHeader>

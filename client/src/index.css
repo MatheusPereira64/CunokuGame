@@ -65,6 +65,13 @@
   border-radius: 120px;
 }
 
+@media (max-width: 768px) {
+  .felt-table {
+    border: 8px solid #5d4037;
+    border-radius: 24px;
+  }
+}
+
 .card-shadow {
   box-shadow: 2px 4px 12px rgba(0,0,0,0.3);
 }
