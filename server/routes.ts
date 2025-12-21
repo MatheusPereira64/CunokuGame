@@ -315,6 +315,7 @@ export async function registerRoutes(
           await storage.updateRoomStatus(roomCode, "playing");
           
           console.log("start_game: Broadcasting game state to all players in room:", roomCode);
+          // Broadcast com estado filtrado para cada jogador (drawnCard só visível para quem puxou)
           broadcast(roomCode, { type: "game_state", state: newState });
           
           // Auto-trigger first bot turn if exists
@@ -384,13 +385,43 @@ export async function registerRoutes(
     });
   });
 
+  // Filtra o estado do jogo para ocultar informações privadas de cada jogador
+  function filterGameStateForPlayer(state: GameState, playerId: string): GameState {
+    const filteredState = JSON.parse(JSON.stringify(state)); // Deep copy
+    
+    // O drawnCard só deve ser visível para o jogador atual (que puxou a carta)
+    // Se houver uma carta puxada, só o jogador que está no turno atual pode vê-la
+    if (filteredState.drawnCard) {
+      const currentPlayer = state.players[state.currentPlayerIndex];
+      const isCurrentPlayer = currentPlayer && currentPlayer.id === playerId;
+      
+      if (!isCurrentPlayer) {
+        // Se não é o jogador atual, oculta a carta puxada
+        console.log(`Filtering drawnCard for player ${playerId} (current: ${currentPlayer?.id || 'none'})`);
+        filteredState.drawnCard = null;
+      } else {
+        console.log(`Keeping drawnCard visible for current player ${playerId}`);
+      }
+    }
+    
+    return filteredState;
+  }
+
   function broadcast(roomCode: string, msg: any, exclude?: WebSocket) {
     const clients = roomsMap.get(roomCode);
     if (clients) {
-      clients.forEach(client => {
+      clients.forEach((client, clientPlayerId) => {
         // Exclui o cliente especificado (se fornecido) para evitar enviar mensagem de volta ao remetente
         if (client !== exclude && client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify(msg));
+          // Se for game_state, filtra para cada jogador
+          if (msg.type === "game_state" && msg.state) {
+            const filteredState = filterGameStateForPlayer(msg.state, clientPlayerId);
+            const hasDrawnCard = filteredState.drawnCard !== null;
+            console.log(`Broadcasting game_state to ${clientPlayerId}: drawnCard=${hasDrawnCard ? 'visible' : 'hidden'}`);
+            client.send(JSON.stringify({ ...msg, state: filteredState }));
+          } else {
+            client.send(JSON.stringify(msg));
+          }
         }
       });
     }

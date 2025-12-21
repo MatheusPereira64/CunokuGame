@@ -844,9 +844,9 @@ export default function Game() {
               )}
             </div>
 
-            {/* Drawn Card (Floating) */}
+            {/* Drawn Card (Floating) - Só mostra se for o turno do jogador */}
             <AnimatePresence>
-              {gameState.drawnCard && (
+              {gameState.drawnCard && isMyTurn && (
                 <motion.div
                   initial={{ scale: 0, y: -50 }}
                   animate={{ scale: 1, y: 0 }}
