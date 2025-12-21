@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { type GameState, type WsMessage, type GameAction } from "@shared/schema";
+import { type GameState, type WsMessage, type GameAction, type Card } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 export function useGameSocket(roomCode: string, playerId: string) {
@@ -7,6 +7,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
+  const [revealedCard, setRevealedCard] = useState<{ card: Card; playerName: string; targetPlayerId?: string; targetCardIndex?: number } | null>(null);
 
   useEffect(() => {
     if (!roomCode || !playerId) return;
@@ -106,13 +107,15 @@ export function useGameSocket(roomCode: string, playerId: string) {
             });
             break;
           case "private_info":
-            // Mensagem privada (para cartas 5 e 6)
-            toast({
-              title: "Carta Revelada!",
-              description: message.card 
-                ? `${message.playerName} tem ${message.card.rank} de ${message.card.suit}`
-                : message.message,
-            });
+            // Mensagem privada (para cartas 5 e 6) - armazena para exibir no overlay
+            if (message.card && message.playerName) {
+              setRevealedCard({ 
+                card: message.card, 
+                playerName: message.playerName,
+                targetPlayerId: (message as any).targetPlayerId,
+                targetCardIndex: (message as any).targetCardIndex
+              });
+            }
             break;
         }
       } catch (err) {
@@ -145,5 +148,5 @@ export function useGameSocket(roomCode: string, playerId: string) {
     }
   }, [toast]);
 
-  return { gameState, connected, sendAction, socketRef };
+  return { gameState, connected, sendAction, socketRef, revealedCard, setRevealedCard };
 }

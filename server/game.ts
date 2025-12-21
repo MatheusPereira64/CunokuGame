@@ -184,7 +184,7 @@ export class GameLogic {
 
   static processAction(state: GameState, action: any, playerId: string): { 
     newState: GameState; 
-    privateMessage?: { playerId: string; message: string; card?: Card; playerName?: string } 
+    privateMessage?: { playerId: string; message: string; card?: Card; playerName?: string; targetPlayerId?: string; targetCardIndex?: number } 
   } {
     const newState = JSON.parse(JSON.stringify(state)); // Deep copy
     const playerIndex = newState.players.findIndex(p => p.id === playerId);
@@ -327,7 +327,9 @@ export class GameLogic {
                 playerId,
                 message: abilityResult.message,
                 card: abilityResult.privateInfo.card,
-                playerName: abilityResult.privateInfo.playerName
+                playerName: abilityResult.privateInfo.playerName,
+                targetPlayerId: action.targetPlayerId,
+                targetCardIndex: action.targetCardIndex
               }
             };
           }

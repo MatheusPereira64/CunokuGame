@@ -97,5 +97,7 @@ export type WsPrivateMessage = {
   message: string;
   card?: Card;
   playerName?: string;
+  targetPlayerId?: string;
+  targetCardIndex?: number;
 };
 

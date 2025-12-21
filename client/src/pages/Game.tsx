@@ -101,7 +101,7 @@ export default function Game() {
   );
 
   // Hook para jogo online
-  const { gameState: onlineGameState, connected, sendAction: sendOnlineAction, socketRef } = useGameSocket(
+  const { gameState: onlineGameState, connected, sendAction: sendOnlineAction, socketRef, revealedCard: onlineRevealedCard, setRevealedCard: setOnlineRevealedCard } = useGameSocket(
     isOffline ? "" : roomCode, 
     isOffline ? "" : playerId
   );
@@ -117,17 +117,111 @@ export default function Game() {
   const [firstPlayerSelection, setFirstPlayerSelection] = useState<{ playerId: string; cardIndex: number } | null>(null);
   const [privateCardInfo, setPrivateCardInfo] = useState<{ card: Card; playerName: string } | null>(null);
   const [peekTimers, setPeekTimers] = useState<Map<number, NodeJS.Timeout>>(new Map());
+  const [revealedOpponentCard, setRevealedOpponentCard] = useState<{ card: Card; playerName: string; timer?: NodeJS.Timeout } | null>(null);
+  // Rastreia cartas de oponentes reveladas temporariamente: chave = `${playerId}_${cardIndex}`
+  // Usa array em vez de Set para facilitar detecção de mudanças pelo React
+  const [revealedOpponentCardsInHand, setRevealedOpponentCardsInHand] = useState<string[]>([]);
+  // Usa ref para armazenar timers sem causar re-renders
+  const revealedCardTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   
+  // Usa estado offline se estiver em modo offline, senão usa online
+  const gameState = isOffline ? offlineGameStateFromHook : onlineGameState;
+  const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
+
   // Cleanup timers ao desmontar
   useEffect(() => {
     return () => {
       peekTimers.forEach(timer => clearTimeout(timer));
+      if (revealedOpponentCard?.timer) {
+        clearTimeout(revealedOpponentCard.timer);
+      }
+      revealedCardTimersRef.current.forEach(timer => clearTimeout(timer));
+      revealedCardTimersRef.current.clear();
+      setRevealedOpponentCardsInHand([]);
     };
-  }, []);
-
-  // Usa estado offline se estiver em modo offline, senão usa online
-  const gameState = isOffline ? offlineGameStateFromHook : onlineGameState;
-  const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
+  }, [revealedOpponentCard, peekTimers]);
+  
+  // Quando recebe carta revelada do servidor (online), exibe por 20 segundos
+  useEffect(() => {
+    if (!isOffline && onlineRevealedCard) {
+      // Limpa qualquer timer anterior do overlay
+      if (revealedOpponentCard?.timer) {
+        clearTimeout(revealedOpponentCard.timer);
+      }
+      
+      // Mostra a carta no overlay por 20 segundos
+      const overlayTimer = setTimeout(() => {
+        setOnlineRevealedCard(null);
+        setRevealedOpponentCard(null);
+      }, 20000);
+      
+      setRevealedOpponentCard({ 
+        card: onlineRevealedCard.card, 
+        playerName: onlineRevealedCard.playerName,
+        timer: overlayTimer
+      });
+      
+      // Para a carta na mão, usa as informações do servidor se disponíveis
+      const targetPlayerId = (onlineRevealedCard as any).targetPlayerId;
+      const targetCardIndex = (onlineRevealedCard as any).targetCardIndex;
+      
+      if (targetPlayerId !== undefined && targetCardIndex !== undefined) {
+        // IMPORTANTE: Usa o ID da carta em vez do índice para rastrear mesmo quando os índices mudam
+        // Precisamos encontrar a carta no gameState atual para obter seu ID
+        const targetPlayer = gameState?.players.find(p => p.id === targetPlayerId);
+        if (targetPlayer && targetPlayer.hand[targetCardIndex]) {
+          const targetCard = targetPlayer.hand[targetCardIndex];
+          const cardKey = `${targetPlayerId}_${targetCard.id}`;
+          
+          // Limpa timer anterior se existir
+          const existingTimer = revealedCardTimersRef.current.get(cardKey);
+          if (existingTimer) {
+            clearTimeout(existingTimer);
+            revealedCardTimersRef.current.delete(cardKey);
+          }
+          
+          // Adiciona a carta ao array de cartas reveladas
+          setRevealedOpponentCardsInHand(prev => {
+            if (prev.includes(cardKey)) return prev; // Já está no array
+            console.log(`[Online] Adicionando carta ${cardKey} (${targetCard.rank} de ${targetCard.suit}) ao array de reveladas`);
+            return [...prev, cardKey];
+          });
+          
+          // Cria novo timer para ocultar a carta após 20 segundos
+          const handTimer = setTimeout(() => {
+            console.log(`[Online] Timer executado, removendo carta ${cardKey}`);
+            setRevealedOpponentCardsInHand(current => {
+              const filtered = current.filter(key => key !== cardKey);
+              console.log(`[Online] Array após remoção:`, filtered);
+              return filtered;
+            });
+            revealedCardTimersRef.current.delete(cardKey);
+          }, 20000);
+          
+          revealedCardTimersRef.current.set(cardKey, handTimer);
+        }
+      }
+      
+      // Cleanup: limpa timers quando o componente desmonta ou quando onlineRevealedCard muda
+      return () => {
+        clearTimeout(overlayTimer);
+        if (targetPlayerId !== undefined && targetCardIndex !== undefined) {
+          // Precisamos encontrar a carta no gameState atual para obter seu ID
+          const targetPlayer = gameState?.players.find(p => p.id === targetPlayerId);
+          if (targetPlayer && targetPlayer.hand[targetCardIndex]) {
+            const targetCard = targetPlayer.hand[targetCardIndex];
+            const cardKey = `${targetPlayerId}_${targetCard.id}`;
+            const timer = revealedCardTimersRef.current.get(cardKey);
+            if (timer) {
+              clearTimeout(timer);
+              revealedCardTimersRef.current.delete(cardKey);
+            }
+            setRevealedOpponentCardsInHand(prev => prev.filter(key => key !== cardKey));
+          }
+        }
+      };
+    }
+  }, [onlineRevealedCard, isOffline, setOnlineRevealedCard]);
 
   // Detecta quando alguém declara Cunoku (para jogo offline)
   const prevFinalRound = useRef(false);
@@ -375,10 +469,60 @@ export default function Game() {
       if (targetPlayer && targetPlayer.hand[selectedTargetCard]) {
         const peekedCard = targetPlayer.hand[selectedTargetCard];
         setPrivateCardInfo({ card: peekedCard, playerName: targetPlayer.name });
-        toast({
-          title: "Carta revelada!",
-          description: `${targetPlayer.name} tem ${peekedCard.rank} de ${peekedCard.suit}`,
+        
+        // Limpa qualquer timer anterior do overlay
+        if (revealedOpponentCard?.timer) {
+          clearTimeout(revealedOpponentCard.timer);
+        }
+        
+        // Mostra a carta no overlay por 20 segundos
+        const overlayTimer = setTimeout(() => {
+          setRevealedOpponentCard(null);
+        }, 20000);
+        
+        setRevealedOpponentCard({ 
+          card: peekedCard, 
+          playerName: targetPlayer.name,
+          timer: overlayTimer
         });
+        
+        // Marca a carta na mão do oponente como revelada por 20 segundos
+        // IMPORTANTE: Usa o ID da carta em vez do índice para rastrear mesmo quando os índices mudam
+        const targetCard = targetPlayer.hand[selectedTargetCard];
+        const cardKey = `${selectedTargetPlayer}_${targetCard.id}`;
+        
+        // Limpa timer anterior se existir
+        const existingTimer = revealedCardTimersRef.current.get(cardKey);
+        if (existingTimer) {
+          clearTimeout(existingTimer);
+          revealedCardTimersRef.current.delete(cardKey);
+        }
+        
+        // Adiciona a carta ao array de cartas reveladas
+        console.log(`[Offline] Adicionando carta ${cardKey} (${targetCard.rank} de ${targetCard.suit}) ao array, targetPlayer: ${selectedTargetPlayer}, targetCardIndex: ${selectedTargetCard}`);
+        setRevealedOpponentCardsInHand(prev => {
+          if (prev.includes(cardKey)) {
+            console.log(`[Offline] Carta ${cardKey} já está no array`);
+            return prev; // Já está no array
+          }
+          console.log(`[Offline] Array antes:`, prev, `Array depois:`, [...prev, cardKey]);
+          return [...prev, cardKey];
+        });
+        
+        // Cria novo timer para ocultar a carta após 20 segundos
+        const handTimer = setTimeout(() => {
+          console.log(`[Offline Timer] Executando timer para ocultar carta ${cardKey} após 20 segundos`);
+          setRevealedOpponentCardsInHand(prev => {
+            const filtered = prev.filter(key => key !== cardKey);
+            console.log(`[Offline Timer] Array antes:`, prev, `Array depois:`, filtered);
+            return filtered;
+          });
+          revealedCardTimersRef.current.delete(cardKey);
+          console.log(`[Offline Timer] Timer removido do ref para ${cardKey}`);
+        }, 20000);
+        
+        revealedCardTimersRef.current.set(cardKey, handTimer);
+        console.log(`[Offline] Timer criado para carta ${cardKey}, será executado em 20 segundos`);
       }
       
       sendAction({ 
@@ -464,29 +608,58 @@ export default function Game() {
           "flex justify-center",
           isMobile ? "gap-0.5 mb-1" : "gap-1 mb-2"
         )}>
-          {player.hand.map((card, i) => (
-            <div key={i} className="relative">
-              <PlayingCard 
-                card={card} 
-                // Only show my cards if I know them (peeked) or if game ended
-                // Default: hidden for everyone, including me, unless 'knownCards' is true
-                hidden={!gameState?.winnerId && !(isMe && player.knownCards[i])} 
-                className={cn(
-                  isMobile ? "w-8 h-12" : "w-12 h-16 md:w-16 md:h-24"
+          {player.hand.map((card, i) => {
+            // Verifica se esta carta foi revelada temporariamente (cartas 5 e 6)
+            // IMPORTANTE: Usa o ID da carta em vez do índice para rastrear mesmo quando os índices mudam
+            const cardKey = `${player.id}_${card.id}`;
+            const isTemporarilyRevealed = revealedOpponentCardsInHand.includes(cardKey);
+            
+            // Verifica se a carta está em knownCards (para cartas próprias)
+            const isKnownCard = isMe && (player.knownCards[i] || player.knownCards[i.toString()]);
+            
+            // Debug: log quando a carta deveria estar revelada
+            if (isTemporarilyRevealed && !isMe) {
+              console.log(`[Render] Carta ${cardKey} (${card.rank} de ${card.suit}) está temporariamente revelada para ${player.name}`);
+            }
+            
+            // Mostra a carta se: jogo terminou, é minha carta e eu conheço, ou foi revelada temporariamente
+            // IMPORTANTE: Para oponentes, só mostra se isTemporarilyRevealed for true (não verifica knownCards)
+            const shouldShowCard = gameState?.winnerId || 
+                                   isKnownCard || 
+                                   (!isMe && isTemporarilyRevealed);
+            
+            return (
+              <div key={i} className="relative">
+                <PlayingCard 
+                  card={card} 
+                  hidden={!shouldShowCard}
+                  className={cn(
+                    isMobile ? "w-8 h-12" : "w-12 h-16 md:w-16 md:h-24",
+                    isTemporarilyRevealed && !isMe && "ring-2 ring-yellow-400 ring-offset-2"
+                  )}
+                  animate={false}
+                />
+                {/* Eye icon marker if I know this card */}
+                {isMe && player.knownCards[i] && (
+                  <div className={cn(
+                    "absolute bg-yellow-400 rounded-full shadow",
+                    isMobile ? "-top-1 -right-1 p-0.5" : "-top-2 -right-2 p-1"
+                  )}>
+                    <Eye className={cn("text-yellow-900", isMobile ? "w-2 h-2" : "w-3 h-3")} />
+                  </div>
                 )}
-                animate={false}
-              />
-              {/* Eye icon marker if I know this card */}
-              {isMe && player.knownCards[i] && (
-                <div className={cn(
-                  "absolute bg-yellow-400 rounded-full shadow",
-                  isMobile ? "-top-1 -right-1 p-0.5" : "-top-2 -right-2 p-1"
-                )}>
-                  <Eye className={cn("text-yellow-900", isMobile ? "w-2 h-2" : "w-3 h-3")} />
-                </div>
-              )}
-            </div>
-          ))}
+                {/* Indicador visual para carta revelada temporariamente */}
+                {!isMe && isTemporarilyRevealed && (
+                  <div className={cn(
+                    "absolute bg-yellow-400 rounded-full shadow animate-pulse",
+                    isMobile ? "-top-1 -right-1 p-0.5" : "-top-2 -right-2 p-1"
+                  )}>
+                    <Eye className={cn("text-yellow-900", isMobile ? "w-2 h-2" : "w-3 h-3")} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
         <Avatar 
           name={player.name} 
@@ -1481,6 +1654,75 @@ export default function Game() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Overlay para carta revelada (cartas 5 e 6) */}
+      <AnimatePresence>
+        {revealedOpponentCard && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            onClick={() => {
+              // Permite fechar clicando fora
+              if (revealedOpponentCard?.timer) {
+                clearTimeout(revealedOpponentCard.timer);
+              }
+              setRevealedOpponentCard(null);
+              if (!isOffline) {
+                setOnlineRevealedCard(null);
+              }
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.8, y: 20 }}
+              className={cn(
+                "bg-gradient-to-br from-indigo-900 to-purple-900 rounded-3xl border-4 border-yellow-400 shadow-2xl p-8 flex flex-col items-center gap-6",
+                isMobile ? "mx-4 max-w-[90vw]" : "max-w-md"
+              )}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center">
+                <h3 className={cn(
+                  "font-bold text-yellow-400 mb-2",
+                  isMobile ? "text-lg" : "text-2xl"
+                )}>
+                  Carta Revelada!
+                </h3>
+                <p className={cn(
+                  "text-white/80",
+                  isMobile ? "text-sm" : "text-base"
+                )}>
+                  {revealedOpponentCard.playerName} tem:
+                </p>
+              </div>
+              
+              <div className={cn(
+                "transform transition-transform",
+                isMobile ? "scale-90" : "scale-110"
+              )}>
+                <PlayingCard 
+                  card={revealedOpponentCard.card} 
+                  hidden={false}
+                  animate={true}
+                  className={isMobile ? "w-32 h-48" : "w-40 h-60"}
+                />
+              </div>
+              
+              <div className="text-center">
+                <p className={cn(
+                  "text-white/60 font-mono",
+                  isMobile ? "text-xs" : "text-sm"
+                )}>
+                  Esta carta ficará visível por 20 segundos
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Game Over Modal */}
       <Dialog open={!!gameState.winnerId}>

@@ -362,7 +362,9 @@ export async function registerRoutes(
               type: "private_info",
               message: result.privateMessage.message,
               card: result.privateMessage.card,
-              playerName: result.privateMessage.playerName
+              playerName: result.privateMessage.playerName,
+              targetPlayerId: result.privateMessage.targetPlayerId,
+              targetCardIndex: result.privateMessage.targetCardIndex
             }));
           }
           
