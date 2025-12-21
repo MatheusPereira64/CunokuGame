@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { audioManager } from "@/utils/audioManager";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { VolumeControl } from "@/components/VolumeControl";
 import {
   Dialog,
   DialogContent,
@@ -527,7 +528,14 @@ export default function Game() {
     });
     
     return (
-      <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-8">
+      <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-8 relative">
+        {/* Volume Control - Top Right */}
+        <div className="absolute top-4 right-4 z-20">
+          <div className="[&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md">
+            <VolumeControl />
+          </div>
+        </div>
+        
         <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-200">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-display font-bold text-indigo-900">Waiting for Players</h2>
@@ -630,18 +638,23 @@ export default function Game() {
         "absolute top-0 left-0 right-0 z-50 pointer-events-none",
         isMobile ? "p-2 flex flex-col gap-2" : "p-4 flex justify-between items-start"
       )}>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className={cn(
-            "pointer-events-auto bg-black/20 text-white border-white/20 backdrop-blur-sm",
-            isMobile ? "text-xs px-2 py-1" : ""
-          )}
-          onClick={() => setLocation("/")}
-        >
-          <ArrowLeft className={cn("w-4 h-4", isMobile ? "mr-1" : "mr-2")} /> 
-          {isMobile ? "" : "Exit"}
-        </Button>
+        <div className="flex items-center gap-2 pointer-events-auto">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className={cn(
+              "bg-black/20 text-white border-white/20 backdrop-blur-sm",
+              isMobile ? "text-xs px-2 py-1" : ""
+            )}
+            onClick={() => setLocation("/")}
+          >
+            <ArrowLeft className={cn("w-4 h-4", isMobile ? "mr-1" : "mr-2")} /> 
+            {isMobile ? "" : "Exit"}
+          </Button>
+          <div className="[&_button]:bg-black/20 [&_button]:text-white [&_button]:border-white/20 [&_button]:backdrop-blur-sm [&_button]:hover:bg-black/30">
+            <VolumeControl />
+          </div>
+        </div>
         
         <div className={cn(
           "bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center pointer-events-auto cursor-pointer",

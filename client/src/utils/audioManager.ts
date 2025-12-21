@@ -13,6 +13,21 @@ class AudioManager {
   private userInteracted: boolean = false;
 
   constructor() {
+    // Carrega volumes salvos do localStorage
+    const savedMusicVolume = localStorage.getItem('cunoku_music_volume');
+    const savedSfxVolume = localStorage.getItem('cunoku_sfx_volume');
+    const savedMuted = localStorage.getItem('cunoku_muted');
+    
+    if (savedMusicVolume !== null) {
+      this.musicVolume = parseFloat(savedMusicVolume);
+    }
+    if (savedSfxVolume !== null) {
+      this.sfxVolume = parseFloat(savedSfxVolume);
+    }
+    if (savedMuted !== null) {
+      this.isMuted = savedMuted === 'true';
+    }
+
     // Inicializa as músicas
     this.menuMusic = new Audio('/audio/soundtrack/menu.mp3');
     this.menuMusic.loop = true;
@@ -134,6 +149,15 @@ class AudioManager {
     this.musicVolume = Math.max(0, Math.min(1, volume));
     if (this.menuMusic) this.menuMusic.volume = this.musicVolume;
     if (this.gameMusic) this.gameMusic.volume = this.musicVolume;
+    // Salva no localStorage
+    localStorage.setItem('cunoku_music_volume', this.musicVolume.toString());
+  }
+
+  /**
+   * Obtém o volume da música
+   */
+  getMusicVolume(): number {
+    return this.musicVolume;
   }
 
   /**
@@ -141,6 +165,15 @@ class AudioManager {
    */
   setSfxVolume(volume: number): void {
     this.sfxVolume = Math.max(0, Math.min(1, volume));
+    // Salva no localStorage
+    localStorage.setItem('cunoku_sfx_volume', this.sfxVolume.toString());
+  }
+
+  /**
+   * Obtém o volume dos efeitos sonoros
+   */
+  getSfxVolume(): number {
+    return this.sfxVolume;
   }
 
   /**
@@ -148,6 +181,7 @@ class AudioManager {
    */
   setMuted(muted: boolean): void {
     this.isMuted = muted;
+    localStorage.setItem('cunoku_muted', muted.toString());
     if (muted) {
       this.stopAllMusic();
     } else {

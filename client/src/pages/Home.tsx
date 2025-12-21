@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createOfflineGame } from "@/utils/localGame";
 import { audioManager } from "@/utils/audioManager";
+import { VolumeControl } from "@/components/VolumeControl";
 
 export default function Home() {
   // Toca música do menu assim que o componente montar
@@ -112,6 +113,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Volume Control - Top Right */}
+      <div className="absolute top-4 right-4 z-20">
+        <div className="[&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md">
+          <VolumeControl />
+        </div>
+      </div>
+
       {/* Decorative Background Elements */}
       <div className="absolute inset-0 pointer-events-none">
         <Spade className="absolute top-10 left-10 w-32 h-32 text-indigo-900/5 rotate-12" />
