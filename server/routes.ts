@@ -27,7 +27,8 @@ export async function registerRoutes(
       
       console.log("POST /api/rooms - Creating room with code:", roomCode);
       
-      const newRoom = await storage.createRoom({
+      // Prepare room data according to InsertRoom schema (gameState is omitted from schema)
+      const roomData: any = {
         code: roomCode,
         hostId: playerId,
         status: "waiting",
@@ -35,8 +36,11 @@ export async function registerRoutes(
         botDifficulty: input.botDifficulty || "medium",
         maxPlayers: input.maxPlayers || 4,
         botCount: input.botCount || 0,
-        gameState: null
-      });
+      };
+      
+      console.log("POST /api/rooms - Room data to insert:", JSON.stringify(roomData));
+      
+      const newRoom = await storage.createRoom(roomData);
 
       console.log("POST /api/rooms - Room created successfully:", roomCode);
       res.status(201).json({ code: roomCode, playerId });

@@ -71,10 +71,18 @@ app.use((req, res, next) => {
           await db.execute(sql`SELECT 1 FROM rooms LIMIT 1`);
           log("Database tables verified");
         } catch (err: any) {
-          // Table doesn't exist, create it
+          // Table doesn't exist or has wrong structure, create/recreate it
           log("Creating database tables...");
+          try {
+            // Drop table if exists (only in case of structure mismatch)
+            await db.execute(sql`DROP TABLE IF EXISTS rooms CASCADE;`);
+          } catch (dropErr: any) {
+            log(`Warning: Could not drop existing table: ${dropErr.message}`, "db-init");
+          }
+          
+          // Create table with correct structure
           await db.execute(sql`
-            CREATE TABLE IF NOT EXISTS rooms (
+            CREATE TABLE rooms (
               id SERIAL PRIMARY KEY,
               code TEXT NOT NULL UNIQUE,
               host_id TEXT NOT NULL,
@@ -88,6 +96,15 @@ app.use((req, res, next) => {
             );
           `);
           log("Database tables created successfully");
+          
+          // Verify table was created
+          try {
+            await db.execute(sql`SELECT 1 FROM rooms LIMIT 1`);
+            log("Database table verified after creation");
+          } catch (verifyErr: any) {
+            log(`Error: Table verification failed after creation: ${verifyErr.message}`, "db-init");
+            throw verifyErr;
+          }
         }
       }
     } catch (err: any) {

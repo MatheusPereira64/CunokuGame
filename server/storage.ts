@@ -18,14 +18,41 @@ export class DatabaseStorage implements IStorage {
     }
     try {
       console.log("DatabaseStorage.createRoom - Inserting room:", insertRoom.code);
-      const [room] = await db.insert(rooms).values(insertRoom).returning();
+      console.log("DatabaseStorage.createRoom - Full insert data:", JSON.stringify(insertRoom, null, 2));
+      
+      // Ensure gameState is explicitly set to null if not provided
+      const insertData = {
+        ...insertRoom,
+        gameState: (insertRoom as any).gameState ?? null
+      };
+      
+      const [room] = await db.insert(rooms).values(insertData).returning();
       console.log("DatabaseStorage.createRoom - Room created:", room.id);
       return room;
     } catch (err: any) {
-      console.error("DatabaseStorage.createRoom - Error:", err);
+      console.error("DatabaseStorage.createRoom - Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+      console.error("DatabaseStorage.createRoom - Error message:", err.message);
       console.error("DatabaseStorage.createRoom - Error code:", err.code);
       console.error("DatabaseStorage.createRoom - Error detail:", err.detail);
-      throw new Error(`Failed to create room in database: ${err.message || err.code || "Unknown error"}`);
+      console.error("DatabaseStorage.createRoom - Error constraint:", err.constraint);
+      console.error("DatabaseStorage.createRoom - Insert data:", JSON.stringify(insertRoom));
+      
+      // Try to extract more information from the error
+      let errorMessage = "Unknown error";
+      if (err.message) {
+        errorMessage = err.message;
+      } else if (err.code) {
+        errorMessage = `Database error code: ${err.code}`;
+      } else if (err.detail) {
+        errorMessage = err.detail;
+      }
+      
+      // Add constraint information if available
+      if (err.constraint) {
+        errorMessage += ` (constraint: ${err.constraint})`;
+      }
+      
+      throw new Error(`Failed to create room in database: ${errorMessage}`);
     }
   }
 
