@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { getDb } from "./db";
 import { rooms, type Room, type InsertRoom, type GameState } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
@@ -12,7 +12,8 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async createRoom(insertRoom: InsertRoom): Promise<Room> {
-    if (!db) {
+    const database = await getDb();
+    if (!database) {
       console.error("Database not initialized - DATABASE_URL:", process.env.DATABASE_URL ? "SET" : "NOT SET");
       throw new Error("Database not initialized. Please check DATABASE_URL environment variable.");
     }
@@ -26,7 +27,7 @@ export class DatabaseStorage implements IStorage {
         gameState: (insertRoom as any).gameState ?? null
       };
       
-      const [room] = await db.insert(rooms).values(insertData).returning();
+      const [room] = await database.insert(rooms).values(insertData).returning();
       console.log("DatabaseStorage.createRoom - Room created:", room.id);
       return room;
     } catch (err: any) {
@@ -57,19 +58,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRoom(code: string): Promise<Room | undefined> {
-    if (!db) throw new Error("Database not initialized");
-    const [room] = await db.select().from(rooms).where(eq(rooms.code, code));
+    const database = await getDb();
+    if (!database) throw new Error("Database not initialized");
+    const [room] = await database.select().from(rooms).where(eq(rooms.code, code));
     return room;
   }
 
   async listRooms(): Promise<Room[]> {
-    if (!db) throw new Error("Database not initialized");
-    return await db.select().from(rooms);
+    const database = await getDb();
+    if (!database) throw new Error("Database not initialized");
+    return await database.select().from(rooms);
   }
 
   async updateGameState(code: string, state: GameState): Promise<Room> {
-    if (!db) throw new Error("Database not initialized");
-    const [room] = await db
+    const database = await getDb();
+    if (!database) throw new Error("Database not initialized");
+    const [room] = await database
       .update(rooms)
       .set({ gameState: state })
       .where(eq(rooms.code, code))
@@ -78,8 +82,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateRoomStatus(code: string, status: string): Promise<Room> {
-    if (!db) throw new Error("Database not initialized");
-    const [room] = await db
+    const database = await getDb();
+    if (!database) throw new Error("Database not initialized");
+    const [room] = await database
       .update(rooms)
       .set({ status })
       .where(eq(rooms.code, code))

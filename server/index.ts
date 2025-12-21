@@ -63,7 +63,8 @@ app.use((req, res, next) => {
   // Initialize database tables if in production and DATABASE_URL is set
   if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
     try {
-      const { db } = await import("./db");
+      const { getDb } = await import("./db");
+      const db = await getDb();
       if (db) {
         // Check if rooms table exists, if not, create it
         const { sql } = await import("drizzle-orm");
