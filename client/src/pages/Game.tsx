@@ -100,7 +100,7 @@ export default function Game() {
   );
 
   // Hook para jogo online
-  const { gameState: onlineGameState, connected, sendAction: sendOnlineAction } = useGameSocket(
+  const { gameState: onlineGameState, connected, sendAction: sendOnlineAction, socketRef } = useGameSocket(
     isOffline ? "" : roomCode, 
     isOffline ? "" : playerId
   );
@@ -509,7 +509,23 @@ export default function Game() {
   }
 
   // Waiting Room State
-  if (gameState.players.length < 2 && !gameState.winnerId) {
+  if ((gameState.players.length < 2 || gameState.turnPhase === "waiting") && !gameState.winnerId) {
+    // Busca hostId do sessionStorage
+    const storedHostId = sessionStorage.getItem(`hostId_${roomCode}`);
+    const isHost = storedHostId === playerId;
+    const canStart = gameState.players.length >= 2;
+    
+    console.log("Waiting room state:", {
+      players: gameState.players.length,
+      playerId,
+      storedHostId,
+      isHost,
+      canStart,
+      turnPhase: gameState.turnPhase,
+      roomCode,
+      allSessionStorage: Object.keys(sessionStorage).filter(k => k.includes(roomCode))
+    });
+    
     return (
       <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-8">
         <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-200">
@@ -525,24 +541,82 @@ export default function Game() {
             <Copy className="w-5 h-5 text-gray-500" />
           </div>
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Current Players</h3>
-            {gameState.players.map(p => (
-              <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg bg-indigo-50">
-                <Avatar name={p.name} className="scale-75" />
-                <div className="font-bold text-indigo-900">{p.name} {p.id === playerId && "(You)"}</div>
-              </div>
-            ))}
+          <div className="space-y-4 mb-6">
+            <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
+              Current Players ({gameState.players.length}/{gameState.players.length >= 2 ? "Ready" : "2+"})
+            </h3>
+            <div className="space-y-2">
+              {gameState.players.map(p => (
+                <div 
+                  key={p.id} 
+                  className={cn(
+                    "flex items-center gap-3 p-4 rounded-xl transition-all",
+                    p.id === playerId 
+                      ? "bg-gradient-to-r from-indigo-100 to-purple-100 border-2 border-indigo-300 shadow-md" 
+                      : "bg-gray-50 border border-gray-200"
+                  )}
+                >
+                  <Avatar name={p.name} className={cn("scale-90", p.id === playerId && "ring-2 ring-indigo-400")} />
+                  <div className="flex-1">
+                    <div className="font-bold text-indigo-900 flex items-center gap-2">
+                      {p.name}
+                      {p.id === playerId && (
+                        <span className="text-xs font-normal text-indigo-600 bg-indigo-200 px-2 py-0.5 rounded-full">
+                          You
+                        </span>
+                      )}
+                      {p.id === playerId && isHost && (
+                        <span className="text-xs font-semibold text-purple-700 bg-purple-200 px-2 py-0.5 rounded-full">
+                          Host
+                        </span>
+                      )}
+                    </div>
+                    {p.id === playerId && (
+                      <div className="text-xs text-gray-500 mt-1">Score: {p.score}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-
-          {gameState.players.length > 1 && (
-             <Button className="w-full mt-8" onClick={() => {
-               // Assuming logic starts automatically or via a 'start' action I didn't add to schema yet
-               // For now, let's assume players join and it starts
-               toast({ title: "Waiting for host to start..." });
-             }}>
-               Wait for more...
+          
+          {canStart && isHost && (
+             <Button 
+               variant="primary"
+               size="lg"
+               className="w-full mt-6 text-lg py-6 font-bold shadow-lg hover:shadow-xl transition-all" 
+               onClick={() => {
+                 console.log("Start game clicked - socket state:", socketRef.current?.readyState);
+                 console.log("Current room:", roomCode, "Player:", playerId);
+                 if (socketRef.current?.readyState === WebSocket.OPEN) {
+                   console.log("Sending start_game message");
+                   socketRef.current.send(JSON.stringify({ type: "start_game" }));
+                 } else {
+                   console.error("Socket not open, state:", socketRef.current?.readyState);
+                   toast({ 
+                     title: "Connection Error", 
+                     description: "Not connected to server",
+                     variant: "destructive" 
+                   });
+                 }
+               }}
+             >
+               Start Game ({gameState.players.length} players)
              </Button>
+          )}
+          
+          {canStart && !isHost && (
+             <div className="w-full mt-6 p-4 bg-indigo-50 rounded-xl border border-indigo-200 text-center">
+               <div className="text-indigo-700 font-semibold mb-1">Waiting for host to start...</div>
+               <div className="text-sm text-indigo-500">The game will begin shortly</div>
+             </div>
+          )}
+          
+          {!canStart && (
+             <div className="w-full mt-6 p-4 bg-amber-50 rounded-xl border border-amber-200 text-center">
+               <div className="text-amber-700 font-semibold">Need at least 2 players to start</div>
+               <div className="text-sm text-amber-600 mt-1">Share the room code with a friend!</div>
+             </div>
           )}
         </div>
       </div>

@@ -11,7 +11,9 @@ const viteLogger = createLogger();
 export async function setupVite(server: Server, app: Express) {
   const serverOptions = {
     middlewareMode: true,
-    hmr: { server, path: "/vite-hmr" },
+    // Desabilita HMR para evitar erros de conexão WebSocket
+    // O HMR não é essencial para o funcionamento do jogo
+    hmr: false,
     allowedHosts: true as const,
   };
 

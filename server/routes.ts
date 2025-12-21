@@ -26,6 +26,8 @@ export async function registerRoutes(
         status: "waiting",
         gameMode: input.gameMode || "multiplayer",
         botDifficulty: input.botDifficulty || "medium",
+        maxPlayers: input.maxPlayers || 4,
+        botCount: input.botCount || 0,
         gameState: null
       });
 
@@ -77,51 +79,164 @@ export async function registerRoutes(
   wss.on("connection", (ws) => {
     let currentRoom: string | null = null;
     let currentPlayer: string | null = null;
+    
+    // Armazena room e player no próprio WebSocket para acesso posterior
+    (ws as any).currentRoom = null;
+    (ws as any).currentPlayer = null;
 
     ws.on("message", async (data) => {
       try {
         const msg = JSON.parse(data.toString());
+        console.log("WS message received:", msg.type, msg);
         
         if (msg.type === "join") {
           // { type: 'join', code, playerId, name }
           const { code, playerId, name } = msg;
           currentRoom = code;
           currentPlayer = playerId;
-
-          if (!roomsMap.has(code)) roomsMap.set(code, new Map());
-          roomsMap.get(code)!.set(playerId, ws);
+          // Armazena também no WebSocket
+          (ws as any).currentRoom = code;
+          (ws as any).currentPlayer = playerId;
 
           // Get current state
           const room = await storage.getRoom(code);
-          if (!room) return;
+          if (!room) {
+            ws.send(JSON.stringify({ type: "error", message: "Room not found" }));
+            return;
+          }
+
+          // Verifica se a sala está cheia
+          const maxPlayers = (room as any).maxPlayers || 4;
+          const currentConnections = roomsMap.get(code)?.size || 0;
+          
+          // Se o jogo já começou, não permite novos jogadores
+          if (room.gameState) {
+            ws.send(JSON.stringify({ type: "error", message: "Game has already started" }));
+            return;
+          }
+          
+          // Verifica limite de jogadores
+          if (currentConnections >= maxPlayers) {
+            ws.send(JSON.stringify({ type: "error", message: `Room is full (max ${maxPlayers} players)` }));
+            return;
+          }
+
+          if (!roomsMap.has(code)) roomsMap.set(code, new Map());
+          roomsMap.get(code)!.set(playerId, ws);
+          
+          // Armazena nome do jogador para uso posterior
+          if (!(roomsMap.get(code) as any)?.playerNames) {
+            (roomsMap.get(code) as any).playerNames = new Map();
+          }
+          (roomsMap.get(code) as any).playerNames.set(playerId, name);
 
           let state = room.gameState as GameState;
           
-          // If waiting and no state, initialize lobby state effectively (or just list players)
-          // For MVP, if state is null, we create a dummy state or wait for "start"
-          // Let's assume the first join creates a basic state if null? 
-          // No, separate "start_game" action is better.
-          
-          // Broadcast join
-          broadcast(code, { type: "player_joined", playerId, name });
-          
-          // Send current state
-          if (state) ws.send(JSON.stringify({ type: "game_state", state }));
+          // Se o jogo já está em andamento, envia o estado atual
+          if (state) {
+            ws.send(JSON.stringify({ type: "game_state", state }));
+            // Broadcast join para outros jogadores
+            broadcast(code, { type: "player_joined", playerId, name }, ws);
+          } else {
+            // Se ainda não começou, atualiza o lobby para TODOS os jogadores
+            const connectedPlayers = Array.from(roomsMap.get(code)!.keys());
+            const playerNames = (roomsMap.get(code) as any)?.playerNames || new Map();
+            const lobbyPlayers = connectedPlayers.map(id => ({
+              id,
+              name: playerNames.get(id) || `Player ${id.substring(0, 4)}`,
+              isBot: false,
+              isConnected: true,
+              hand: [],
+              score: 0,
+              knownCards: {}
+            })) as Player[];
+            
+            console.log("join: Sending lobby_state to all players. Players:", lobbyPlayers.length, lobbyPlayers.map(p => p.name));
+            // Envia lobby_state para TODOS os jogadores conectados (incluindo o que acabou de entrar)
+            // Inclui hostId para que o cliente saiba quem é o host
+            const lobbyMessage = { 
+              type: "lobby_state", 
+              players: lobbyPlayers,
+              hostId: room.hostId 
+            };
+            
+            // Envia para TODOS, incluindo o novo jogador
+            const clients = roomsMap.get(code);
+            if (clients) {
+              let sentCount = 0;
+              clients.forEach((client, clientPlayerId) => {
+                if (client.readyState === WebSocket.OPEN) {
+                  console.log(`Sending lobby_state to player ${clientPlayerId} (${(roomsMap.get(code) as any)?.playerNames?.get(clientPlayerId) || 'unknown'})`);
+                  try {
+                    client.send(JSON.stringify(lobbyMessage));
+                    sentCount++;
+                  } catch (err) {
+                    console.error("Error sending lobby_state to", clientPlayerId, ":", err);
+                  }
+                } else {
+                  console.log(`Skipping player ${clientPlayerId} - WebSocket not OPEN (state: ${client.readyState})`);
+                }
+              });
+              console.log(`lobby_state sent to ${sentCount} players`);
+            } else {
+              console.error("No clients found for room", code);
+            }
+            
+            // Também envia player_joined para notificar outros jogadores (exceto o novo)
+            broadcast(code, { type: "player_joined", playerId, name }, ws);
+          }
         }
 
         if (msg.type === "start_game") {
+          // Tenta recuperar room e player do WebSocket se não estiverem definidos
+          const roomCode = currentRoom || (ws as any).currentRoom;
+          const playerId = currentPlayer || (ws as any).currentPlayer;
+          
+          console.log("start_game received from player:", playerId, "in room:", roomCode);
+          console.log("currentRoom from closure:", currentRoom, "from ws:", (ws as any).currentRoom);
+          
           // Initialize game
-          if (!currentRoom) return;
+          if (!roomCode) {
+            console.error("start_game: No current room");
+            ws.send(JSON.stringify({ type: "error", message: "No room associated with connection. Please reconnect." }));
+            return;
+          }
           
-          const room = await storage.getRoom(currentRoom);
-          if (!room) return;
+          // Atualiza variáveis locais
+          currentRoom = roomCode;
+          currentPlayer = playerId;
           
-          const connectedPlayers = Array.from(roomsMap.get(currentRoom)!.keys());
+          const room = await storage.getRoom(roomCode);
+          if (!room) {
+            console.error("start_game: Room not found:", roomCode);
+            ws.send(JSON.stringify({ type: "error", message: "Room not found" }));
+            return;
+          }
           
-          // Create Players
+          // Verifica se o jogador que está iniciando é o host
+          if (room.hostId !== playerId) {
+            console.error("start_game: Only host can start game. Host:", room.hostId, "Player:", playerId);
+            ws.send(JSON.stringify({ type: "error", message: "Only the host can start the game" }));
+            return;
+          }
+          
+          const connectedPlayers = Array.from(roomsMap.get(roomCode)!.keys());
+          console.log("start_game: Connected players:", connectedPlayers.length, connectedPlayers);
+          
+          if (connectedPlayers.length < 2) {
+            console.log("start_game: Not enough players");
+            ws.send(JSON.stringify({ 
+              type: "error", 
+              message: "Need at least 2 players to start" 
+            }));
+            return;
+          }
+          
+          // Create Players - busca nomes do mapa
+          const playerNames = (roomsMap.get(roomCode) as any)?.playerNames || new Map();
           const players: Player[] = connectedPlayers.map(id => ({
             id,
-            name: "Player " + id.substr(0,4), // Simplified name resolution
+            name: playerNames.get(id) || `Player ${id.substring(0, 4)}`,
             isBot: false,
             isConnected: true,
             hand: [],
@@ -129,9 +244,19 @@ export async function registerRoutes(
             knownCards: {}
           }));
 
-          // Add bots if vs_bots mode
-          if (room.gameMode === "vs_bots") {
-            const bots = createBots(3, (room.botDifficulty as any) || "medium");
+          // Adiciona bots se configurado
+          const maxPlayers = (room as any).maxPlayers || 4;
+          const botCount = (room as any).botCount || 0;
+          const botDifficulty = (room.botDifficulty as any) || "medium";
+          
+          // Calcula quantos bots adicionar (não pode exceder maxPlayers)
+          const totalSlots = maxPlayers;
+          const humanPlayers = players.length;
+          const availableSlots = totalSlots - humanPlayers;
+          const botsToAdd = Math.min(botCount, availableSlots);
+          
+          if (botsToAdd > 0) {
+            const bots = createBots(botsToAdd, botDifficulty);
             bots.forEach(bot => {
               players.push({
                 id: bot.id,
@@ -145,45 +270,64 @@ export async function registerRoutes(
             });
             
             // Store bot instances in memory for turn handling
-            if (!roomsMap.has(currentRoom)) roomsMap.set(currentRoom, new Map());
+            if (!roomsMap.has(roomCode)) roomsMap.set(roomCode, new Map());
+            if (!(roomsMap.get(roomCode) as any).bots) {
+              (roomsMap.get(roomCode) as any).bots = [];
+            }
             bots.forEach(bot => {
-              // Mark bot connections (no actual WS)
-              const botPlayers = (roomsMap.get(currentRoom) as any).bots || [];
-              botPlayers.push(bot);
-              (roomsMap.get(currentRoom) as any).bots = botPlayers;
+              (roomsMap.get(roomCode) as any).bots.push(bot);
             });
+          }
+          
+          // Verifica se há jogadores suficientes (incluindo bots)
+          if (players.length < 2) {
+            ws.send(JSON.stringify({ 
+              type: "error", 
+              message: "Need at least 2 players (including bots) to start" 
+            }));
+            return;
           }
 
           const newState = GameLogic.createInitialState(players);
-          await storage.updateGameState(currentRoom, newState);
-          await storage.updateRoomStatus(currentRoom, "playing");
+          console.log("start_game: Created game state with", newState.players.length, "players");
+          await storage.updateGameState(roomCode, newState);
+          await storage.updateRoomStatus(roomCode, "playing");
           
-          broadcast(currentRoom, { type: "game_state", state: newState });
+          console.log("start_game: Broadcasting game state to all players in room:", roomCode);
+          broadcast(roomCode, { type: "game_state", state: newState });
           
           // Auto-trigger first bot turn if exists
           if (newState.players[0].isBot) {
-            scheduleNextBotTurn(currentRoom, newState);
+            scheduleNextBotTurn(roomCode, newState);
           }
         }
 
         if (msg.type === "player_action") {
           // Handle logic (draw, discard, etc)
-          const room = await storage.getRoom(currentRoom!);
+          const roomCode = currentRoom || (ws as any).currentRoom;
+          const playerId = currentPlayer || (ws as any).currentPlayer;
+          
+          if (!roomCode || !playerId) {
+            console.error("player_action: No room or player associated");
+            return;
+          }
+          
+          const room = await storage.getRoom(roomCode);
           if (!room || !room.gameState) return;
           
           let state = room.gameState as GameState;
           
           // Processa ação usando GameLogic.processAction
-          const result = GameLogic.processAction(state, msg.action, currentPlayer!);
+          const result = GameLogic.processAction(state, msg.action, playerId);
           
-          await storage.updateGameState(currentRoom!, result.newState);
-          broadcast(currentRoom!, { type: "game_state", state: result.newState });
+          await storage.updateGameState(roomCode, result.newState);
+          broadcast(roomCode, { type: "game_state", state: result.newState });
           
           // Se alguém declarou Cunoku, envia notificação para todos
           if (msg.action.type === "declare_finish" && result.newState.isFinalRound) {
-            const declarer = result.newState.players.find(p => p.id === currentPlayer!);
+            const declarer = result.newState.players.find(p => p.id === playerId);
             if (declarer) {
-              broadcast(currentRoom!, { 
+              broadcast(roomCode, { 
                 type: "cunoku_declared", 
                 playerName: declarer.name 
               });
@@ -202,7 +346,7 @@ export async function registerRoutes(
           
           // Check if next player is bot
           if (result.newState.players[result.newState.currentPlayerIndex]?.isBot) {
-            scheduleNextBotTurn(currentRoom!, result.newState);
+            scheduleNextBotTurn(roomCode, result.newState);
           }
         }
 
@@ -219,11 +363,12 @@ export async function registerRoutes(
     });
   });
 
-  function broadcast(roomCode: string, msg: any) {
+  function broadcast(roomCode: string, msg: any, exclude?: WebSocket) {
     const clients = roomsMap.get(roomCode);
     if (clients) {
       clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
+        // Exclui o cliente especificado (se fornecido) para evitar enviar mensagem de volta ao remetente
+        if (client !== exclude && client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify(msg));
         }
       });
