@@ -28,7 +28,7 @@ export function RulesDialog() {
             </div>
 
             <div>
-              <h4 className="text-lg font-semibold text-gray-800 mb-2">Valores das Cartas:</h4>
+              <h4 className="text-lg font-semibold text-gray-800 mb-2">{t("rules.cardValues")}</h4>
               <ul className="space-y-2 text-gray-700">
                 <li>• {t("rules.queen")}</li>
                 <li>• {t("rules.ace")}</li>
@@ -39,11 +39,11 @@ export function RulesDialog() {
             </div>
 
             <div>
-              <h4 className="text-lg font-semibold text-gray-800 mb-2">Habilidades das Cartas:</h4>
+              <h4 className="text-lg font-semibold text-gray-800 mb-2">{t("rules.cardAbilities")}</h4>
               <ul className="space-y-2 text-gray-700">
-                <li>• <strong>9 e 10:</strong> {t("rules.nineTen")}</li>
-                <li>• <strong>7 e 8:</strong> {t("rules.sevenEight")}</li>
-                <li>• <strong>5 e 6:</strong> {t("rules.fiveSix")}</li>
+                <li>• <strong>{t("rules.nineAndTen")}:</strong> {t("rules.nineTen")}</li>
+                <li>• <strong>{t("rules.sevenAndEight")}:</strong> {t("rules.sevenEight")}</li>
+                <li>• <strong>{t("rules.fiveAndSix")}:</strong> {t("rules.fiveSix")}</li>
               </ul>
             </div>
 
