@@ -53,6 +53,8 @@ export const rooms = pgTable("rooms", {
   status: text("status").notNull().default("waiting"), // waiting, playing, finished
   gameMode: text("game_mode").notNull().default("multiplayer"), // multiplayer, vs_bots
   botDifficulty: text("bot_difficulty").default("medium"), // easy, medium, hard
+  maxPlayers: integer("max_players").default(4), // Maximum number of players
+  botCount: integer("bot_count").default(0), // Number of bots to add
   gameState: jsonb("game_state").$type<GameState>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -72,9 +74,12 @@ export type RoomResponse = Room & { playerCount: number };
 export type WsMessage =
   | { type: "connect"; playerId: string; roomCode: string }
   | { type: "game_state"; state: GameState }
+  | { type: "lobby_state"; players: Player[]; hostId?: string }
+  | { type: "player_joined"; playerId: string; name: string }
   | { type: "player_action"; action: GameAction }
   | { type: "error"; message: string }
   | { type: "cunoku_declared"; playerName: string }
+  | { type: "bot_thinking"; botName: string }
   | WsPrivateMessage;
 
 export type GameAction =

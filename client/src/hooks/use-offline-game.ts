@@ -2,12 +2,14 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { GameState, GameAction, Player } from "@shared/schema";
 import { processOfflineAction } from "@/utils/offlineGameLogic";
 import { BotPlayer } from "@/utils/botPlayer";
+import { useToast } from "@/hooks/use-toast";
 
 export function useOfflineGame(
   initialGameState: GameState | null,
   playerId: string,
   botDifficulty: "easy" | "medium" | "hard"
 ) {
+  const { toast } = useToast();
   const [gameState, setGameState] = useState<GameState | null>(initialGameState);
   const [botPlayers, setBotPlayers] = useState<Map<string, BotPlayer>>(new Map());
   const processingRef = useRef(false);
@@ -51,15 +53,25 @@ export function useOfflineGame(
       // Processa turno do bot
       const bot = bots.get(currentPlayer.id);
       if (bot) {
-        const action = bot.decideTurn(state, state.currentPlayerIndex);
-        state = processOfflineAction(state, action, currentPlayer.id);
+        // Mostra mensagem "Bot está pensando"
+        toast({
+          title: `${currentPlayer.name} está pensando...`,
+          description: "O bot está analisando sua jogada",
+          duration: 3000,
+        });
         
-        // Salva estado
-        setGameState(state);
-        sessionStorage.setItem(`offline_game_${playerId}`, JSON.stringify(state));
-        
-        // Continua processando após um delay
-        setTimeout(processNextBot, 800);
+        // Espera 3 segundos antes de executar a ação
+        setTimeout(() => {
+          const action = bot.decideTurn(state, state.currentPlayerIndex);
+          state = processOfflineAction(state, action, currentPlayer.id);
+          
+          // Salva estado
+          setGameState(state);
+          sessionStorage.setItem(`offline_game_${playerId}`, JSON.stringify(state));
+          
+          // Continua processando após um pequeno delay
+          setTimeout(processNextBot, 500);
+        }, 3000);
       } else {
         setGameState(state);
         processingRef.current = false;

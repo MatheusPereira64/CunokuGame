@@ -97,6 +97,14 @@ export function useGameSocket(roomCode: string, playerId: string) {
               duration: 5000,
             });
             break;
+          case "bot_thinking":
+            // Notificação quando um bot está pensando
+            toast({
+              title: `${(message as any).botName} está pensando...`,
+              description: "O bot está analisando sua jogada",
+              duration: 3000,
+            });
+            break;
           case "private_info":
             // Mensagem privada (para cartas 5 e 6)
             toast({

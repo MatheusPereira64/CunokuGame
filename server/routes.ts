@@ -379,9 +379,13 @@ export async function registerRoutes(
     const currentPlayer = state.players[state.currentPlayerIndex];
     if (!currentPlayer?.isBot) return;
 
-    // Simulate bot delay (0.5-2 seconds)
-    const delay = 500 + Math.random() * 1500;
-    
+    // Envia mensagem "Bot está pensando" para todos os clientes
+    broadcast(roomCode, { 
+      type: "bot_thinking", 
+      botName: currentPlayer.name 
+    });
+
+    // Espera 3 segundos antes de executar a ação
     setTimeout(async () => {
       const room = await storage.getRoom(roomCode);
       if (!room || !room.gameState) return;
@@ -412,7 +416,7 @@ export async function registerRoutes(
       if (updatedState.players[updatedState.currentPlayerIndex]?.isBot) {
         scheduleNextBotTurn(roomCode, updatedState);
       }
-    }, delay);
+    }, 3000); // 3 segundos de delay
   }
 
   return httpServer;
