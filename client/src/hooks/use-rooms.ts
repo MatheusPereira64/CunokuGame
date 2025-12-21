@@ -5,7 +5,9 @@ import { z } from "zod";
 type CreateRoomRequest = { 
   name: string; 
   gameMode?: "multiplayer" | "vs_bots"; 
-  botDifficulty?: "easy" | "medium" | "hard" 
+  botDifficulty?: "easy" | "medium" | "hard";
+  maxPlayers?: number;
+  botCount?: number;
 };
 
 type JoinRoomRequest = { code: string; name: string };
@@ -28,6 +30,8 @@ export function useCreateRoom() {
         playerName: data.name,
         gameMode: data.gameMode || "multiplayer",
         botDifficulty: data.botDifficulty || "medium",
+        maxPlayers: data.maxPlayers || 4,
+        botCount: data.botCount || 0,
       });
       const res = await fetch(api.rooms.create.path, {
         method: api.rooms.create.method,

@@ -33,6 +33,10 @@ export default function Home() {
   const [botCount, setBotCount] = useState<number>(2);
   const [botCountOpen, setBotCountOpen] = useState(false);
   const [botDifficultyOpen, setBotDifficultyOpen] = useState(false);
+  // Novos estados para Create New Game
+  const [maxPlayers, setMaxPlayers] = useState<number>(4);
+  const [includeBots, setIncludeBots] = useState<boolean>(false);
+  const [maxPlayersOpen, setMaxPlayersOpen] = useState(false);
 
   const createRoom = useCreateRoom();
   const joinRoom = useJoinRoom();
@@ -78,9 +82,15 @@ export default function Home() {
     try {
       const result = await createRoom.mutateAsync({ 
         name,
-        gameMode: "multiplayer"
+        gameMode: "multiplayer",
+        maxPlayers: maxPlayers,
+        botCount: includeBots ? botCount : 0,
+        botDifficulty: includeBots ? botDifficulty : undefined
       });
       sessionStorage.setItem(`player_${result.code}`, result.playerId);
+      sessionStorage.setItem(`playerName_${result.code}`, name);
+      // Salva o hostId (o criador da sala é sempre o host)
+      sessionStorage.setItem(`hostId_${result.code}`, result.playerId);
       setLocation(`/game/${result.code}?player=${result.playerId}`);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -93,6 +103,7 @@ export default function Home() {
     try {
       const result = await joinRoom.mutateAsync({ name, code: roomCode });
       sessionStorage.setItem(`player_${result.code}`, result.playerId);
+      sessionStorage.setItem(`playerName_${result.code}`, name);
       setLocation(`/game/${result.code}?player=${result.playerId}`);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -136,12 +147,12 @@ export default function Home() {
                 <Gamepad2 className="mr-3 w-6 h-6" /> Create New Game
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-md overflow-visible">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-display text-indigo-900">Start a New Table</DialogTitle>
                 <DialogDescription>Create a multiplayer room for friends to join</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="space-y-4 py-4 overflow-visible">
                 <div className="space-y-2">
                   <Label htmlFor="hostName">Your Name</Label>
                   <Input 
@@ -152,6 +163,138 @@ export default function Home() {
                     className="text-lg py-6"
                   />
                 </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="maxPlayers">Maximum Number of Players</Label>
+                  <Select 
+                    value={maxPlayers.toString()} 
+                    onValueChange={(value) => {
+                      const newMax = parseInt(value);
+                      setMaxPlayers(newMax);
+                      // Ajusta botCount se necessário
+                      if (botCount > newMax - 1) {
+                        setBotCount(newMax - 1);
+                      }
+                      setMaxPlayersOpen(false);
+                    }}
+                    open={maxPlayersOpen}
+                    onOpenChange={(open) => {
+                      setMaxPlayersOpen(open);
+                      if (open) {
+                        setBotCountOpen(false);
+                        setBotDifficultyOpen(false);
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="maxPlayers" className="text-lg py-6 w-full">
+                      <SelectValue placeholder="Select max players" />
+                    </SelectTrigger>
+                    <SelectContent 
+                      position="popper"
+                      className="z-[100] auto-height"
+                      sideOffset={5}
+                    >
+                      <SelectItem value="2">2 Players</SelectItem>
+                      <SelectItem value="3">3 Players</SelectItem>
+                      <SelectItem value="4">4 Players</SelectItem>
+                      <SelectItem value="5">5 Players</SelectItem>
+                      <SelectItem value="6">6 Players</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="includeBots"
+                      checked={includeBots}
+                      onChange={(e) => setIncludeBots(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <Label htmlFor="includeBots" className="cursor-pointer">
+                      Add Bots to fill empty slots
+                    </Label>
+                  </div>
+                </div>
+
+                {includeBots && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="createBotCount">
+                        Number of Bots (max: {maxPlayers - 1})
+                      </Label>
+                      <Select 
+                        value={Math.min(botCount, maxPlayers - 1).toString()} 
+                        onValueChange={(value) => {
+                          const newCount = parseInt(value);
+                          setBotCount(Math.min(newCount, maxPlayers - 1));
+                          setBotCountOpen(false);
+                        }}
+                        open={botCountOpen}
+                        onOpenChange={(open) => {
+                          setBotCountOpen(open);
+                          if (open) {
+                            setMaxPlayersOpen(false);
+                            setBotDifficultyOpen(false);
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="createBotCount" className="text-lg py-6 w-full">
+                          <SelectValue placeholder="Select number of bots" />
+                        </SelectTrigger>
+                        <SelectContent 
+                          position="popper"
+                          className="z-[100] auto-height"
+                          sideOffset={5}
+                        >
+                          {Array.from({ length: Math.min(maxPlayers - 1, 5) }, (_, i) => i + 1).map(num => (
+                            <SelectItem key={num} value={num.toString()}>
+                              {num} Bot{num > 1 ? 's' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {botCount > maxPlayers - 1 && (
+                        <p className="text-xs text-orange-600">
+                          Bot count adjusted to {maxPlayers - 1} (max players: {maxPlayers})
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="createBotDifficulty">Bot Difficulty</Label>
+                      <Select 
+                        value={botDifficulty} 
+                        onValueChange={(value: "easy" | "medium" | "hard") => {
+                          setBotDifficulty(value);
+                          setBotDifficultyOpen(false);
+                        }}
+                        open={botDifficultyOpen}
+                        onOpenChange={(open) => {
+                          setBotDifficultyOpen(open);
+                          if (open) {
+                            setMaxPlayersOpen(false);
+                            setBotCountOpen(false);
+                          }
+                        }}
+                      >
+                        <SelectTrigger id="createBotDifficulty" className="text-lg py-6 w-full">
+                          <SelectValue placeholder="Select difficulty" />
+                        </SelectTrigger>
+                        <SelectContent 
+                          position="popper"
+                          className="z-[100] auto-height"
+                          sideOffset={5}
+                        >
+                          <SelectItem value="easy">Easy</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="hard">Hard</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
                 <Button 
                   className="w-full mt-4" 
                   onClick={handleCreate} 

@@ -23,6 +23,8 @@ export const api = {
         playerName: z.string().min(1),
         gameMode: z.enum(['multiplayer', 'vs_bots']).optional().default('multiplayer'),
         botDifficulty: z.enum(['easy', 'medium', 'hard']).optional().default('medium'),
+        maxPlayers: z.number().min(2).max(6).optional().default(4),
+        botCount: z.number().min(0).max(5).optional().default(0),
       }),
       responses: {
         201: z.object({ code: z.string(), playerId: z.string() }),
