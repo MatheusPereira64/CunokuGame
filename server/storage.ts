@@ -12,9 +12,21 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async createRoom(insertRoom: InsertRoom): Promise<Room> {
-    if (!db) throw new Error("Database not initialized");
-    const [room] = await db.insert(rooms).values(insertRoom).returning();
-    return room;
+    if (!db) {
+      console.error("Database not initialized - DATABASE_URL:", process.env.DATABASE_URL ? "SET" : "NOT SET");
+      throw new Error("Database not initialized. Please check DATABASE_URL environment variable.");
+    }
+    try {
+      console.log("DatabaseStorage.createRoom - Inserting room:", insertRoom.code);
+      const [room] = await db.insert(rooms).values(insertRoom).returning();
+      console.log("DatabaseStorage.createRoom - Room created:", room.id);
+      return room;
+    } catch (err: any) {
+      console.error("DatabaseStorage.createRoom - Error:", err);
+      console.error("DatabaseStorage.createRoom - Error code:", err.code);
+      console.error("DatabaseStorage.createRoom - Error detail:", err.detail);
+      throw new Error(`Failed to create room in database: ${err.message || err.code || "Unknown error"}`);
+    }
   }
 
   async getRoom(code: string): Promise<Room | undefined> {

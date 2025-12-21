@@ -16,9 +16,16 @@ export async function registerRoutes(
   // === HTTP ROUTES ===
   app.post(api.rooms.create.path, async (req, res) => {
     try {
+      console.log("POST /api/rooms - Request body:", JSON.stringify(req.body));
+      console.log("POST /api/rooms - Storage type:", process.env.DATABASE_URL ? "DatabaseStorage" : "MemoryStorage");
+      
       const input = api.rooms.create.input.parse(req.body);
+      console.log("POST /api/rooms - Parsed input:", input);
+      
       const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
       const playerId = randomUUID();
+      
+      console.log("POST /api/rooms - Creating room with code:", roomCode);
       
       const newRoom = await storage.createRoom({
         code: roomCode,
@@ -31,13 +38,23 @@ export async function registerRoutes(
         gameState: null
       });
 
+      console.log("POST /api/rooms - Room created successfully:", roomCode);
       res.status(201).json({ code: roomCode, playerId });
     } catch (err: any) {
       console.error("Error creating room:", err);
-      const message = err instanceof z.ZodError 
-        ? `Validation error: ${err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`
-        : err.message || "Invalid input";
-      res.status(400).json({ message });
+      console.error("Error stack:", err.stack);
+      
+      let message: string;
+      if (err instanceof z.ZodError) {
+        message = `Validation error: ${err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`;
+        console.error("Zod validation errors:", err.errors);
+      } else if (err.message) {
+        message = err.message;
+      } else {
+        message = "Invalid input";
+      }
+      
+      res.status(400).json({ message, details: err instanceof z.ZodError ? err.errors : undefined });
     }
   });
 

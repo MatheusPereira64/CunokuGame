@@ -60,6 +60,42 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Initialize database tables if in production and DATABASE_URL is set
+  if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
+    try {
+      const { db } = await import("./db");
+      if (db) {
+        // Check if rooms table exists, if not, create it
+        const { sql } = await import("drizzle-orm");
+        try {
+          await db.execute(sql`SELECT 1 FROM rooms LIMIT 1`);
+          log("Database tables verified");
+        } catch (err: any) {
+          // Table doesn't exist, create it
+          log("Creating database tables...");
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS rooms (
+              id SERIAL PRIMARY KEY,
+              code TEXT NOT NULL UNIQUE,
+              host_id TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'waiting',
+              game_mode TEXT NOT NULL DEFAULT 'multiplayer',
+              bot_difficulty TEXT DEFAULT 'medium',
+              max_players INTEGER DEFAULT 4,
+              bot_count INTEGER DEFAULT 0,
+              game_state JSONB,
+              created_at TIMESTAMP DEFAULT NOW()
+            );
+          `);
+          log("Database tables created successfully");
+        }
+      }
+    } catch (err: any) {
+      log(`Warning: Could not initialize database: ${err.message}`, "db-init");
+      // Continue anyway - will use MemoryStorage if database fails
+    }
+  }
+  
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -85,8 +121,11 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
-  // Use localhost on Windows, 0.0.0.0 on Linux/Mac
-  const host = process.platform === "win32" ? "127.0.0.1" : "0.0.0.0";
+  // In production, always use 0.0.0.0 to accept connections from anywhere
+  // In development on Windows, use 127.0.0.1 for local testing
+  const host = process.env.NODE_ENV === "production" 
+    ? "0.0.0.0" 
+    : (process.platform === "win32" ? "127.0.0.1" : "0.0.0.0");
   httpServer.listen(
     port,
     host,
