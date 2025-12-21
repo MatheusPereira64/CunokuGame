@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/Button";
 import { useCreateRoom, useJoinRoom } from "@/hooks/use-rooms";
 import { useToast } from "@/hooks/use-toast";
-import { Spade, Heart, Club, Diamond, ArrowRight, Gamepad2, Users, Bot } from "lucide-react";
+import { Spade, Heart, Club, Diamond, ArrowRight, Gamepad2, Users, Bot, Languages } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createOfflineGame } from "@/utils/localGame";
 import { audioManager } from "@/utils/audioManager";
 import { VolumeControl } from "@/components/VolumeControl";
+import { RulesDialog } from "@/components/RulesDialog";
+import { useI18n, type Language } from "@/contexts/i18n-context";
 
 export default function Home() {
   // Toca música do menu assim que o componente montar
@@ -26,6 +28,8 @@ export default function Home() {
   }, []);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t, language, setLanguage } = useI18n();
+  const [languageOpen, setLanguageOpen] = useState(false);
   const [name, setName] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [mode, setMode] = useState<"create" | "join" | "bots" | null>(null);
@@ -43,7 +47,7 @@ export default function Home() {
   const joinRoom = useJoinRoom();
 
   const handleCreate = async () => {
-    if (!name) return toast({ title: "Name required", description: "Please enter your player name", variant: "destructive" });
+    if (!name) return toast({ title: t("error.nameRequired"), description: t("error.nameRequiredDesc"), variant: "destructive" });
     
     // Se for modo bots, cria partida offline
     if (gameMode === "vs_bots") {
@@ -74,7 +78,7 @@ export default function Home() {
         }, 100);
       } catch (err: any) {
         console.error("Error creating offline game:", err);
-        toast({ title: "Error", description: err.message || "Failed to start offline game", variant: "destructive" });
+        toast({ title: t("error.generic"), description: err.message || t("error.failedToStart"), variant: "destructive" });
       }
       return;
     }
@@ -99,7 +103,7 @@ export default function Home() {
   };
 
   const handleJoin = async () => {
-    if (!name || !roomCode) return toast({ title: "Missing details", description: "Please enter name and room code", variant: "destructive" });
+    if (!name || !roomCode) return toast({ title: t("error.missingDetails"), description: t("error.missingDetailsDesc"), variant: "destructive" });
 
     try {
       const result = await joinRoom.mutateAsync({ name, code: roomCode });
@@ -113,6 +117,29 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Language Selector - Top Left */}
+      <div className="absolute top-4 left-4 z-20">
+        <Select
+          value={language}
+          onValueChange={(value: Language) => {
+            setLanguage(value);
+            setLanguageOpen(false);
+          }}
+          open={languageOpen}
+          onOpenChange={setLanguageOpen}
+        >
+          <SelectTrigger className="w-[140px] bg-white/90 text-indigo-900 border-indigo-200 hover:bg-white shadow-md">
+            <Languages className="mr-2 h-4 w-4" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper" className="z-[100]" sideOffset={5}>
+            <SelectItem value="pt">{t("lang.pt")}</SelectItem>
+            <SelectItem value="es">{t("lang.es")}</SelectItem>
+            <SelectItem value="en">{t("lang.en")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Volume Control - Top Right */}
       <div className="absolute top-4 right-4 z-20">
         <div className="[&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md">
@@ -141,31 +168,31 @@ export default function Home() {
             className="inline-block"
           >
             <h1 className="text-6xl md:text-8xl font-black text-indigo-900 tracking-tighter mb-2" style={{ fontFamily: 'Noto Serif JP' }}>
-              Cunoku
+              {t("menu.title")}
             </h1>
             <div className="h-2 bg-red-600 w-full rounded-full" />
           </motion.div>
-          <p className="mt-4 text-xl text-gray-600 font-medium">A Game of Strategy & Deception</p>
+          <p className="mt-4 text-xl text-gray-600 font-medium">{t("menu.subtitle")}</p>
         </div>
 
         <div className="grid gap-6">
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="primary" size="lg" className="w-full text-xl py-8" onClick={() => { setMode("create"); setGameMode("multiplayer"); }}>
-                <Gamepad2 className="mr-3 w-6 h-6" /> Create New Game
+                <Gamepad2 className="mr-3 w-6 h-6" /> {t("menu.createGame")}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md overflow-visible">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-display text-indigo-900">Start a New Table</DialogTitle>
-                <DialogDescription>Create a multiplayer room for friends to join</DialogDescription>
+                <DialogTitle className="text-2xl font-display text-indigo-900">{t("create.title")}</DialogTitle>
+                <DialogDescription>{t("create.description")}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4 overflow-visible">
                 <div className="space-y-2">
-                  <Label htmlFor="hostName">Your Name</Label>
+                  <Label htmlFor="hostName">{t("create.yourName")}</Label>
                   <Input 
                     id="hostName" 
-                    placeholder="Enter your name..." 
+                    placeholder={t("create.namePlaceholder")} 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="text-lg py-6"
@@ -173,7 +200,7 @@ export default function Home() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="maxPlayers">Maximum Number of Players</Label>
+                  <Label htmlFor="maxPlayers">{t("create.maxPlayers")}</Label>
                   <Select 
                     value={maxPlayers.toString()} 
                     onValueChange={(value) => {
@@ -195,18 +222,18 @@ export default function Home() {
                     }}
                   >
                     <SelectTrigger id="maxPlayers" className="text-lg py-6 w-full">
-                      <SelectValue placeholder="Select max players" />
+                      <SelectValue placeholder={t("create.maxPlayers")} />
                     </SelectTrigger>
                     <SelectContent 
                       position="popper"
                       className="z-[100] auto-height"
                       sideOffset={5}
                     >
-                      <SelectItem value="2">2 Players</SelectItem>
-                      <SelectItem value="3">3 Players</SelectItem>
-                      <SelectItem value="4">4 Players</SelectItem>
-                      <SelectItem value="5">5 Players</SelectItem>
-                      <SelectItem value="6">6 Players</SelectItem>
+                      <SelectItem value="2">2 {t("create.players")}</SelectItem>
+                      <SelectItem value="3">3 {t("create.players")}</SelectItem>
+                      <SelectItem value="4">4 {t("create.players")}</SelectItem>
+                      <SelectItem value="5">5 {t("create.players")}</SelectItem>
+                      <SelectItem value="6">6 {t("create.players")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -221,7 +248,7 @@ export default function Home() {
                       className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                     />
                     <Label htmlFor="includeBots" className="cursor-pointer">
-                      Add Bots to fill empty slots
+                      {t("create.addBots")}
                     </Label>
                   </div>
                 </div>
@@ -230,7 +257,7 @@ export default function Home() {
                   <>
                     <div className="space-y-2">
                       <Label htmlFor="createBotCount">
-                        Number of Bots (max: {maxPlayers - 1})
+                        {t("create.botCount").replace("{max}", (maxPlayers - 1).toString())}
                       </Label>
                       <Select 
                         value={Math.min(botCount, maxPlayers - 1).toString()} 
@@ -249,7 +276,7 @@ export default function Home() {
                         }}
                       >
                         <SelectTrigger id="createBotCount" className="text-lg py-6 w-full">
-                          <SelectValue placeholder="Select number of bots" />
+                          <SelectValue placeholder={t("create.botCount")} />
                         </SelectTrigger>
                         <SelectContent 
                           position="popper"
@@ -258,19 +285,19 @@ export default function Home() {
                         >
                           {Array.from({ length: Math.min(maxPlayers - 1, 5) }, (_, i) => i + 1).map(num => (
                             <SelectItem key={num} value={num.toString()}>
-                              {num} Bot{num > 1 ? 's' : ''}
+                              {num} {num > 1 ? t("create.bots") : t("create.bot")}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                       {botCount > maxPlayers - 1 && (
                         <p className="text-xs text-orange-600">
-                          Bot count adjusted to {maxPlayers - 1} (max players: {maxPlayers})
+                          {t("create.botCountAdjusted").replace("{max}", (maxPlayers - 1).toString()).replace("{total}", maxPlayers.toString())}
                         </p>
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="createBotDifficulty">Bot Difficulty</Label>
+                      <Label htmlFor="createBotDifficulty">{t("create.botDifficulty")}</Label>
                       <Select 
                         value={botDifficulty} 
                         onValueChange={(value: "easy" | "medium" | "hard") => {
@@ -287,16 +314,16 @@ export default function Home() {
                         }}
                       >
                         <SelectTrigger id="createBotDifficulty" className="text-lg py-6 w-full">
-                          <SelectValue placeholder="Select difficulty" />
+                          <SelectValue placeholder={t("create.botDifficulty")} />
                         </SelectTrigger>
                         <SelectContent 
                           position="popper"
                           className="z-[100] auto-height"
                           sideOffset={5}
                         >
-                          <SelectItem value="easy">Easy</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="hard">Hard</SelectItem>
+                          <SelectItem value="easy">{t("create.difficulty.easy")}</SelectItem>
+                          <SelectItem value="medium">{t("create.difficulty.medium")}</SelectItem>
+                          <SelectItem value="hard">{t("create.difficulty.hard")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -308,7 +335,7 @@ export default function Home() {
                   onClick={handleCreate} 
                   isLoading={createRoom.isPending}
                 >
-                  Create Room <ArrowRight className="ml-2 w-4 h-4" />
+                  {t("create.createRoom")} <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </div>
             </DialogContent>
@@ -317,27 +344,27 @@ export default function Home() {
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="secondary" size="lg" className="w-full text-xl py-8" onClick={() => { setMode("bots"); setGameMode("vs_bots"); }}>
-                <Bot className="mr-3 w-6 h-6" /> Play Against Bots
+                <Bot className="mr-3 w-6 h-6" /> {t("menu.playBots")}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md overflow-visible">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-display text-indigo-900">Play Against Bots</DialogTitle>
-                <DialogDescription>Start a game with AI opponents</DialogDescription>
+                <DialogTitle className="text-2xl font-display text-indigo-900">{t("bots.title")}</DialogTitle>
+                <DialogDescription>{t("bots.description")}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4 overflow-visible">
                 <div className="space-y-2">
-                  <Label htmlFor="botName">Your Name</Label>
+                  <Label htmlFor="botName">{t("bots.yourName")}</Label>
                   <Input 
                     id="botName" 
-                    placeholder="Enter your name..." 
+                    placeholder={t("bots.namePlaceholder")} 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="text-lg py-6"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="botCount">Number of Bots</Label>
+                  <Label htmlFor="botCount">{t("bots.botCount")}</Label>
                   <Select 
                     value={botCount.toString()} 
                     onValueChange={(value) => {
@@ -351,23 +378,23 @@ export default function Home() {
                     }}
                   >
                     <SelectTrigger id="botCount" className="text-lg py-6 w-full">
-                      <SelectValue placeholder="Select number of bots" />
+                      <SelectValue placeholder={t("bots.botCount")} />
                     </SelectTrigger>
                     <SelectContent 
                       position="popper"
                       className="z-[100] auto-height"
                       sideOffset={5}
                     >
-                      <SelectItem value="1">1 Bot</SelectItem>
-                      <SelectItem value="2">2 Bots</SelectItem>
-                      <SelectItem value="3">3 Bots</SelectItem>
-                      <SelectItem value="4">4 Bots</SelectItem>
-                      <SelectItem value="5">5 Bots</SelectItem>
+                      <SelectItem value="1">1 {t("bots.bot")}</SelectItem>
+                      <SelectItem value="2">2 {t("bots.bots")}</SelectItem>
+                      <SelectItem value="3">3 {t("bots.bots")}</SelectItem>
+                      <SelectItem value="4">4 {t("bots.bots")}</SelectItem>
+                      <SelectItem value="5">5 {t("bots.bots")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="botDifficulty">Bot Difficulty</Label>
+                  <Label htmlFor="botDifficulty">{t("bots.botDifficulty")}</Label>
                   <Select 
                     value={botDifficulty} 
                     onValueChange={(value: "easy" | "medium" | "hard") => {
@@ -381,16 +408,16 @@ export default function Home() {
                     }}
                   >
                     <SelectTrigger id="botDifficulty" className="text-lg py-6 w-full">
-                      <SelectValue placeholder="Select difficulty" />
+                      <SelectValue placeholder={t("bots.botDifficulty")} />
                     </SelectTrigger>
                     <SelectContent 
                       position="popper"
                       className="z-[100] auto-height"
                       sideOffset={5}
                     >
-                      <SelectItem value="easy">Easy</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="hard">Hard</SelectItem>
+                      <SelectItem value="easy">{t("create.difficulty.easy")}</SelectItem>
+                      <SelectItem value="medium">{t("create.difficulty.medium")}</SelectItem>
+                      <SelectItem value="hard">{t("create.difficulty.hard")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -398,7 +425,7 @@ export default function Home() {
                   className="w-full mt-4" 
                   onClick={handleCreate}
                 >
-                  Start Game <ArrowRight className="ml-2 w-4 h-4" />
+                  {t("bots.startGame")} <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </div>
             </DialogContent>
@@ -407,30 +434,30 @@ export default function Home() {
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="secondary" size="lg" className="w-full text-xl py-8" onClick={() => setMode("join")}>
-                <Users className="mr-3 w-6 h-6" /> Join Existing Room
+                <Users className="mr-3 w-6 h-6" /> {t("menu.joinRoom")}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-display text-indigo-900">Join a Table</DialogTitle>
-                <DialogDescription>Enter the room code to join an existing game</DialogDescription>
+                <DialogTitle className="text-2xl font-display text-indigo-900">{t("join.title")}</DialogTitle>
+                <DialogDescription>{t("join.description")}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="joinName">Your Name</Label>
+                  <Label htmlFor="joinName">{t("join.yourName")}</Label>
                   <Input 
                     id="joinName" 
-                    placeholder="Enter your name..." 
+                    placeholder={t("join.namePlaceholder")} 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="text-lg py-6"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="roomCode">Room Code</Label>
+                  <Label htmlFor="roomCode">{t("join.roomCode")}</Label>
                   <Input 
                     id="roomCode" 
-                    placeholder="e.g. A4B2" 
+                    placeholder={t("join.roomCodePlaceholder")} 
                     maxLength={4}
                     value={roomCode}
                     onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
@@ -442,15 +469,17 @@ export default function Home() {
                   onClick={handleJoin} 
                   isLoading={joinRoom.isPending}
                 >
-                  Join Room <ArrowRight className="ml-2 w-4 h-4" />
+                  {t("join.joinRoom")} <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
+
+          <RulesDialog />
         </div>
 
         <div className="mt-12 text-center text-sm text-gray-500">
-          <p>© 2025 Cunoku Card Game. Minimum 2 players.</p>
+          <p>{t("menu.copyright")}</p>
         </div>
       </motion.div>
     </div>

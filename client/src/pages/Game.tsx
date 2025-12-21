@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { audioManager } from "@/utils/audioManager";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { VolumeControl } from "@/components/VolumeControl";
+import { useI18n } from "@/contexts/i18n-context";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ export default function Game() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { t } = useI18n();
   const roomCode = params?.code || "";
   
   // Extract player ID and mode from query string
@@ -63,8 +65,8 @@ export default function Game() {
           } else {
             console.error("Invalid game state structure:", parsedState);
             toast({ 
-              title: "Error", 
-              description: "Invalid game state. Please start a new game.", 
+              title: t("error.generic"), 
+              description: t("game.errorInvalidState"), 
               variant: "destructive" 
             });
             setIsLoadingOffline(false);
@@ -72,8 +74,8 @@ export default function Game() {
         } catch (e) {
           console.error("Failed to parse offline game state:", e);
           toast({ 
-            title: "Error", 
-            description: "Failed to load game. Please start a new game.", 
+            title: t("error.generic"), 
+            description: t("game.errorFailedToLoad"), 
             variant: "destructive" 
           });
           setIsLoadingOffline(false);
@@ -82,8 +84,8 @@ export default function Game() {
         console.error("No saved game state found for player:", playerId);
         console.log("Available sessionStorage keys:", Object.keys(sessionStorage));
         toast({ 
-          title: "Error", 
-          description: "Game not found. Please start a new game.", 
+          title: t("error.generic"), 
+          description: t("game.errorNotFound"), 
           variant: "destructive" 
         });
         setIsLoadingOffline(false);
@@ -232,8 +234,8 @@ export default function Game() {
         const declarer = gameState.players.find(p => p.id === gameState.finalRoundDeclarerId);
         if (declarer) {
           toast({
-            title: "🔥 CUNOKU Declarado!",
-            description: `${declarer.name} declarou fim de jogo! Rodada final iniciada.`,
+            title: t("game.cunokuDeclared"),
+            description: t("game.cunokuDeclaredDesc").replace("{player}", declarer.name),
             duration: 5000,
           });
         }
@@ -271,14 +273,14 @@ export default function Game() {
 
   // Early returns APÓS todos os hooks
   if (!playerId || (!isOffline && !roomCode)) {
-    return <div className="h-screen flex items-center justify-center">Invalid game URL</div>;
+    return <div className="h-screen flex items-center justify-center">{t("game.invalidUrl")}</div>;
   }
 
   if (isOffline && (isLoadingOffline || !offlineGameStateFromHook)) {
     return (
       <div className="min-h-screen bg-indigo-950 flex flex-col items-center justify-center text-white">
-        <div className="animate-pulse text-2xl font-display mb-4">Loading Game...</div>
-        <div className="text-white/50">Setting up offline match</div>
+        <div className="animate-pulse text-2xl font-display mb-4">{t("game.loading")}</div>
+        <div className="text-white/50">{t("game.settingUp")}</div>
       </div>
     );
   }
@@ -286,7 +288,7 @@ export default function Game() {
   // Helpers
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomCode);
-    toast({ title: "Copied!", description: "Room code copied to clipboard." });
+    toast({ title: t("game.copied"), description: t("game.copiedDesc") });
   };
 
   const handleCardClick = (cardIndex: number, isMyHand: boolean) => {
@@ -376,13 +378,13 @@ export default function Game() {
     switch (rank) {
       case "5":
       case "6":
-        return "Ver carta de um oponente";
+        return t("game.abilityPeekOpponent");
       case "7":
       case "8":
-        return "Ver uma de suas cartas";
+        return t("game.abilityPeekOwn");
       case "9":
       case "10":
-        return "Trocar cartas entre 2 jogadores";
+        return t("game.abilitySwap");
       default:
         return "";
     }
@@ -412,8 +414,8 @@ export default function Game() {
     if (rank === "7" || rank === "8") {
       if (selectedHandIndex === null) {
         toast({ 
-          title: "Selecione uma carta", 
-          description: "Selecione uma carta da sua mão para ver",
+          title: t("game.selectCard"), 
+          description: t("game.selectCardDesc"),
           variant: "destructive" 
         });
         return;
@@ -458,8 +460,8 @@ export default function Game() {
     if (rank === "5" || rank === "6") {
       if (!selectedTargetPlayer || selectedTargetCard === null) {
         toast({ 
-          title: "Selecione alvo", 
-          description: "Selecione um jogador e uma carta",
+          title: t("game.selectTarget"), 
+          description: t("game.selectTargetDesc"),
           variant: "destructive" 
         });
         return;
@@ -822,7 +824,7 @@ export default function Game() {
             onClick={() => setLocation("/")}
           >
             <ArrowLeft className={cn("w-4 h-4", isMobile ? "mr-1" : "mr-2")} /> 
-            {isMobile ? "" : "Exit"}
+            {isMobile ? "" : t("game.exit")}
           </Button>
           <div className="[&_button]:bg-black/20 [&_button]:text-white [&_button]:border-white/20 [&_button]:backdrop-blur-sm [&_button]:hover:bg-black/30">
             <VolumeControl />
@@ -833,7 +835,7 @@ export default function Game() {
           "bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center pointer-events-auto cursor-pointer",
           isMobile ? "px-3 py-1.5" : "px-6 py-2"
         )} onClick={handleCopyCode}>
-          <div className={cn("text-white/60 font-mono", isMobile ? "text-[10px]" : "text-xs")}>ROOM CODE</div>
+          <div className={cn("text-white/60 font-mono", isMobile ? "text-[10px]" : "text-xs")}>{t("game.roomCode")}</div>
           <div className={cn(
             "font-bold tracking-widest font-mono flex items-center gap-2",
             isMobile ? "text-sm" : "text-xl"
@@ -858,15 +860,15 @@ export default function Game() {
               isMobile ? "px-3 py-2 gap-2 flex-col" : "px-8 py-3 gap-4"
             )}
           >
-            <span className={cn("text-yellow-900 font-bold", isMobile ? "text-xs" : "text-lg")}>YOUR TURN</span>
+            <span className={cn("text-yellow-900 font-bold", isMobile ? "text-xs" : "text-lg")}>{t("game.yourTurn")}</span>
             {phase === 'draw' && (
               <span className={cn("text-yellow-100 text-center", isMobile ? "text-[10px]" : "text-sm")}>
-                {isMobile ? "Draw from Deck/Discard" : "Draw from Deck or Discard"}
+                {isMobile ? t("game.drawFromDeckShort") : t("game.drawFromDeck")}
               </span>
             )}
             {phase === 'action' && (
               <span className={cn("text-yellow-100 text-center", isMobile ? "text-[10px]" : "text-sm")}>
-                {isMobile ? "Replace card or Discard" : "Select a card to replace or Discard drawn"}
+                {isMobile ? t("game.replaceOrDiscardShort") : t("game.replaceOrDiscard")}
               </span>
             )}
           </motion.div>
@@ -889,15 +891,15 @@ export default function Game() {
           >
             <div className="text-center">
               <div className={cn("font-bold text-yellow-400 mb-1", isMobile ? "text-sm" : "text-lg")}>
-                Round {gameState.round}{gameState.round < 5 ? '/5' : ''}
+                {t("game.round")} {gameState.round}{gameState.round < 5 ? '/5' : ''}
               </div>
               {gameState.round < 5 ? (
                 <div className={cn("text-white/80", isMobile ? "text-[10px]" : "text-xs")}>
-                  {isMobile ? "Cunoku after R5" : "Cunoku available after round 5"}
+                  {isMobile ? t("game.cunokuAfterRound5Short") : t("game.cunokuAfterRound5")}
                 </div>
               ) : (
                 <div className={cn("text-white/80", isMobile ? "text-[10px]" : "text-xs")}>
-                  Turn: {gameState.players[gameState.currentPlayerIndex]?.name || 'Unknown'}
+                  {t("game.turn")}: {gameState.players[gameState.currentPlayerIndex]?.name || 'Unknown'}
                 </div>
               )}
             </div>
@@ -918,7 +920,7 @@ export default function Game() {
               <div className="text-2xl">⚡</div>
               <div className="flex-1">
                 <div className="text-yellow-900 font-bold text-sm mb-1">
-                  Habilidade da Carta
+                  {t("game.abilityCard")}
                 </div>
                 <div className="text-yellow-950 font-semibold text-base leading-tight">
                   {getAbilityDescription(gameState.drawnCard!.rank)}
@@ -927,7 +929,7 @@ export default function Game() {
             </div>
             <div className="mt-3 pt-3 border-t border-yellow-400/30">
               <div className="text-yellow-900 text-xs font-medium">
-                Clique no botão "Use Ability" para ativar
+                {t("game.abilityClickToUse")}
               </div>
             </div>
           </motion.div>
@@ -947,16 +949,16 @@ export default function Game() {
               <div className="text-2xl">✨</div>
               <div className="flex-1">
                 <div className="text-green-100 font-bold text-sm mb-1">
-                  Dica de Jogada
+                  {t("game.hintTitle")}
                 </div>
                 <div className="text-white font-semibold text-base leading-tight">
-                  Clique em uma carta da sua mão para substituir pela carta puxada
+                  {t("game.hintReplace")}
                 </div>
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-green-400/30">
               <div className="text-green-200 text-xs">
-                As cartas da sua mão estão destacadas em verde
+                {t("game.hintHighlighted")}
               </div>
             </div>
           </motion.div>
@@ -1009,13 +1011,13 @@ export default function Game() {
                       isMobile ? "text-xs" : "",
                       isMyTurn && phase === 'draw' ? "text-white text-lg" : "text-white/80"
                     )}>
-                      DECK
+                      {t("game.deck")}
                     </span>
                   </div>
                   {isMyTurn && phase === 'draw' && !isMobile && (
                     <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-center">
                       <div className="text-xs text-yellow-400 font-bold animate-pulse">
-                        Click to Draw
+                        {t("game.clickToDraw")}
                       </div>
                     </div>
                   )}
@@ -1041,7 +1043,7 @@ export default function Game() {
                 >
                    {!isMobile && (
                      <div className="absolute -top-12 left-0 right-0 text-center font-bold text-yellow-400 drop-shadow-md whitespace-nowrap text-sm">
-                       DRAWN CARD
+                       {t("game.drawnCard")}
                      </div>
                    )}
                    <PlayingCard 
@@ -1068,7 +1070,7 @@ export default function Game() {
                                isMobile && "text-xs px-2 py-1"
                              )}
                            >
-                             {isMobile ? "Ability" : "Use Ability"}
+                             {isMobile ? t("game.ability") : t("game.useAbility")}
                            </Button>
                          )}
                          <Button 
@@ -1077,7 +1079,7 @@ export default function Game() {
                            onClick={() => sendAction({ type: 'discard_drawn' })}
                            className={isMobile ? "text-xs px-2 py-1" : ""}
                          >
-                           Discard
+                           {t("game.discard")}
                          </Button>
                        </div>
                        {gameState.drawnFromDiscard && (
@@ -1085,7 +1087,7 @@ export default function Game() {
                            "text-orange-400 text-center",
                            isMobile ? "text-[10px] max-w-[150px]" : "text-xs max-w-[200px]"
                          )}>
-                           {isMobile ? "Carta do descarte - sem habilidade" : "Carta da pilha de descarte - não pode usar habilidade"}
+                           {isMobile ? t("game.fromDiscardNoAbilityShort") : t("game.fromDiscardNoAbility")}
                          </div>
                        )}
                      </div>
@@ -1104,7 +1106,7 @@ export default function Game() {
                   />
                   {!isMobile && (
                     <div className="absolute -bottom-8 w-full text-center text-xs font-bold text-white/50 uppercase tracking-widest">
-                      Discard Pile
+                      {t("game.discardPile")}
                     </div>
                   )}
                 </div>
@@ -1170,14 +1172,14 @@ export default function Game() {
                          <div className={cn(
                            "text-center mt-1 font-bold text-yellow-400 uppercase tracking-wider",
                            isMobile ? "text-[10px]" : "text-xs mt-2"
-                         )}>Known</div>
+                         )}>{t("game.known")}</div>
                       )}
                       {canMatchThisCard && (
                          <div className={cn(
                            "text-center mt-1 font-bold text-orange-400 uppercase tracking-wider animate-pulse",
                            isMobile ? "text-[10px]" : "text-xs"
                          )}>
-                           Match!
+                           {t("game.match")}
                          </div>
                       )}
                       
@@ -1202,12 +1204,12 @@ export default function Game() {
                           >
                             {isMobile 
                               ? (isSafeDiscard ? "✓" : "⚠") 
-                              : (isSafeDiscard ? "✓ Descartar" : "⚠ Tentar Descartar")
+                              : (isSafeDiscard ? t("game.discardSafe") : t("game.discardRisk"))
                             }
                           </Button>
                           {!isSafeDiscard && !isMobile && (
                             <div className="text-center mt-1 text-xs text-red-400 font-semibold">
-                              Risco de punição!
+                              {t("game.punishmentRisk")}
                             </div>
                           )}
                         </motion.div>
@@ -1231,7 +1233,7 @@ export default function Game() {
                     "text-white font-bold",
                     isMobile ? "text-[10px]" : "text-sm"
                   )}>
-                    {isMobile ? "Pode descartar igual!" : "Você pode descartar uma carta igual!"}
+                    {isMobile ? t("game.canDiscardMatchShort") : t("game.canDiscardMatch")}
                   </span>
                 </motion.div>
               )}
@@ -1257,11 +1259,11 @@ export default function Game() {
                     )}
                     onClick={() => sendAction({ type: 'declare_finish' })}
                   >
-                    {isMobile ? "CUN" : "CUNOKU"}
+                    {isMobile ? t("game.cunokuShort") : t("game.cunoku")}
                   </Button>
                   {!isMobile && (
                     <div className="text-center mt-2 text-xs text-white/60">
-                      Round {gameState.round}
+                      {t("game.round")} {gameState.round}
                     </div>
                   )}
                 </div>
@@ -1282,7 +1284,7 @@ export default function Game() {
               "font-display text-indigo-900",
               isMobile ? "text-lg" : "text-2xl"
             )}>
-              Usar Habilidade
+              {t("game.abilityTitle")}
             </DialogTitle>
             <DialogDescription className={isMobile ? "text-sm" : ""}>
               {gameState?.drawnCard && getAbilityDescription(gameState.drawnCard.rank)}
@@ -1296,7 +1298,7 @@ export default function Game() {
                 <>
                   <div className="space-y-2">
                     <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
-                      Selecione o jogador:
+                      {t("game.selectPlayer")}
                     </label>
                     <div className={cn(
                       "grid gap-2",
@@ -1326,7 +1328,7 @@ export default function Game() {
                   {selectedTargetPlayer && (
                     <div className="space-y-2">
                       <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
-                        Selecione a carta (1-4):
+                        {t("game.selectCardNumber")}
                       </label>
                       <div className={cn("grid gap-2", isMobile ? "grid-cols-4" : "grid-cols-4")}>
                         {[0, 1, 2, 3].map(idx => (
@@ -1349,7 +1351,7 @@ export default function Game() {
               {(gameState.drawnCard.rank === "7" || gameState.drawnCard.rank === "8") && (
                 <div className="space-y-2">
                   <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
-                    Selecione sua carta para ver:
+                    {t("game.selectYourCard")}
                   </label>
                   <div className={cn(
                     "flex gap-2 justify-center",
@@ -1376,7 +1378,7 @@ export default function Game() {
                 <>
                   <div className="space-y-2">
                     <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
-                      Modo de troca:
+                      {t("game.swapMode")}
                     </label>
                     <div className={cn(
                       "flex gap-2",
@@ -1394,7 +1396,7 @@ export default function Game() {
                         }}
                         className={cn("flex-1", isMobile && "text-xs py-2")}
                       >
-                        {isMobile ? "Você e outro" : "Entre você e outro"}
+                        {isMobile ? t("game.swapMeAndOtherShort") : t("game.swapMeAndOther")}
                       </Button>
                       <Button
                         variant={swapMode === "two_others" ? "primary" : "outline"}
@@ -1410,7 +1412,7 @@ export default function Game() {
                         }}
                         className={cn("flex-1", isMobile && "text-xs py-2")}
                       >
-                        {isMobile ? "Dois outros" : "Entre dois outros"}
+                        {isMobile ? t("game.swapTwoOthersShort") : t("game.swapTwoOthers")}
                       </Button>
                     </div>
                   </div>
@@ -1418,7 +1420,7 @@ export default function Game() {
                   {swapMode === "me_and_other" && (
                     <>
                       <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700">Sua carta:</label>
+                        <label className="text-sm font-bold text-gray-700">{t("game.yourCard")}</label>
                         <div className="flex gap-2 justify-center">
                           {me?.hand.map((card, idx) => (
                             <Button
@@ -1434,7 +1436,7 @@ export default function Game() {
                       </div>
                       
                       <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700">Outro jogador:</label>
+                        <label className="text-sm font-bold text-gray-700">{t("game.otherPlayer")}</label>
                         <div className="grid grid-cols-2 gap-2">
                           {gameState.players
                             .filter(p => p.id !== playerId)
@@ -1459,7 +1461,7 @@ export default function Game() {
                       
                       {selectedTargetPlayer && selectedTargetPlayer !== playerId && (
                         <div className="space-y-2">
-                          <label className="text-sm font-bold text-gray-700">Carta do outro jogador (1-4):</label>
+                          <label className="text-sm font-bold text-gray-700">{t("game.otherPlayerCard")}</label>
                           <div className="grid grid-cols-4 gap-2">
                             {[0, 1, 2, 3].map(idx => (
                               <Button
@@ -1482,7 +1484,7 @@ export default function Game() {
                       {swapStep === 1 ? (
                         <>
                           <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-700">Primeiro jogador:</label>
+                            <label className="text-sm font-bold text-gray-700">{t("game.firstPlayer")}</label>
                             <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                               {gameState.players.map(p => (
                                 <Button
@@ -1505,7 +1507,7 @@ export default function Game() {
                           
                           {selectedTargetPlayer && (
                             <div className="space-y-2">
-                              <label className="text-sm font-bold text-gray-700">Carta do primeiro jogador (1-4):</label>
+                              <label className="text-sm font-bold text-gray-700">{t("game.firstPlayerCard")}</label>
                               <div className="grid grid-cols-4 gap-2">
                                 {[0, 1, 2, 3].map(idx => (
                                   <Button
@@ -1534,7 +1536,7 @@ export default function Game() {
                               }}
                               className="w-full"
                             >
-                              Confirmar Primeiro Jogador
+                              {t("game.confirmFirstPlayer")}
                             </Button>
                           )}
                         </>
@@ -1543,13 +1545,15 @@ export default function Game() {
                           {firstPlayerSelection && (
                             <div className="bg-gray-100 p-2 rounded mb-2">
                               <div className="text-xs text-gray-600">
-                                Primeiro jogador: {gameState.players.find(p => p.id === firstPlayerSelection.playerId)?.name} - Carta {firstPlayerSelection.cardIndex + 1}
+                                {t("game.firstPlayerSelected")
+                                  .replace("{name}", gameState.players.find(p => p.id === firstPlayerSelection.playerId)?.name || "")
+                                  .replace("{card}", (firstPlayerSelection.cardIndex + 1).toString())}
                               </div>
                             </div>
                           )}
                           
                           <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-700">Segundo jogador:</label>
+                            <label className="text-sm font-bold text-gray-700">{t("game.secondPlayer")}</label>
                             <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                               {gameState.players
                                 .filter(p => p.id !== firstPlayerSelection?.playerId)
@@ -1574,7 +1578,7 @@ export default function Game() {
                           
                           {selectedTargetPlayer2 && (
                             <div className="space-y-2">
-                              <label className="text-sm font-bold text-gray-700">Carta do segundo jogador (1-4):</label>
+                              <label className="text-sm font-bold text-gray-700">{t("game.secondPlayerCard")}</label>
                               <div className="grid grid-cols-4 gap-2">
                                 {[0, 1, 2, 3].map(idx => (
                                   <Button
@@ -1601,7 +1605,7 @@ export default function Game() {
                               }}
                               className="flex-1"
                             >
-                              Voltar
+                              {t("game.back")}
                             </Button>
                           </div>
                         </>
@@ -1630,7 +1634,7 @@ export default function Game() {
                   }}
                   className={cn("flex-1", isMobile && "text-xs py-2")}
                 >
-                  Cancelar
+                  {t("game.cancel")}
                 </Button>
                 <Button 
                   variant="primary" 
@@ -1647,7 +1651,7 @@ export default function Game() {
                     swapMode === "two_others" && (!firstPlayerSelection || !selectedTargetPlayer2 || selectedTargetCard2 === null))
                   }
                 >
-                  Confirmar
+                  {t("game.confirm")}
                 </Button>
               </div>
             </div>
@@ -1689,13 +1693,13 @@ export default function Game() {
                   "font-bold text-yellow-400 mb-2",
                   isMobile ? "text-lg" : "text-2xl"
                 )}>
-                  Carta Revelada!
+                  {t("game.cardRevealed")}
                 </h3>
                 <p className={cn(
                   "text-white/80",
                   isMobile ? "text-sm" : "text-base"
                 )}>
-                  {revealedOpponentCard.playerName} tem:
+                  {t("game.playerHas").replace("{player}", revealedOpponentCard.playerName)}
                 </p>
               </div>
               
@@ -1716,7 +1720,7 @@ export default function Game() {
                   "text-white/60 font-mono",
                   isMobile ? "text-xs" : "text-sm"
                 )}>
-                  Esta carta ficará visível por 20 segundos
+                  {t("game.visibleFor20s")}
                 </p>
               </div>
             </motion.div>
@@ -1736,10 +1740,10 @@ export default function Game() {
               isMobile ? "text-2xl mb-2" : "text-4xl mb-4"
             )}>
               <Trophy className={cn("text-yellow-500", isMobile ? "w-6 h-6" : "w-10 h-10")} />
-              Game Over
+              {t("game.gameOver")}
             </DialogTitle>
             <DialogDescription className={cn(isMobile ? "text-sm" : "text-lg")}>
-              The winner is <span className="font-bold text-indigo-900">{gameState.players.find(p => p.id === gameState.winnerId)?.name}</span>!
+              {t("game.winnerIs").replace("{player}", gameState.players.find(p => p.id === gameState.winnerId)?.name || "")}
             </DialogDescription>
           </DialogHeader>
           
@@ -1753,13 +1757,13 @@ export default function Game() {
                   <Avatar name={p.name} className="scale-50 w-8 h-8" />
                   <span className="font-bold text-gray-900">{p.name}</span>
                 </div>
-                <span className="font-mono font-bold text-xl">{p.score} pts</span>
+                  <span className="font-mono font-bold text-xl">{p.score} {t("game.points")}</span>
               </div>
             ))}
           </div>
 
           <Button onClick={() => setLocation("/")} className="w-full">
-            Back to Home
+            {t("game.backToHome")}
           </Button>
         </DialogContent>
       </Dialog>
