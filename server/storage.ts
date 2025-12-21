@@ -32,11 +32,19 @@ export class DatabaseStorage implements IStorage {
       return room;
     } catch (err: any) {
       console.error("DatabaseStorage.createRoom - Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+      console.error("DatabaseStorage.createRoom - Error name:", err.name);
       console.error("DatabaseStorage.createRoom - Error message:", err.message);
       console.error("DatabaseStorage.createRoom - Error code:", err.code);
       console.error("DatabaseStorage.createRoom - Error detail:", err.detail);
       console.error("DatabaseStorage.createRoom - Error constraint:", err.constraint);
+      console.error("DatabaseStorage.createRoom - Error stack:", err.stack);
       console.error("DatabaseStorage.createRoom - Insert data:", JSON.stringify(insertRoom));
+      
+      // Check if error is from Neon when it shouldn't be
+      if (err.stack?.includes('@neondatabase/serverless') && !process.env.DATABASE_URL?.includes('neon.tech')) {
+        console.error("⚠️ ERROR: Using Neon driver but DATABASE_URL is not from Neon!");
+        console.error("DATABASE_URL preview:", process.env.DATABASE_URL ? `${process.env.DATABASE_URL.substring(0, 50)}...` : 'none');
+      }
       
       // Try to extract more information from the error
       let errorMessage = "Unknown error";
@@ -46,6 +54,8 @@ export class DatabaseStorage implements IStorage {
         errorMessage = `Database error code: ${err.code}`;
       } else if (err.detail) {
         errorMessage = err.detail;
+      } else if (err.name) {
+        errorMessage = `${err.name}: ${errorMessage}`;
       }
       
       // Add constraint information if available
