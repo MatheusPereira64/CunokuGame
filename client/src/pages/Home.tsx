@@ -132,7 +132,7 @@ export default function Home() {
             <Languages className="mr-2 h-4 w-4" />
             <SelectValue />
           </SelectTrigger>
-          <SelectContent position="popper" className="z-[100]" sideOffset={5}>
+          <SelectContent position="popper" className="z-[100] bg-white" sideOffset={5}>
             <SelectItem value="pt">{t("lang.pt")}</SelectItem>
             <SelectItem value="es">{t("lang.es")}</SelectItem>
             <SelectItem value="en">{t("lang.en")}</SelectItem>
@@ -226,7 +226,7 @@ export default function Home() {
                     </SelectTrigger>
                     <SelectContent 
                       position="popper"
-                      className="z-[100] auto-height"
+                      className="z-[100] auto-height bg-white"
                       sideOffset={5}
                     >
                       <SelectItem value="2">2 {t("create.players")}</SelectItem>
@@ -280,7 +280,7 @@ export default function Home() {
                         </SelectTrigger>
                         <SelectContent 
                           position="popper"
-                          className="z-[100] auto-height"
+                          className="z-[100] auto-height bg-white"
                           sideOffset={5}
                         >
                           {Array.from({ length: Math.min(maxPlayers - 1, 5) }, (_, i) => i + 1).map(num => (
@@ -318,7 +318,7 @@ export default function Home() {
                         </SelectTrigger>
                         <SelectContent 
                           position="popper"
-                          className="z-[100] auto-height"
+                          className="z-[100] auto-height bg-white"
                           sideOffset={5}
                         >
                           <SelectItem value="easy">{t("create.difficulty.easy")}</SelectItem>
@@ -382,7 +382,7 @@ export default function Home() {
                     </SelectTrigger>
                     <SelectContent 
                       position="popper"
-                      className="z-[100] auto-height"
+                      className="z-[100] auto-height bg-white"
                       sideOffset={5}
                     >
                       <SelectItem value="1">1 {t("bots.bot")}</SelectItem>
@@ -412,7 +412,7 @@ export default function Home() {
                     </SelectTrigger>
                     <SelectContent 
                       position="popper"
-                      className="z-[100] auto-height"
+                      className="z-[100] auto-height bg-white"
                       sideOffset={5}
                     >
                       <SelectItem value="easy">{t("create.difficulty.easy")}</SelectItem>
