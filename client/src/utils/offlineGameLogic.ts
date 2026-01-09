@@ -19,6 +19,15 @@ export function processOfflineAction(
   switch (action.type) {
     case "draw_deck":
       if (newState.deck.length === 0) {
+        // Se não há mais cartas na pilha de descarte para reciclar, termina o jogo
+        if (newState.discardPile.length <= 1) {
+          // Não há cartas suficientes para continuar - termina o jogo
+          newState.turnPhase = "finished";
+          calculateFinalScores(newState);
+          newState.logs.push("Baralho acabou! Jogo finalizado.");
+          return newState;
+        }
+        
         // Recicla pilha de descarte se baralho vazio
         const topDiscard = newState.discardPile.pop();
         newState.deck = [...newState.discardPile];
@@ -28,12 +37,18 @@ export function processOfflineAction(
           const j = Math.floor(Math.random() * (i + 1));
           [newState.deck[i], newState.deck[j]] = [newState.deck[j], newState.deck[i]];
         }
+        newState.logs.push("Baralho reciclado e embaralhado");
       }
       const drawnCard = newState.deck.pop();
       if (drawnCard) {
         newState.drawnCard = drawnCard;
         newState.drawnFromDiscard = false; // Puxou do deck, pode usar habilidades
         newState.turnPhase = "action";
+      } else {
+        // Se não conseguiu puxar carta mesmo após reciclar, termina o jogo
+        newState.turnPhase = "finished";
+        calculateFinalScores(newState);
+        newState.logs.push("Baralho acabou! Jogo finalizado.");
       }
       break;
       
@@ -258,8 +273,18 @@ export function processOfflineAction(
             }
           } else {
             // Punição normal: compra 2 cartas
+            let cardsDrawn = 0;
             for (let i = 0; i < 2; i++) {
               if (newState.deck.length === 0) {
+                // Se não há mais cartas na pilha de descarte para reciclar, termina o jogo
+                if (newState.discardPile.length <= 1) {
+                  // Não há cartas suficientes para continuar - termina o jogo
+                  newState.turnPhase = "finished";
+                  calculateFinalScores(newState);
+                  newState.logs.push("Baralho acabou durante punição! Jogo finalizado.");
+                  return newState;
+                }
+                
                 const topDiscardCard = newState.discardPile.pop();
                 newState.deck = [...newState.discardPile];
                 newState.discardPile = topDiscardCard ? [topDiscardCard] : [];
@@ -271,9 +296,16 @@ export function processOfflineAction(
               const penaltyCard = newState.deck.pop();
               if (penaltyCard) {
                 player.hand.push(penaltyCard);
+                cardsDrawn++;
+              } else {
+                // Se não conseguiu puxar carta, termina o jogo
+                newState.turnPhase = "finished";
+                calculateFinalScores(newState);
+                newState.logs.push("Baralho acabou durante punição! Jogo finalizado.");
+                return newState;
               }
             }
-            newState.logs.push(`${player.name} tried to discard wrong card! Draws 2 cards as penalty.`);
+            newState.logs.push(`${player.name} tried to discard wrong card! Draws ${cardsDrawn} card${cardsDrawn > 1 ? 's' : ''} as penalty.`);
             // NÃO descarta a carta, NÃO avança turno - jogador mantém a carta e recebe punição
           }
         }

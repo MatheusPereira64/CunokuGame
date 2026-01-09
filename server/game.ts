@@ -3,7 +3,10 @@ import { randomUUID } from "crypto";
 
 export class GameLogic {
   static createInitialState(players: Player[]): GameState {
-    const deck = this.createDeck();
+    // Cria baralho baseado no número de jogadores
+    // Para cada jogador adicional além de 2, adiciona mais um baralho completo
+    const numberOfDecks = Math.max(1, Math.ceil(players.length / 2));
+    const deck = this.createDeck(numberOfDecks);
     
     // Deal 4 cards to each player
     players.forEach(p => {
@@ -29,29 +32,33 @@ export class GameLogic {
       drawnFromDiscard: false,
       round: 1,
       winnerId: null,
-      logs: ["Game started!"],
+      logs: [`Game started! Deck size: ${deck.length + 1} cards (${numberOfDecks} deck${numberOfDecks > 1 ? 's' : ''})`],
       finalRoundDeclarerId: null,
       isFinalRound: false
     };
   }
 
-  static createDeck(): Card[] {
+  static createDeck(numberOfDecks: number = 1): Card[] {
     const deck: Card[] = [];
-    SUITS.forEach(suit => {
-      RANKS.forEach(rank => {
-        if (rank === "Joker") return; // Handle jokers separately if needed (usually 2)
-        deck.push({
-          id: randomUUID(),
-          suit,
-          rank,
-          value: this.getCardValue(rank),
-          isFaceUp: false
+    
+    // Cria múltiplos baralhos conforme necessário
+    for (let deckNum = 0; deckNum < numberOfDecks; deckNum++) {
+      SUITS.forEach(suit => {
+        RANKS.forEach(rank => {
+          if (rank === "Joker") return; // Handle jokers separately
+          deck.push({
+            id: randomUUID(),
+            suit,
+            rank,
+            value: this.getCardValue(rank),
+            isFaceUp: false
+          });
         });
       });
-    });
-    // Add 2 Jokers
-    deck.push({ id: randomUUID(), suit: "spades", rank: "Joker", value: -1, isFaceUp: false });
-    deck.push({ id: randomUUID(), suit: "hearts", rank: "Joker", value: -1, isFaceUp: false });
+      // Add 2 Jokers per deck
+      deck.push({ id: randomUUID(), suit: "spades", rank: "Joker", value: -1, isFaceUp: false });
+      deck.push({ id: randomUUID(), suit: "hearts", rank: "Joker", value: -1, isFaceUp: false });
+    }
 
     // Shuffle
     for (let i = deck.length - 1; i > 0; i--) {
@@ -213,6 +220,15 @@ export class GameLogic {
     switch (action.type) {
       case "draw_deck":
         if (newState.deck.length === 0) {
+          // Se não há mais cartas na pilha de descarte para reciclar, termina o jogo
+          if (newState.discardPile.length <= 1) {
+            // Não há cartas suficientes para continuar - termina o jogo
+            newState.turnPhase = "finished";
+            this.calculateFinalScores(newState);
+            newState.logs.push("Baralho acabou! Jogo finalizado.");
+            return { newState };
+          }
+          
           // Recicla pilha de descarte se baralho vazio
           const topDiscard = newState.discardPile.pop();
           newState.deck = [...newState.discardPile];
@@ -230,6 +246,11 @@ export class GameLogic {
           newState.drawnFromDiscard = false; // Puxou do deck, pode usar habilidades
           newState.turnPhase = "action";
           newState.logs.push(`${newState.players[playerIndex].name} comprou uma carta do baralho`);
+        } else {
+          // Se não conseguiu puxar carta mesmo após reciclar, termina o jogo
+          newState.turnPhase = "finished";
+          this.calculateFinalScores(newState);
+          newState.logs.push("Baralho acabou! Jogo finalizado.");
         }
         break;
 
@@ -503,8 +524,18 @@ export class GameLogic {
               }
             } else {
               // Punição normal: compra 2 cartas
+              let cardsDrawn = 0;
               for (let i = 0; i < 2; i++) {
                 if (newState.deck.length === 0) {
+                  // Se não há mais cartas na pilha de descarte para reciclar, termina o jogo
+                  if (newState.discardPile.length <= 1) {
+                    // Não há cartas suficientes para continuar - termina o jogo
+                    newState.turnPhase = "finished";
+                    this.calculateFinalScores(newState);
+                    newState.logs.push("Baralho acabou durante punição! Jogo finalizado.");
+                    return { newState };
+                  }
+                  
                   // Recicla pilha de descarte se baralho vazio
                   const topDiscardCard = newState.discardPile.pop();
                   newState.deck = [...newState.discardPile];
@@ -518,9 +549,16 @@ export class GameLogic {
                 const penaltyCard = newState.deck.pop();
                 if (penaltyCard) {
                   player.hand.push(penaltyCard);
+                  cardsDrawn++;
+                } else {
+                  // Se não conseguiu puxar carta, termina o jogo
+                  newState.turnPhase = "finished";
+                  this.calculateFinalScores(newState);
+                  newState.logs.push("Baralho acabou durante punição! Jogo finalizado.");
+                  return { newState };
                 }
               }
-              newState.logs.push(`${newState.players[playerIndex].name} tentou descartar carta errada! Compra 2 cartas como punição.`);
+              newState.logs.push(`${newState.players[playerIndex].name} tentou descartar carta errada! Compra ${cardsDrawn} carta${cardsDrawn > 1 ? 's' : ''} como punição.`);
               // NÃO descarta a carta, NÃO avança turno - jogador mantém a carta e recebe punição
             }
           }

@@ -12,29 +12,32 @@ function randomUUID(): string {
 }
 
 /**
- * Cria um baralho completo
+ * Cria um baralho completo (ou múltiplos baralhos)
  */
-function createDeck(): Card[] {
+function createDeck(numberOfDecks: number = 1): Card[] {
   const SUITS = ["hearts", "diamonds", "clubs", "spades"] as const;
   const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"] as const;
   
   const deck: Card[] = [];
   
-  SUITS.forEach(suit => {
-    RANKS.forEach(rank => {
-      deck.push({
-        id: randomUUID(),
-        suit,
-        rank,
-        value: getCardValue(rank),
-        isFaceUp: false
+  // Cria múltiplos baralhos conforme necessário
+  for (let deckNum = 0; deckNum < numberOfDecks; deckNum++) {
+    SUITS.forEach(suit => {
+      RANKS.forEach(rank => {
+        deck.push({
+          id: randomUUID(),
+          suit,
+          rank,
+          value: getCardValue(rank),
+          isFaceUp: false
+        });
       });
     });
-  });
-  
-  // Add 2 Jokers
-  deck.push({ id: randomUUID(), suit: "spades", rank: "Joker", value: -1, isFaceUp: false });
-  deck.push({ id: randomUUID(), suit: "hearts", rank: "Joker", value: -1, isFaceUp: false });
+    
+    // Add 2 Jokers per deck
+    deck.push({ id: randomUUID(), suit: "spades", rank: "Joker", value: -1, isFaceUp: false });
+    deck.push({ id: randomUUID(), suit: "hearts", rank: "Joker", value: -1, isFaceUp: false });
+  }
   
   // Shuffle
   for (let i = deck.length - 1; i > 0; i--) {
@@ -100,8 +103,10 @@ export function createOfflineGame(
   // Combina jogadores (humano primeiro)
   const players = [humanPlayer, ...botPlayers];
   
-  // Cria baralho e distribui cartas
-  const deck = createDeck();
+  // Cria baralho baseado no número de jogadores
+  // Para cada jogador adicional além de 2, adiciona mais um baralho completo
+  const numberOfDecks = Math.max(1, Math.ceil(players.length / 2));
+  const deck = createDeck(numberOfDecks);
   
   players.forEach(player => {
     player.hand = [];
@@ -126,7 +131,7 @@ export function createOfflineGame(
     drawnFromDiscard: false,
     round: 1,
     winnerId: null,
-    logs: [`Game started! ${playerName} vs ${botCount} bot(s)`],
+    logs: [`Game started! ${playerName} vs ${botCount} bot(s). Deck size: ${deck.length + 1} cards (${numberOfDecks} deck${numberOfDecks > 1 ? 's' : ''})`],
     finalRoundDeclarerId: null,
     isFinalRound: false
   };
