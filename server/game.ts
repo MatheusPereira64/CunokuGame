@@ -163,31 +163,31 @@ export class GameLogic {
         }
         
         const sourceCardIdx = cardIdx !== undefined ? cardIdx : Math.floor(Math.random() * sourcePlayer.hand.length);
-        const targetCardIdx = targetCardIdx !== undefined ? targetCardIdx : Math.floor(Math.random() * targetPlayer.hand.length);
+        const finalTargetCardIdx = targetCardIdx !== undefined ? targetCardIdx : Math.floor(Math.random() * targetPlayer.hand.length);
         
         if (sourceCardIdx < 0 || sourceCardIdx >= sourcePlayer.hand.length ||
-            targetCardIdx < 0 || targetCardIdx >= targetPlayer.hand.length) {
+            finalTargetCardIdx < 0 || finalTargetCardIdx >= targetPlayer.hand.length) {
           return { success: false, message: "Invalid card indices for swap" };
         }
 
         const sourceCard = sourcePlayer.hand[sourceCardIdx];
-        const targetCard = targetPlayer.hand[targetCardIdx];
+        const targetCard = targetPlayer.hand[finalTargetCardIdx];
         
         sourcePlayer.hand[sourceCardIdx] = targetCard;
-        targetPlayer.hand[targetCardIdx] = sourceCard;
+        targetPlayer.hand[finalTargetCardIdx] = sourceCard;
         
         delete sourcePlayer.knownCards[sourceCardIdx.toString()];
-        delete targetPlayer.knownCards[targetCardIdx.toString()];
+        delete targetPlayer.knownCards[finalTargetCardIdx.toString()];
         
         // Retorna mensagem detalhada para log
         return { 
           success: true, 
-          message: `${sourcePlayer.name} swapped card ${sourceCardIdx + 1} with card ${targetCardIdx + 1} of ${targetPlayer.name}`,
+          message: `${sourcePlayer.name} swapped card ${sourceCardIdx + 1} with card ${finalTargetCardIdx + 1} of ${targetPlayer.name}`,
           swapInfo: {
             player1Name: sourcePlayer.name,
             player1CardIndex: sourceCardIdx + 1,
             player2Name: targetPlayer.name,
-            player2CardIndex: targetCardIdx + 1
+            player2CardIndex: finalTargetCardIdx + 1
           }
         };
       }
