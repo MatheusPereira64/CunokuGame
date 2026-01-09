@@ -7,6 +7,8 @@ import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { GameState, Card, Player } from "@shared/schema";
 import { motion, AnimatePresence } from "framer-motion";
+import { CardSwapAnimation } from "@/components/CardSwapAnimation";
+import { CardFlipAnimation } from "@/components/CardFlipAnimation";
 import { ArrowLeft, Copy, Eye, RefreshCw, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -103,10 +105,26 @@ export default function Game() {
   );
 
   // Hook para jogo online
-  const { gameState: onlineGameState, connected, sendAction: sendOnlineAction, socketRef, revealedCard: onlineRevealedCard, setRevealedCard: setOnlineRevealedCard } = useGameSocket(
+  const { gameState: onlineGameState, connected, sendAction: sendOnlineAction, socketRef, revealedCard: onlineRevealedCard, setRevealedCard: setOnlineRevealedCard, swapInfo: onlineSwapInfo, setSwapInfo: setOnlineSwapInfo } = useGameSocket(
     isOffline ? "" : roomCode, 
     isOffline ? "" : playerId
   );
+  
+  // Estado para animação de troca de cartas
+  const [activeSwapAnimation, setActiveSwapAnimation] = useState<{
+    swapInfo: { player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number };
+    player1Card?: Card;
+    player2Card?: Card;
+    player1Position: { x: number; y: number };
+    player2Position: { x: number; y: number };
+  } | null>(null);
+  
+  // Refs para calcular posições das cartas
+  const cardRefs = useRef<Map<string, { x: number; y: number; card?: Card }>>(new Map());
+  // Ref para rastrear estado anterior de revelação das cartas (para animação de flip)
+  const previousRevealedState = useRef<Map<string, boolean>>(new Map());
+  // Ref para guardar estado anterior do jogo (para pegar cartas antes da troca)
+  const previousGameState = useRef<GameState | null>(null);
 
   const [selectedHandIndex, setSelectedHandIndex] = useState<number | null>(null);
   const [abilityModalOpen, setAbilityModalOpen] = useState(false);
@@ -125,10 +143,107 @@ export default function Game() {
   const [revealedOpponentCardsInHand, setRevealedOpponentCardsInHand] = useState<string[]>([]);
   // Usa ref para armazenar timers sem causar re-renders
   const revealedCardTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  // Estado para controlar se o modal de fim de jogo está aberto
+  const [gameOverModalOpen, setGameOverModalOpen] = useState(false);
   
   // Usa estado offline se estiver em modo offline, senão usa online
   const gameState = isOffline ? offlineGameStateFromHook : onlineGameState;
   const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
+  
+  // Guarda estado anterior para pegar cartas antes da troca
+  useEffect(() => {
+    if (gameState) {
+      previousGameState.current = JSON.parse(JSON.stringify(gameState));
+    }
+  }, [gameState]);
+
+  // Detecta quando uma troca acontece e prepara animação
+  useEffect(() => {
+    if (!isOffline && onlineSwapInfo && gameState && previousGameState.current) {
+      console.log("[Game] Troca detectada:", onlineSwapInfo);
+      
+      const prevState = previousGameState.current;
+      const player1Prev = prevState.players.find(p => p.id === onlineSwapInfo.player1Id);
+      const player2Prev = prevState.players.find(p => p.id === onlineSwapInfo.player2Id);
+      
+      const player1 = gameState.players.find(p => p.id === onlineSwapInfo.player1Id);
+      const player2 = gameState.players.find(p => p.id === onlineSwapInfo.player2Id);
+      
+      if (player1 && player2 && player1Prev && player2Prev) {
+        // Ajusta índices (swapInfo usa índices baseados em 1, mas arrays são baseados em 0)
+        const card1Index = onlineSwapInfo.player1CardIndex - 1;
+        const card2Index = onlineSwapInfo.player2CardIndex - 1;
+        
+        // Pega as cartas do estado ANTERIOR (antes da troca)
+        const player1Card = player1Prev.hand[card1Index];
+        const player2Card = player2Prev.hand[card2Index];
+        
+        console.log("[Game] Cartas encontradas (do estado anterior):", {
+          player1Card: player1Card?.rank,
+          player2Card: player2Card?.rank,
+          card1Index,
+          card2Index
+        });
+        
+        // Calcula posições das cartas usando os índices ORIGINAIS (antes da troca)
+        const card1Key = `${onlineSwapInfo.player1Id}_${card1Index}`;
+        const card2Key = `${onlineSwapInfo.player2Id}_${card2Index}`;
+        
+        // Aguarda múltiplos frames para garantir que os elementos estão renderizados
+        let attempts = 0;
+        const maxAttempts = 15;
+        
+        const tryGetPositions = () => {
+          attempts++;
+          const card1Pos = cardRefs.current.get(card1Key);
+          const card2Pos = cardRefs.current.get(card2Key);
+          
+          console.log(`[Game] Tentativa ${attempts} de obter posições:`, {
+            card1Key,
+            card2Key,
+            card1Pos: card1Pos ? { x: card1Pos.x, y: card1Pos.y } : null,
+            card2Pos: card2Pos ? { x: card2Pos.x, y: card2Pos.y } : null,
+            totalRefs: cardRefs.current.size
+          });
+          
+          if (card1Pos && card2Pos && player1Card && player2Card) {
+            console.log("[Game] ✅ Posições encontradas, iniciando animação:", {
+              pos1: card1Pos,
+              pos2: card2Pos,
+              card1: player1Card.rank,
+              card2: player2Card.rank
+            });
+            
+            setActiveSwapAnimation({
+              swapInfo: onlineSwapInfo,
+              player1Card: player1Card,
+              player2Card: player2Card,
+              player1Position: { x: card1Pos.x, y: card1Pos.y },
+              player2Position: { x: card2Pos.x, y: card2Pos.y }
+            });
+          } else if (attempts < maxAttempts) {
+            // Tenta novamente após um pequeno delay
+            setTimeout(tryGetPositions, 100);
+          } else {
+            console.warn("[Game] ❌ Não foi possível obter posições das cartas após", maxAttempts, "tentativas");
+            console.warn("[Game] Refs disponíveis:", Array.from(cardRefs.current.keys()));
+          }
+        };
+        
+        // Inicia tentativas após um pequeno delay inicial para garantir renderização
+        setTimeout(tryGetPositions, 200);
+      }
+      
+      // Limpa swapInfo após um tempo maior para dar tempo da animação
+      setTimeout(() => {
+        setOnlineSwapInfo(null);
+        // Limpa a animação ativa após um pequeno delay para garantir que as cartas voltem a aparecer
+        setTimeout(() => {
+          setActiveSwapAnimation(null);
+        }, 500);
+      }, 5000);
+    }
+  }, [onlineSwapInfo, gameState, isOffline, setOnlineSwapInfo]);
 
   // Cleanup timers ao desmontar
   useEffect(() => {
@@ -263,6 +378,9 @@ export default function Game() {
   // Detecta quando o jogo termina e toca som de vitória/derrota
   useEffect(() => {
     if (gameState?.winnerId && me) {
+      // Abre o modal de fim de jogo quando há um vencedor
+      setGameOverModalOpen(true);
+      
       if (gameState.winnerId === playerId) {
         audioManager.playGameWon();
       } else {
@@ -630,17 +748,94 @@ export default function Game() {
                                    isKnownCard || 
                                    (!isMe && isTemporarilyRevealed);
             
+            // Calcula posição da carta para animação de troca
+            const cardPositionKey = `${player.id}_${i}`;
+            const cardRef = (el: HTMLDivElement | null) => {
+              if (el) {
+                const rect = el.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                cardRefs.current.set(cardPositionKey, {
+                  x: centerX,
+                  y: centerY,
+                  card: card
+                });
+              } else {
+                cardRefs.current.delete(cardPositionKey);
+              }
+            };
+            
+            // Verifica se esta carta está sendo animada em uma troca
+            // Durante a animação, esconde temporariamente as cartas que estão sendo trocadas
+            const isSwapping = activeSwapAnimation && (
+              (activeSwapAnimation.swapInfo.player1Id === player.id && activeSwapAnimation.swapInfo.player1CardIndex - 1 === i) ||
+              (activeSwapAnimation.swapInfo.player2Id === player.id && activeSwapAnimation.swapInfo.player2CardIndex - 1 === i)
+            );
+            
+            // Verifica se a carta acabou de ser revelada (para animação de flip)
+            const cardStateKey = `${player.id}_${card.id}`;
+            const wasPreviouslyHidden = previousRevealedState.current.get(cardStateKey) === false;
+            const isNowRevealed = shouldShowCard;
+            const wasJustRevealed = wasPreviouslyHidden && isNowRevealed;
+            
+            // Atualiza estado anterior
+            previousRevealedState.current.set(cardStateKey, isNowRevealed);
+            
             return (
-              <div key={i} className="relative">
-                <PlayingCard 
-                  card={card} 
-                  hidden={!shouldShowCard}
-                  className={cn(
-                    isMobile ? "w-8 h-12" : "w-12 h-16 md:w-16 md:h-24",
-                    isTemporarilyRevealed && !isMe && "ring-2 ring-yellow-400 ring-offset-2"
-                  )}
-                  animate={false}
-                />
+              <div 
+                key={i} 
+                className="relative"
+                ref={cardRef}
+              >
+                {shouldShowCard && !isSwapping ? (
+                  <motion.div
+                    initial={wasJustRevealed ? { rotateY: 180 } : false}
+                    animate={{ rotateY: 0 }}
+                    transition={{ duration: 0.6, ease: "easeInOut" }}
+                    style={{ transformStyle: "preserve-3d" }}
+                  >
+                    <PlayingCard 
+                      card={card} 
+                      hidden={false}
+                      className={cn(
+                        isMobile ? "w-8 h-12" : "w-12 h-16 md:w-16 md:h-24",
+                        isTemporarilyRevealed && !isMe && "ring-2 ring-yellow-400 ring-offset-2"
+                      )}
+                      animate={false}
+                    />
+                  </motion.div>
+                ) : isSwapping ? (
+                  // Durante a animação de troca, esconde completamente a carta original
+                  <motion.div
+                    initial={{ opacity: 1 }}
+                    animate={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className={cn(
+                      isMobile ? "w-8 h-12" : "w-12 h-16 md:w-16 md:h-24"
+                    )}
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    <PlayingCard 
+                      card={card} 
+                      hidden={!shouldShowCard}
+                      className={cn(
+                        isMobile ? "w-8 h-12" : "w-12 h-16 md:w-16 md:h-24",
+                        isTemporarilyRevealed && !isMe && "ring-2 ring-yellow-400 ring-offset-2"
+                      )}
+                      animate={false}
+                    />
+                  </motion.div>
+                ) : (
+                  <PlayingCard 
+                    card={card} 
+                    hidden={!shouldShowCard}
+                    className={cn(
+                      isMobile ? "w-8 h-12" : "w-12 h-16 md:w-16 md:h-24",
+                      isTemporarilyRevealed && !isMe && "ring-2 ring-yellow-400 ring-offset-2"
+                    )}
+                    animate={false}
+                  />
+                )}
                 {/* Eye icon marker if I know this card */}
                 {isMe && player.knownCards[i] && (
                   <div className={cn(
@@ -808,6 +1003,17 @@ export default function Game() {
 
   return (
     <div className="min-h-screen bg-neutral-900 text-white relative overflow-hidden flex flex-col">
+      {/* Animação de troca de cartas */}
+      {activeSwapAnimation && (
+        <CardSwapAnimation
+          swapInfo={activeSwapAnimation.swapInfo}
+          player1Card={activeSwapAnimation.player1Card}
+          player2Card={activeSwapAnimation.player2Card}
+          player1Position={activeSwapAnimation.player1Position}
+          player2Position={activeSwapAnimation.player2Position}
+          onComplete={() => setActiveSwapAnimation(null)}
+        />
+      )}
       {/* Top Bar */}
       <div className={cn(
         "absolute top-0 left-0 right-0 z-50 pointer-events-none",
@@ -1729,44 +1935,46 @@ export default function Game() {
       </AnimatePresence>
 
       {/* Game Over Modal */}
-      <Dialog open={!!gameState.winnerId}>
-        <DialogContent className={cn(
-          "bg-white text-center",
-          isMobile ? "max-w-[95vw] max-h-[90vh] overflow-y-auto" : "sm:max-w-md"
-        )}>
-          <DialogHeader>
-            <DialogTitle className={cn(
-              "font-display text-indigo-900 flex items-center justify-center gap-3",
-              isMobile ? "text-2xl mb-2" : "text-4xl mb-4"
-            )}>
-              <Trophy className={cn("text-yellow-500", isMobile ? "w-6 h-6" : "w-10 h-10")} />
-              {t("game.gameOver")}
-            </DialogTitle>
-            <DialogDescription className={cn(isMobile ? "text-sm" : "text-lg")}>
-              {t("game.winnerIs").replace("{player}", gameState.players.find(p => p.id === gameState.winnerId)?.name || "")}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-6 space-y-4">
-            {gameState.players
-              .sort((a, b) => a.score - b.score) // Assuming lower is better in Cunoku
-              .map((p, i) => (
-              <div key={p.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="font-bold text-gray-400 w-6">#{i + 1}</span>
-                  <Avatar name={p.name} className="scale-50 w-8 h-8" />
-                  <span className="font-bold text-gray-900">{p.name}</span>
+      {gameState.winnerId && (
+        <Dialog open={gameOverModalOpen} onOpenChange={setGameOverModalOpen}>
+          <DialogContent className={cn(
+            "bg-white text-center",
+            isMobile ? "max-w-[95vw] max-h-[90vh] overflow-y-auto" : "sm:max-w-md"
+          )}>
+            <DialogHeader>
+              <DialogTitle className={cn(
+                "font-display text-indigo-900 flex items-center justify-center gap-3",
+                isMobile ? "text-2xl mb-2" : "text-4xl mb-4"
+              )}>
+                <Trophy className={cn("text-yellow-500", isMobile ? "w-6 h-6" : "w-10 h-10")} />
+                {t("game.gameOver")}
+              </DialogTitle>
+              <DialogDescription className={cn(isMobile ? "text-sm" : "text-lg")}>
+                {t("game.winnerIs").replace("{player}", gameState.players.find(p => p.id === gameState.winnerId)?.name || "")}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="py-6 space-y-4">
+              {gameState.players
+                .sort((a, b) => a.score - b.score) // Assuming lower is better in Cunoku
+                .map((p, i) => (
+                <div key={p.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-gray-400 w-6">#{i + 1}</span>
+                    <Avatar name={p.name} className="scale-50 w-8 h-8" />
+                    <span className="font-bold text-gray-900">{p.name}</span>
+                  </div>
+                    <span className="font-mono font-bold text-xl">{p.score} {t("game.points")}</span>
                 </div>
-                  <span className="font-mono font-bold text-xl">{p.score} {t("game.points")}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          <Button onClick={() => setLocation("/")} className="w-full">
-            {t("game.backToHome")}
-          </Button>
-        </DialogContent>
-      </Dialog>
+            <Button onClick={() => setLocation("/")} className="w-full">
+              {t("game.backToHome")}
+            </Button>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

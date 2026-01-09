@@ -10,6 +10,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
   const { toast } = useToast();
   const { translateBotMessage } = useI18n();
   const [revealedCard, setRevealedCard] = useState<{ card: Card; playerName: string; targetPlayerId?: string; targetCardIndex?: number } | null>(null);
+  const [swapInfo, setSwapInfo] = useState<{ player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number } | null>(null);
 
   useEffect(() => {
     if (!roomCode || !playerId) return;
@@ -129,6 +130,12 @@ export function useGameSocket(roomCode: string, playerId: string) {
               });
             }
             break;
+          case "card_swap":
+            // Informação de troca de cartas - para animação
+            if ((message as any).swapInfo) {
+              setSwapInfo((message as any).swapInfo);
+            }
+            break;
         }
       } catch (err) {
         console.error("Failed to parse WS message", err);
@@ -160,5 +167,5 @@ export function useGameSocket(roomCode: string, playerId: string) {
     }
   }, [toast]);
 
-  return { gameState, connected, sendAction, socketRef, revealedCard, setRevealedCard };
+  return { gameState, connected, sendAction, socketRef, revealedCard, setRevealedCard, swapInfo, setSwapInfo };
 }

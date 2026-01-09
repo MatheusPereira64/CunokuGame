@@ -81,6 +81,7 @@ export type WsMessage =
   | { type: "cunoku_declared"; playerName: string }
   | { type: "bot_thinking"; botName: string }
   | { type: "bot_action"; botName: string; message: string }
+  | { type: "card_swap"; swapInfo: { player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number } }
   | WsPrivateMessage;
 
 export type GameAction =

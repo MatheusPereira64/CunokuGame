@@ -198,7 +198,8 @@ export class GameLogic {
 
   static processAction(state: GameState, action: any, playerId: string): { 
     newState: GameState; 
-    privateMessage?: { playerId: string; message: string; card?: Card; playerName?: string; targetPlayerId?: string; targetCardIndex?: number } 
+    privateMessage?: { playerId: string; message: string; card?: Card; playerName?: string; targetPlayerId?: string; targetCardIndex?: number };
+    swapInfo?: { player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number }
   } {
     const newState = JSON.parse(JSON.stringify(state)); // Deep copy
     const playerIndex = newState.players.findIndex(p => p.id === playerId);
@@ -362,6 +363,31 @@ export class GameLogic {
                 playerName: abilityResult.privateInfo.playerName,
                 targetPlayerId: action.targetPlayerId,
                 targetCardIndex: action.targetCardIndex
+              },
+              swapInfo: abilityResult.swapInfo ? {
+                player1Id: newState.players.find(p => p.name === abilityResult.swapInfo!.player1Name)?.id || "",
+                player1Name: abilityResult.swapInfo.player1Name,
+                player1CardIndex: abilityResult.swapInfo.player1CardIndex,
+                player2Id: newState.players.find(p => p.name === abilityResult.swapInfo!.player2Name)?.id || "",
+                player2Name: abilityResult.swapInfo.player2Name,
+                player2CardIndex: abilityResult.swapInfo.player2CardIndex
+              } : undefined
+            };
+          }
+          
+          // Se há informação de troca, retorna para enviar notificação de animação
+          if (abilityResult.swapInfo) {
+            const player1 = newState.players.find(p => p.name === abilityResult.swapInfo!.player1Name);
+            const player2 = newState.players.find(p => p.name === abilityResult.swapInfo!.player2Name);
+            return {
+              newState,
+              swapInfo: {
+                player1Id: player1?.id || "",
+                player1Name: abilityResult.swapInfo.player1Name,
+                player1CardIndex: abilityResult.swapInfo.player1CardIndex,
+                player2Id: player2?.id || "",
+                player2Name: abilityResult.swapInfo.player2Name,
+                player2CardIndex: abilityResult.swapInfo.player2CardIndex
               }
             };
           }

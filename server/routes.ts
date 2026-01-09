@@ -368,6 +368,14 @@ export async function registerRoutes(
             }));
           }
           
+          // Envia informação de troca de cartas para todos os jogadores (para animação)
+          if (result.swapInfo) {
+            broadcast(roomCode, {
+              type: "card_swap",
+              swapInfo: result.swapInfo
+            });
+          }
+          
           // Check if next player is bot
           if (result.newState.players[result.newState.currentPlayerIndex]?.isBot) {
             scheduleNextBotTurn(roomCode, result.newState);
