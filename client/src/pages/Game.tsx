@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useGameSocket } from "@/hooks/use-game-socket";
 import { useOfflineGame } from "@/hooks/use-offline-game";
@@ -9,6 +9,12 @@ import { GameState, Card, Player } from "@shared/schema";
 import { motion, AnimatePresence } from "framer-motion";
 import { CardSwapAnimation } from "@/components/CardSwapAnimation";
 import { CardFlipAnimation } from "@/components/CardFlipAnimation";
+import { 
+  useGameAnimations, 
+  AnimationRenderer,
+  OpponentActionNotification,
+  OpponentActionType
+} from "@/components/animations";
 import { ArrowLeft, Copy, Eye, RefreshCw, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -146,11 +152,262 @@ export default function Game() {
   // Estado para controlar se o modal de fim de jogo está aberto
   const [gameOverModalOpen, setGameOverModalOpen] = useState(false);
   
+  // Estado para notificações de ações de oponentes
+  const [opponentActionNotification, setOpponentActionNotification] = useState<{
+    playerName: string;
+    actionType: OpponentActionType;
+  } | null>(null);
+  
   // Usa estado offline se estiver em modo offline, senão usa online
   const gameState = isOffline ? offlineGameStateFromHook : onlineGameState;
   const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
   
-  // Guarda estado anterior para pegar cartas antes da troca
+  // Sistema de animações de cartas
+  const {
+    deckRef,
+    discardRef,
+    registerCardRef,
+    currentAnimation,
+    isPlaying: isAnimationPlaying,
+    animateDraw,
+    animateDiscard,
+    animateReplace,
+    animateSwap,
+    animatePeek,
+    animatePenalty,
+    completeCurrentAnimation,
+  } = useGameAnimations({
+    gameState,
+    playerId,
+    cardRefs, // Passa o cardRefs existente
+    onAnimationComplete: (type) => {
+      console.log(`[Game] Animação ${type} concluída`);
+    },
+  });
+  
+  // Guarda estado anterior para detectar mudanças e disparar animações
+  const prevGameStateRef = useRef<GameState | null>(null);
+  const animationTriggeredRef = useRef<Set<string>>(new Set()); // Evita disparar animações duplicadas
+  
+  useEffect(() => {
+    if (!gameState) {
+      return;
+    }
+
+    // Inicializa estado anterior na primeira vez
+    if (!prevGameStateRef.current) {
+      prevGameStateRef.current = JSON.parse(JSON.stringify(gameState));
+      return;
+    }
+
+    const prevState = prevGameStateRef.current;
+    const currentState = gameState;
+
+    // Cria uma chave única para esta mudança de estado
+    const stateChangeKey = `${prevState.currentPlayerIndex}_${currentState.currentPlayerIndex}_${Date.now()}`;
+    
+    // Aguarda um frame para garantir que os elementos estão renderizados
+    const timeoutId = setTimeout(() => {
+      // Detecta compra de carta (draw_deck ou draw_discard)
+      if (!prevState.drawnCard && currentState.drawnCard) {
+        const currentPlayer = currentState.players[currentState.currentPlayerIndex];
+        if (currentPlayer) {
+          // Determina se veio do deck ou descarte comparando tamanhos
+          const cameFromDeck = prevState.deck.length > currentState.deck.length;
+          const cameFromDiscard = prevState.discardPile.length > currentState.discardPile.length;
+          
+          const source: 'deck' | 'discard' = cameFromDiscard ? 'discard' : 'deck';
+          const animKey = `draw_${currentPlayer.id}_${currentState.drawnCard.rank}_${currentState.drawnCard.suit}`;
+          
+          if (!animationTriggeredRef.current.has(animKey)) {
+            console.log('[Game] Animando compra de carta:', {
+              card: currentState.drawnCard,
+              source,
+              player: currentPlayer.name
+            });
+            
+            animationTriggeredRef.current.add(animKey);
+            animateDraw(currentState.drawnCard, source, currentPlayer.id);
+            
+            // Remove da lista após um tempo para permitir nova animação
+            setTimeout(() => animationTriggeredRef.current.delete(animKey), 2000);
+          }
+        }
+      }
+
+      // Detecta substituição ou descarte de carta comprada
+      if (prevState.drawnCard && !currentState.drawnCard && prevState.discardPile.length < currentState.discardPile.length) {
+        const currentPlayer = currentState.players[currentState.currentPlayerIndex];
+        const prevPlayer = prevState.players[prevState.currentPlayerIndex];
+        const drawnCard = prevState.drawnCard;
+        const topDiscard = currentState.discardPile[currentState.discardPile.length - 1];
+        
+        const isOpponent = currentPlayer.id !== playerId;
+        
+        // Verifica se houve substituição (mão mantém mesmo tamanho)
+        if (currentPlayer && prevPlayer && currentPlayer.hand.length === prevPlayer.hand.length) {
+          // Substituição: carta da mão foi trocada pela comprada
+          const discardedCard = topDiscard;
+          const handIndex = prevPlayer.hand.findIndex(c => 
+            c.rank === discardedCard.rank && c.suit === discardedCard.suit
+          );
+          
+          if (drawnCard && discardedCard && handIndex >= 0) {
+            const animKey = `replace_${currentPlayer.id}_${handIndex}_${Date.now()}`;
+            if (!animationTriggeredRef.current.has(animKey)) {
+              console.log('[Game] Animando substituição de carta:', {
+                drawnCard,
+                discardedCard,
+                handIndex,
+                player: currentPlayer.name,
+                isOpponent
+              });
+              
+              animationTriggeredRef.current.add(animKey);
+              
+              // Se for oponente, mostra notificação
+              if (isOpponent) {
+                setOpponentActionNotification({
+                  playerName: currentPlayer.name,
+                  actionType: 'replace'
+                });
+              } else {
+                animateReplace(drawnCard, discardedCard, handIndex, currentPlayer.id);
+              }
+              
+              setTimeout(() => animationTriggeredRef.current.delete(animKey), 2000);
+            }
+          }
+        } else {
+          // Descarte simples: carta comprada foi descartada sem substituir
+          const discardedCard = drawnCard;
+          if (discardedCard && currentPlayer) {
+            const animKey = `discard_drawn_${currentPlayer.id}_${discardedCard.rank}_${discardedCard.suit}`;
+            if (!animationTriggeredRef.current.has(animKey)) {
+              console.log('[Game] Animando descarte de carta comprada:', {
+                card: discardedCard,
+                player: currentPlayer.name,
+                isOpponent
+              });
+              
+              animationTriggeredRef.current.add(animKey);
+              
+              // Se for oponente, mostra notificação
+              if (isOpponent) {
+                setOpponentActionNotification({
+                  playerName: currentPlayer.name,
+                  actionType: 'discard'
+                });
+              } else {
+                animateDiscard(discardedCard, 'drawn', currentPlayer.id);
+              }
+              
+              setTimeout(() => animationTriggeredRef.current.delete(animKey), 2000);
+            }
+          }
+        }
+      }
+
+      // Detecta descarte da mão (discard_from_hand ou matched_discard)
+      // Só detecta se NÃO foi substituição (já tratada acima)
+      if (!(prevState.drawnCard && !currentState.drawnCard)) {
+        currentState.players.forEach((player, playerIndex) => {
+          const prevPlayer = prevState.players[playerIndex];
+          if (!prevPlayer) return;
+
+          // Verifica se o jogador perdeu uma carta da mão
+          if (player.hand.length < prevPlayer.hand.length) {
+            // Encontra qual carta foi removida comparando as mãos
+            const removedCard = prevPlayer.hand.find(prevCard => 
+              !player.hand.some(currCard => 
+                currCard.rank === prevCard.rank && currCard.suit === prevCard.suit
+              )
+            );
+
+            if (removedCard && currentState.discardPile.length > prevState.discardPile.length) {
+              // Verifica se a carta descartada corresponde ao topo da pilha
+              const topDiscard = currentState.discardPile[currentState.discardPile.length - 1];
+              const isMatch = topDiscard.rank === removedCard.rank && topDiscard.suit === removedCard.suit;
+              
+              // Determina o tipo de descarte
+              const discardType: 'from_hand' | 'matched' = 
+                (prevState.currentPlayerIndex === playerIndex && prevState.turnPhase === 'draw') 
+                  ? 'from_hand' 
+                  : 'matched';
+              
+              const cardIndex = prevPlayer.hand.findIndex(c => 
+                c.rank === removedCard.rank && c.suit === removedCard.suit
+              );
+              
+              const animKey = `discard_hand_${player.id}_${removedCard.rank}_${removedCard.suit}_${Date.now()}`;
+              const isOpponent = player.id !== playerId;
+              
+              if (!animationTriggeredRef.current.has(animKey)) {
+                console.log('[Game] Animando descarte da mão:', {
+                  card: removedCard,
+                  discardType,
+                  isMatch,
+                  player: player.name,
+                  cardIndex,
+                  isOpponent
+                });
+                
+                animationTriggeredRef.current.add(animKey);
+                
+                // Se for oponente, mostra notificação
+                if (isOpponent) {
+                  setOpponentActionNotification({
+                    playerName: player.name,
+                    actionType: 'discard'
+                  });
+                } else {
+                  animateDiscard(removedCard, discardType, player.id, cardIndex, isMatch);
+                }
+                
+                setTimeout(() => animationTriggeredRef.current.delete(animKey), 2000);
+              }
+            }
+          }
+        });
+      }
+
+      // Detecta penalidade (jogador ganhou 2 cartas)
+      currentState.players.forEach((player, playerIndex) => {
+        const prevPlayer = prevState.players[playerIndex];
+        if (!prevPlayer) return;
+
+        if (player.hand.length > prevPlayer.hand.length) {
+          const cardsAdded = player.hand.length - prevPlayer.hand.length;
+          
+          // Se adicionou exatamente 2 cartas e não é o turno do jogador, pode ser penalidade
+          if (cardsAdded === 2 && currentState.currentPlayerIndex !== playerIndex) {
+            const newCards = player.hand.slice(-2);
+            const startingIndex = prevPlayer.hand.length;
+            
+            const animKey = `penalty_${player.id}_${newCards[0]?.rank}_${newCards[1]?.rank}_${Date.now()}`;
+            if (!animationTriggeredRef.current.has(animKey)) {
+              console.log('[Game] Animando penalidade:', {
+                cards: newCards,
+                player: player.name,
+                startingIndex
+              });
+              
+              animationTriggeredRef.current.add(animKey);
+              animatePenalty(newCards, player.id, startingIndex);
+              setTimeout(() => animationTriggeredRef.current.delete(animKey), 3000);
+            }
+          }
+        }
+      });
+
+      // Atualiza estado anterior
+      prevGameStateRef.current = JSON.parse(JSON.stringify(currentState));
+    }, 100); // Aumentado para 100ms para dar tempo dos elementos renderizarem
+    
+    return () => clearTimeout(timeoutId);
+  }, [gameState, animateDraw, animateDiscard, animateReplace, animatePenalty]);
+
+  // Guarda estado anterior para pegar cartas antes da troca (mantido para compatibilidade)
   useEffect(() => {
     if (gameState) {
       previousGameState.current = JSON.parse(JSON.stringify(gameState));
@@ -159,17 +416,14 @@ export default function Game() {
 
   // Detecta quando uma troca acontece e prepara animação
   useEffect(() => {
-    if (!isOffline && onlineSwapInfo && gameState && previousGameState.current) {
+    if (onlineSwapInfo && gameState && previousGameState.current) {
       console.log("[Game] Troca detectada:", onlineSwapInfo);
       
       const prevState = previousGameState.current;
       const player1Prev = prevState.players.find(p => p.id === onlineSwapInfo.player1Id);
       const player2Prev = prevState.players.find(p => p.id === onlineSwapInfo.player2Id);
       
-      const player1 = gameState.players.find(p => p.id === onlineSwapInfo.player1Id);
-      const player2 = gameState.players.find(p => p.id === onlineSwapInfo.player2Id);
-      
-      if (player1 && player2 && player1Prev && player2Prev) {
+      if (player1Prev && player2Prev) {
         // Ajusta índices (swapInfo usa índices baseados em 1, mas arrays são baseados em 0)
         const card1Index = onlineSwapInfo.player1CardIndex - 1;
         const card2Index = onlineSwapInfo.player2CardIndex - 1;
@@ -178,72 +432,34 @@ export default function Game() {
         const player1Card = player1Prev.hand[card1Index];
         const player2Card = player2Prev.hand[card2Index];
         
-        console.log("[Game] Cartas encontradas (do estado anterior):", {
-          player1Card: player1Card?.rank,
-          player2Card: player2Card?.rank,
-          card1Index,
-          card2Index
-        });
-        
-        // Calcula posições das cartas usando os índices ORIGINAIS (antes da troca)
-        const card1Key = `${onlineSwapInfo.player1Id}_${card1Index}`;
-        const card2Key = `${onlineSwapInfo.player2Id}_${card2Index}`;
-        
-        // Aguarda múltiplos frames para garantir que os elementos estão renderizados
-        let attempts = 0;
-        const maxAttempts = 15;
-        
-        const tryGetPositions = () => {
-          attempts++;
-          const card1Pos = cardRefs.current.get(card1Key);
-          const card2Pos = cardRefs.current.get(card2Key);
-          
-          console.log(`[Game] Tentativa ${attempts} de obter posições:`, {
-            card1Key,
-            card2Key,
-            card1Pos: card1Pos ? { x: card1Pos.x, y: card1Pos.y } : null,
-            card2Pos: card2Pos ? { x: card2Pos.x, y: card2Pos.y } : null,
-            totalRefs: cardRefs.current.size
+        if (player1Card && player2Card) {
+          console.log("[Game] Animando troca de cartas:", {
+            player1: onlineSwapInfo.player1Name,
+            player2: onlineSwapInfo.player2Name,
+            card1: player1Card.rank,
+            card2: player2Card.rank
           });
           
-          if (card1Pos && card2Pos && player1Card && player2Card) {
-            console.log("[Game] ✅ Posições encontradas, iniciando animação:", {
-              pos1: card1Pos,
-              pos2: card2Pos,
-              card1: player1Card.rank,
-              card2: player2Card.rank
-            });
-            
-            setActiveSwapAnimation({
-              swapInfo: onlineSwapInfo,
-              player1Card: player1Card,
-              player2Card: player2Card,
-              player1Position: { x: card1Pos.x, y: card1Pos.y },
-              player2Position: { x: card2Pos.x, y: card2Pos.y }
-            });
-          } else if (attempts < maxAttempts) {
-            // Tenta novamente após um pequeno delay
-            setTimeout(tryGetPositions, 100);
-          } else {
-            console.warn("[Game] ❌ Não foi possível obter posições das cartas após", maxAttempts, "tentativas");
-            console.warn("[Game] Refs disponíveis:", Array.from(cardRefs.current.keys()));
-          }
-        };
-        
-        // Inicia tentativas após um pequeno delay inicial para garantir renderização
-        setTimeout(tryGetPositions, 200);
+          // Usa o novo sistema de animações
+          animateSwap(
+            onlineSwapInfo.player1Id,
+            card1Index,
+            onlineSwapInfo.player2Id,
+            card2Index,
+            player1Card,
+            player2Card
+          );
+        }
       }
       
-      // Limpa swapInfo após um tempo maior para dar tempo da animação
+      // Limpa swapInfo após um tempo
       setTimeout(() => {
-        setOnlineSwapInfo(null);
-        // Limpa a animação ativa após um pequeno delay para garantir que as cartas voltem a aparecer
-        setTimeout(() => {
-          setActiveSwapAnimation(null);
-        }, 500);
-      }, 5000);
+        if (!isOffline) {
+          setOnlineSwapInfo(null);
+        }
+      }, 3000);
     }
-  }, [onlineSwapInfo, gameState, isOffline, setOnlineSwapInfo]);
+  }, [onlineSwapInfo, gameState, animateSwap, isOffline, setOnlineSwapInfo]);
 
   // Cleanup timers ao desmontar
   useEffect(() => {
@@ -1003,7 +1219,7 @@ export default function Game() {
 
   return (
     <div className="min-h-screen bg-neutral-900 text-white relative overflow-hidden flex flex-col">
-      {/* Animação de troca de cartas */}
+      {/* Animação de troca de cartas (legado) */}
       {activeSwapAnimation && (
         <CardSwapAnimation
           swapInfo={activeSwapAnimation.swapInfo}
@@ -1014,6 +1230,24 @@ export default function Game() {
           onComplete={() => setActiveSwapAnimation(null)}
         />
       )}
+      
+      {/* Sistema de animações de cartas */}
+      <AnimationRenderer
+        currentAnimation={currentAnimation}
+        onComplete={completeCurrentAnimation}
+        playerId={playerId}
+      />
+      
+      {/* Notificação de ações de oponentes */}
+      {opponentActionNotification && (
+        <OpponentActionNotification
+          playerName={opponentActionNotification.playerName}
+          actionType={opponentActionNotification.actionType}
+          onComplete={() => setOpponentActionNotification(null)}
+          duration={2000}
+        />
+      )}
+      
       {/* Top Bar */}
       <div className={cn(
         "absolute top-0 left-0 right-0 z-50 pointer-events-none",
@@ -1195,7 +1429,7 @@ export default function Game() {
             isMobile ? "gap-3" : "gap-12"
           )}>
             {/* Deck */}
-            <div className="relative group">
+            <div className="relative group" ref={deckRef}>
               {gameState.deck.length > 0 ? (
                 <div 
                   onClick={() => isMyTurn && phase === 'draw' && sendAction({ type: 'draw_deck' })}
@@ -1303,7 +1537,7 @@ export default function Game() {
             </AnimatePresence>
 
             {/* Discard Pile */}
-            <div className="relative">
+            <div className="relative" ref={discardRef}>
               {gameState.discardPile.length > 0 ? (
                 <div>
                   <PlayingCard 
