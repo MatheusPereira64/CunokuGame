@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/Button";
-import { useCreateRoom, useJoinRoom } from "@/hooks/use-rooms";
+import { useCreateRoom, useJoinRoom, fetchLanInfo } from "@/hooks/use-rooms";
 import { useToast } from "@/hooks/use-toast";
-import { Spade, Heart, Club, Diamond, ArrowRight, Gamepad2, Users, Bot, Languages } from "lucide-react";
+import { Spade, Heart, Club, Diamond, ArrowRight, Gamepad2, Users, Bot, Languages, Wifi, Cloud, ArrowLeft } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,9 +13,19 @@ import { createOfflineGame } from "@/utils/localGame";
 import { audioManager } from "@/utils/audioManager";
 import { VolumeControl } from "@/components/VolumeControl";
 import { RulesDialog } from "@/components/RulesDialog";
+import { InstallAppButton } from "@/components/InstallAppButton";
 import { useI18n, type Language } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
+import {
+  clearServerBase,
+  isLikelyLocalHost,
+  normalizeServerBase,
+  setLanJoinUrl,
+  setNetworkMode,
+  setServerBase,
+  type NetworkMode,
+} from "@/lib/gameServer";
 
 export default function Home() {
   // Toca música do menu assim que o componente montar
@@ -57,9 +67,18 @@ export default function Home() {
   const [maxPlayers, setMaxPlayers] = useState<number>(4);
   const [includeBots, setIncludeBots] = useState<boolean>(false);
   const [maxPlayersOpen, setMaxPlayersOpen] = useState(false);
+  const [createStep, setCreateStep] = useState<"network" | "form">("network");
+  const [networkChoice, setNetworkChoice] = useState<NetworkMode | null>(null);
+  const [hostAddress, setHostAddress] = useState("");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const createRoom = useCreateRoom();
   const joinRoom = useJoinRoom();
+
+  const resetCreateDialog = () => {
+    setCreateStep("network");
+    setNetworkChoice(null);
+  };
 
   const handleCreate = async () => {
     if (!name) return toast({ title: t("error.nameRequired"), description: t("error.nameRequiredDesc"), variant: "destructive" });
@@ -97,6 +116,41 @@ export default function Home() {
       }
       return;
     }
+
+    const mode: NetworkMode = networkChoice || "server";
+
+    if (mode === "lan") {
+      if (!isLikelyLocalHost()) {
+        toast({
+          title: t("create.lanNeedLocalHost"),
+          description: t("create.lanNeedLocalHostDesc"),
+          variant: "destructive",
+        });
+        return;
+      }
+      try {
+        const lan = await fetchLanInfo();
+        // Host continua same-origin (evita CORS); convidados usam o IP publicado
+        const preferred =
+          lan.joinBaseUrls.find((u) => u.includes(window.location.hostname)) ||
+          lan.joinBaseUrls[0] ||
+          window.location.origin;
+        clearServerBase();
+        setLanJoinUrl(preferred);
+        setNetworkMode("lan");
+      } catch (err: any) {
+        toast({
+          title: t("error.generic"),
+          description: err.message || t("create.lanInfoFailed"),
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      clearServerBase();
+      setLanJoinUrl(null);
+      setNetworkMode("server");
+    }
     
     // Modo multiplayer - cria sala online
     try {
@@ -111,6 +165,7 @@ export default function Home() {
       sessionStorage.setItem(`playerName_${result.code}`, name);
       // Salva o hostId (o criador da sala é sempre o host)
       sessionStorage.setItem(`hostId_${result.code}`, result.playerId);
+      setCreateDialogOpen(false);
       setLocation(`/game/${result.code}?player=${result.playerId}`);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -119,6 +174,25 @@ export default function Home() {
 
   const handleJoin = async () => {
     if (!name || !roomCode) return toast({ title: t("error.missingDetails"), description: t("error.missingDetailsDesc"), variant: "destructive" });
+
+    if (hostAddress.trim()) {
+      const normalized = normalizeServerBase(hostAddress);
+      if (!normalized) {
+        toast({
+          title: t("join.invalidHost"),
+          description: t("join.invalidHostDesc"),
+          variant: "destructive",
+        });
+        return;
+      }
+      setServerBase(normalized);
+      setLanJoinUrl(normalized);
+      setNetworkMode("lan");
+    } else {
+      clearServerBase();
+      setLanJoinUrl(null);
+      setNetworkMode("server");
+    }
 
     try {
       const result = await joinRoom.mutateAsync({ name, code: roomCode });
@@ -165,8 +239,9 @@ export default function Home() {
         </Select>
       </div>
 
-      {/* Volume Control - Top Right */}
-      <div className={cn("absolute z-20", isLandscapeMenu ? "top-2 right-2" : "top-4 right-4")}>
+      {/* Volume + instalar app - Top Right */}
+      <div className={cn("absolute z-20 flex items-center gap-2", isLandscapeMenu ? "top-2 right-2" : "top-4 right-4")}>
+        <InstallAppButton compact={isLandscapeMenu} />
         <div
           className={cn(
             "[&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md",
@@ -226,18 +301,86 @@ export default function Home() {
         </div>
 
         <div className={cn("flex-1 min-w-0", isLandscapeMenu ? "grid grid-cols-2 gap-2" : "grid gap-6")}>
-          <Dialog>
+          <Dialog
+            open={createDialogOpen}
+            onOpenChange={(open) => {
+              setCreateDialogOpen(open);
+              if (open) {
+                setMode("create");
+                setGameMode("multiplayer");
+                resetCreateDialog();
+              }
+            }}
+          >
             <DialogTrigger asChild>
-              <Button variant="primary" size="lg" className={menuBtnClass} onClick={() => { setMode("create"); setGameMode("multiplayer"); }}>
+              <Button variant="primary" size="lg" className={menuBtnClass}>
                 <Gamepad2 className={menuIconClass} /> {t("menu.createGame")}
               </Button>
             </DialogTrigger>
             <DialogContent className={cn("sm:max-w-md overflow-visible", isLandscapeMenu && "max-h-[90dvh]")}>
               <DialogHeader>
-                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-xl" : "text-2xl")}>{t("create.title")}</DialogTitle>
-                <DialogDescription>{t("create.description")}</DialogDescription>
+                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-xl" : "text-2xl")}>
+                  {createStep === "network" ? t("create.networkTitle") : t("create.title")}
+                </DialogTitle>
+                <DialogDescription>
+                  {createStep === "network" ? t("create.networkDescription") : t("create.description")}
+                </DialogDescription>
               </DialogHeader>
+
+              {createStep === "network" ? (
+                <div className={cn("space-y-3 py-2", dialogBodyClass)}>
+                  <button
+                    type="button"
+                    className="w-full text-left rounded-xl border-2 border-indigo-200 hover:border-indigo-500 bg-white p-4 transition-colors"
+                    onClick={() => {
+                      setNetworkChoice("lan");
+                      setCreateStep("form");
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg bg-indigo-100 p-2 text-indigo-800">
+                        <Wifi className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-indigo-900">{t("create.networkLan")}</div>
+                        <p className="text-sm text-gray-600 mt-1">{t("create.networkLanDesc")}</p>
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left rounded-xl border-2 border-red-200 hover:border-red-500 bg-white p-4 transition-colors"
+                    onClick={() => {
+                      setNetworkChoice("server");
+                      setCreateStep("form");
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-lg bg-red-100 p-2 text-red-700">
+                        <Cloud className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-indigo-900">{t("create.networkServer")}</div>
+                        <p className="text-sm text-gray-600 mt-1">{t("create.networkServerDesc")}</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              ) : (
               <div className={cn("space-y-4 py-4 overflow-visible", dialogBodyClass)}>
+                <button
+                  type="button"
+                  className="inline-flex items-center text-sm text-indigo-700 hover:text-indigo-900 font-medium"
+                  onClick={() => setCreateStep("network")}
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  {t("create.backToNetwork")}
+                </button>
+                {networkChoice === "lan" && (
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+                    {t("create.lanHint")}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="hostName">{t("create.yourName")}</Label>
                   <Input 
@@ -388,6 +531,7 @@ export default function Home() {
                   {t("create.createRoom")} <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </div>
+              )}
             </DialogContent>
           </Dialog>
 
@@ -502,6 +646,17 @@ export default function Home() {
                     onChange={(e) => setName(e.target.value)}
                     className="text-lg py-6"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hostAddress">{t("join.hostAddress")}</Label>
+                  <Input
+                    id="hostAddress"
+                    placeholder={t("join.hostAddressPlaceholder")}
+                    value={hostAddress}
+                    onChange={(e) => setHostAddress(e.target.value)}
+                    className="text-lg py-6 font-mono"
+                  />
+                  <p className="text-xs text-gray-500">{t("join.hostAddressHint")}</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="roomCode">{t("join.roomCode")}</Label>

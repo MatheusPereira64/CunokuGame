@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/contexts/i18n-context";
+import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
 import Home from "@/pages/Home";
 import Game from "@/pages/Game";
 import NotFound from "@/pages/not-found";
@@ -24,6 +25,7 @@ function App() {
       <I18nProvider>
         <TooltipProvider>
           <Toaster />
+          <UpdateAvailableDialog />
           <Router />
         </TooltipProvider>
       </I18nProvider>

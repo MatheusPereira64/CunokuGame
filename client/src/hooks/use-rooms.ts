@@ -1,10 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
-import { z } from "zod";
+import { apiUrl } from "@/lib/gameServer";
 
-type CreateRoomRequest = { 
-  name: string; 
-  gameMode?: "multiplayer" | "vs_bots"; 
+type CreateRoomRequest = {
+  name: string;
+  gameMode?: "multiplayer" | "vs_bots";
   botDifficulty?: "easy" | "medium" | "hard";
   maxPlayers?: number;
   botCount?: number;
@@ -16,7 +16,7 @@ export function useRooms() {
   return useQuery({
     queryKey: [api.rooms.list.path],
     queryFn: async () => {
-      const res = await fetch(api.rooms.list.path);
+      const res = await fetch(apiUrl(api.rooms.list.path));
       if (!res.ok) throw new Error("Failed to fetch rooms");
       return api.rooms.list.responses[200].parse(await res.json());
     },
@@ -33,18 +33,18 @@ export function useCreateRoom() {
         maxPlayers: data.maxPlayers || 4,
         botCount: data.botCount || 0,
       });
-      const res = await fetch(api.rooms.create.path, {
+      const res = await fetch(apiUrl(api.rooms.create.path), {
         method: api.rooms.create.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validated),
       });
-      
+
       if (!res.ok) {
         const errorData = await res.json();
         const error = api.rooms.create.responses[400].parse(errorData);
         throw new Error(error.message || "Failed to create room");
       }
-      
+
       return api.rooms.create.responses[201].parse(await res.json());
     },
   });
@@ -54,7 +54,7 @@ export function useJoinRoom() {
   return useMutation({
     mutationFn: async (data: JoinRoomRequest) => {
       const validated = api.rooms.join.input.parse({ code: data.code, playerName: data.name });
-      const res = await fetch(api.rooms.join.path, {
+      const res = await fetch(apiUrl(api.rooms.join.path), {
         method: api.rooms.join.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(validated),
@@ -69,3 +69,11 @@ export function useJoinRoom() {
     },
   });
 }
+
+export async function fetchLanInfo() {
+  const res = await fetch(apiUrl(api.lan.info.path));
+  if (!res.ok) throw new Error("Failed to fetch LAN info");
+  return api.lan.info.responses[200].parse(await res.json());
+}
+
+export { buildUrl };

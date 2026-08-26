@@ -29,6 +29,8 @@ import { AbilityAction, hasSpecialAbility, getAbilityDescription } from "@/compo
 import { getSeatPositions } from "@/components/game/seatPositions";
 import { LandscapePrompt } from "@/components/game/LandscapePrompt";
 import { useIsPortrait, lockLandscape, useIsCompactGame } from "@/hooks/use-landscape";
+import { getLanJoinUrl, getNetworkMode } from "@/lib/gameServer";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export default function Game() {
   const [, params] = useRoute("/game/:code");
@@ -512,9 +514,21 @@ export default function Game() {
     );
   }
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(roomCode);
-    toast({ title: t("game.copied"), description: t("game.copiedDesc") });
+  const handleCopyCode = async () => {
+    const ok = await copyToClipboard(roomCode);
+    toast({
+      title: ok ? t("game.copied") : t("error.generic"),
+      description: ok ? t("game.copiedDesc") : roomCode,
+    });
+  };
+
+  const handleCopyLanUrl = async () => {
+    const url = getLanJoinUrl() || window.location.origin;
+    const ok = await copyToClipboard(url);
+    toast({
+      title: ok ? t("game.copied") : t("error.generic"),
+      description: ok ? t("waiting.lanUrlCopied") : url,
+    });
   };
 
   // Resolve a ação escolhida no modal de habilidade
@@ -613,6 +627,9 @@ export default function Game() {
         playerId={playerId}
         isHost={isHost}
         onCopyCode={handleCopyCode}
+        onCopyLanUrl={handleCopyLanUrl}
+        networkMode={getNetworkMode()}
+        lanJoinUrl={getLanJoinUrl()}
         onStart={() => {
           if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ type: "start_game" }));

@@ -10,25 +10,37 @@ export default defineConfig({
     runtimeErrorOverlay(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.png", "icons/CunokuGame.png"],
+      includeAssets: [
+        "favicon.png",
+        "icons/CunokuGame.png",
+        "icons/icon-192.png",
+        "icons/icon-512.png",
+        "icons/apple-touch-icon.png",
+      ],
       manifest: {
+        id: "/",
         name: "Cunoku",
         short_name: "Cunoku",
         description: "Jogo de cartas de mesa com tema japonês",
         lang: "pt-BR",
         theme_color: "#1c1917",
         background_color: "#1c1917",
-        display: "fullscreen",
+        display: "standalone",
+        display_override: ["standalone", "fullscreen", "minimal-ui"],
         orientation: "landscape-primary",
         start_url: "/",
+        scope: "/",
+        categories: ["games", "entertainment"],
         icons: [
-          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
           { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png", purpose: "any" },
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,woff2}", "icons/*.png", "favicon.png"],
+        // Precache do build; ícones públicos entram via includeAssets
+        globPatterns: ["**/*.{js,css,html,svg,woff2,png}"],
         // WebSocket e API nunca passam pelo service worker
         navigateFallbackDenylist: [/^\/ws/, /^\/api/],
         runtimeCaching: [
@@ -55,6 +67,13 @@ export default defineConfig({
             },
           },
         ],
+      },
+      devOptions: {
+        // Em localhost facilita testar “Adicionar à tela inicial”
+        enabled: true,
+        type: "module",
+        // evitas warnings de glob vazio em client/dev-dist no npm run dev
+        suppressWarnings: true,
       },
     }),
     ...(process.env.NODE_ENV !== "production" &&

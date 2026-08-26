@@ -139,16 +139,21 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
-  // In production, always use 0.0.0.0 to accept connections from anywhere
-  // In development on Windows, use 127.0.0.1 for local testing
-  const host = process.env.NODE_ENV === "production" 
-    ? "0.0.0.0" 
-    : (process.platform === "win32" ? "127.0.0.1" : "0.0.0.0");
+  // Aceita conexões na LAN (necessário para partida Wi‑Fi local). Override: HOST=127.0.0.1
+  const host = process.env.HOST || "0.0.0.0";
   httpServer.listen(
     port,
     host,
     () => {
       log(`serving on ${host}:${port}`);
+      void import("./lanInfo").then(({ buildLanInfo }) => {
+        const lan = buildLanInfo(port);
+        if (lan.joinBaseUrls.length > 0) {
+          log(`LAN URLs: ${lan.joinBaseUrls.join(", ")}`);
+        }
+      }).catch(() => {
+        // ignore
+      });
     },
   );
 })();

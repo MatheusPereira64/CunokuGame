@@ -57,7 +57,20 @@ export const api = {
         200: z.custom<typeof rooms.$inferSelect>(),
         404: errorSchemas.notFound,
       },
-    }
+    },
+  },
+  lan: {
+    info: {
+      method: 'GET' as const,
+      path: '/api/lan-info',
+      responses: {
+        200: z.object({
+          port: z.number(),
+          addresses: z.array(z.string()),
+          joinBaseUrls: z.array(z.string()),
+        }),
+      },
+    },
   },
 };
 

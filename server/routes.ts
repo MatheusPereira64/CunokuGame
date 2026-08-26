@@ -9,12 +9,19 @@ import { z } from "zod";
 import { GameState, Player } from "@shared/schema";
 import { generateRoomCode } from "./secureRandom";
 import { randomUUID } from "crypto";
+import { buildLanInfo } from "./lanInfo";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   // === HTTP ROUTES ===
+  app.get(api.lan.info.path, (_req, res) => {
+    const port = parseInt(process.env.PORT || "5000", 10);
+    const info = buildLanInfo(port);
+    res.json(api.lan.info.responses[200].parse(info));
+  });
+
   app.post(api.rooms.create.path, async (req, res) => {
     try {
       console.log("POST /api/rooms - Request body:", JSON.stringify(req.body));

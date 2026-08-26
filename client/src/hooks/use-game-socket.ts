@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { type GameState, type WsMessage, type GameAction, type Card } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/contexts/i18n-context";
+import { wsUrl } from "@/lib/gameServer";
 
 export function useGameSocket(roomCode: string, playerId: string) {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -18,10 +19,9 @@ export function useGameSocket(roomCode: string, playerId: string) {
     // Busca o nome do jogador do sessionStorage
     const playerName = sessionStorage.getItem(`playerName_${roomCode}`) || `Player ${playerId.substring(0, 4)}`;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const url = wsUrl();
     
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(url);
     socketRef.current = ws;
 
     ws.onopen = () => {

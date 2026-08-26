@@ -1,6 +1,8 @@
 node_modules
 dist
+client/dev-dist
 .DS_Store
 server/public
 vite.config.ts.*
 *.tar.gz
+release-artifacts
