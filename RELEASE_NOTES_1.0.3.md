@@ -11,8 +11,8 @@
 ### App nativo (Mac / Xcode)
 
 1. Baixe **`Cunoku-1.0.3.ipa`**
-2. Abra o projeto `ios/App` no Xcode (macOS) e assine com a sua conta Apple para instalar num iPhone
-3. Se a release trouxer **`Cunoku-1.0.3.ipa`**, é o app nativo (precisa de assinatura Apple). Se trouxer **`Cunoku-1.0.3-ios-simulator.zip`**, é a build compilada para o Simulador (sem certificado de desenvolvedor no CI)
+2. Instale com Sideloadly, AltStore ou Xcode (é preciso uma conta Apple para assinar)
+3. O IPA desta release é gerado no CI **sem certificado** da App Store
 
 ### Atalho na tela inicial (sem Mac)
 

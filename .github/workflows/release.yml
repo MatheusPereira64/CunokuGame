@@ -96,7 +96,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ios-build
-          path: release-artifacts/Cunoku-1.0.3-ios-simulator.zip
+          path: release-artifacts/Cunoku-1.0.3.ipa
           if-no-files-found: error
           overwrite: true
 

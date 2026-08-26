@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# Compila o app Capacitor para iOS Simulator (sem certificado Apple).
-set -euo pipefail
+# Compila o app Capacitor e empacota Cunoku-1.0.3.ipa (sem certificado Apple).
+set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/ios/App"
 mkdir -p "$ROOT/release-artifacts"
 
-SPM="$ROOT/ios/App/CapApp-SPM/Package.swift"
-if [[ -f "$SPM" ]]; then
+if [[ -f "$ROOT/ios/App/CapApp-SPM/Package.swift" ]]; then
   python3 - <<'PY'
 from pathlib import Path
 p = Path("CapApp-SPM/Package.swift")
@@ -22,62 +21,65 @@ fi
 
 echo "==> xcodebuild -list"
 xcodebuild -project App.xcodeproj -scheme App -list || true
-
-echo "==> available simulators"
+echo "==> simulators"
 xcrun simctl list devices available || true
 
-DESTINATION="platform=iOS Simulator,name=iPhone 16"
-if ! xcrun simctl list devices available | grep -q "iPhone 16"; then
-  if xcrun simctl list devices available | grep -q "iPhone 15"; then
-    DESTINATION="platform=iOS Simulator,name=iPhone 15"
+pick_sim() {
+  if xcrun simctl list devices available | grep -q "iPhone 16"; then
+    echo "platform=iOS Simulator,name=iPhone 16"
+  elif xcrun simctl list devices available | grep -q "iPhone 15"; then
+    echo "platform=iOS Simulator,name=iPhone 15"
   else
-    NAME="$(xcrun simctl list devices available | awk -F'[()]' '/iPhone/{gsub(/^ +| +$/,"",$1); print $1; exit}')"
-    if [[ -n "${NAME:-}" ]]; then
-      DESTINATION="platform=iOS Simulator,name=${NAME}"
-    else
-      DESTINATION="generic/platform=iOS Simulator"
-    fi
+    echo "generic/platform=iOS Simulator"
   fi
+}
+
+build_app() {
+  local sdk="$1"
+  local dest="$2"
+  local derived="$3"
+  echo "==> xcodebuild sdk=$sdk dest=$dest"
+  xcodebuild \
+    -project App.xcodeproj \
+    -scheme App \
+    -configuration Debug \
+    -sdk "$sdk" \
+    -destination "$dest" \
+    -derivedDataPath "$derived" \
+    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGNING_REQUIRED=NO \
+    CODE_SIGN_IDENTITY="" \
+    CODE_SIGN_STYLE=Manual \
+    COMPILER_INDEX_STORE_ENABLE=NO \
+    ONLY_ACTIVE_ARCH=YES \
+    build
+}
+
+DERIVED_DEV="$ROOT/ios/App/derived-device"
+DERIVED_SIM="$ROOT/ios/App/derived-sim"
+APP_PATH=""
+
+if build_app iphoneos "generic/platform=iOS" "$DERIVED_DEV"; then
+  APP_PATH="$(find "$DERIVED_DEV/Build/Products" -name "App.app" -print -quit || true)"
+else
+  echo "==> device build failed; trying iOS Simulator"
+  SIM_DEST="$(pick_sim)"
+  echo "==> simulator destination: $SIM_DEST"
+  build_app iphonesimulator "$SIM_DEST" "$DERIVED_SIM"
+  APP_PATH="$(find "$DERIVED_SIM/Build/Products" -name "App.app" -print -quit || true)"
 fi
-echo "==> destination: ${DESTINATION}"
 
-LOG="$ROOT/ios/App/xcodebuild.log"
-set +e
-xcodebuild \
-  -project App.xcodeproj \
-  -scheme App \
-  -configuration Debug \
-  -sdk iphonesimulator \
-  -destination "${DESTINATION}" \
-  -derivedDataPath "$ROOT/ios/App/derived-sim" \
-  CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGN_IDENTITY=- \
-  CODE_SIGN_STYLE=Manual \
-  DEVELOPMENT_TEAM= \
-  COMPILER_INDEX_STORE_ENABLE=NO \
-  ONLY_ACTIVE_ARCH=YES \
-  build 2>&1 | tee "$LOG"
-XC=${PIPESTATUS[0]}
-set -e
-
-if [[ "$XC" -ne 0 ]]; then
-  echo "==> xcodebuild failed (${XC}); filtered errors:"
-  grep -E "error:|fatal error|Unable to find a destination|requires a development team|AppIcon" "$LOG" | tail -100 || true
-  exit "$XC"
-fi
-
-APP_PATH="$(find "$ROOT/ios/App/derived-sim/Build/Products" -name "App.app" -print -quit)"
 if [[ -z "$APP_PATH" ]]; then
-  echo "App.app not found under derived-sim"
-  find "$ROOT/ios/App/derived-sim" -name "*.app" || true
+  echo "App.app not found"
   exit 1
 fi
+echo "==> using $APP_PATH"
 
 STAGE="$(mktemp -d)"
-cp -R "$APP_PATH" "$STAGE/App.app"
+mkdir -p "$STAGE/Payload"
+cp -R "$APP_PATH" "$STAGE/Payload/App.app"
 (
   cd "$STAGE"
-  zip -r "$ROOT/release-artifacts/Cunoku-1.0.3-ios-simulator.zip" App.app
+  zip -y -r "$ROOT/release-artifacts/Cunoku-1.0.3.ipa" Payload
 )
-ls -lh "$ROOT/release-artifacts/Cunoku-1.0.3-ios-simulator.zip"
+ls -lh "$ROOT/release-artifacts/Cunoku-1.0.3.ipa"
