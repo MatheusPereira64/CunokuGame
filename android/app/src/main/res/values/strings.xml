@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cunoku</string>
+    <string name="title_activity_main">Cunoku</string>
+    <string name="package_name">com.cunoku.game</string>
+    <string name="custom_url_scheme">com.cunoku.game</string>
+</resources>
