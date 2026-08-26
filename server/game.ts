@@ -208,7 +208,7 @@ export class GameLogic {
     privateMessage?: { playerId: string; message: string; card?: Card; playerName?: string; targetPlayerId?: string; targetCardIndex?: number };
     swapInfo?: { player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number }
   } {
-    const newState: GameState = JSON.parse(JSON.stringify(state)); // Deep copy
+    const newState: GameState = structuredClone(state);
     const playerIndex = newState.players.findIndex((p: Player) => p.id === playerId);
     
     if (playerIndex === -1) {

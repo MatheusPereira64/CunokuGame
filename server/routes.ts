@@ -7,6 +7,7 @@ import { GameLogic } from "./game";
 import { BotPlayer, createBots } from "./bot";
 import { z } from "zod";
 import { GameState, Player } from "@shared/schema";
+import { generateRoomCode } from "./secureRandom";
 import { randomUUID } from "crypto";
 
 export async function registerRoutes(
@@ -22,7 +23,7 @@ export async function registerRoutes(
       const input = api.rooms.create.input.parse(req.body);
       console.log("POST /api/rooms - Parsed input:", input);
       
-      const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const roomCode = generateRoomCode(4);
       const playerId = randomUUID();
       
       console.log("POST /api/rooms - Creating room with code:", roomCode);
@@ -397,7 +398,7 @@ export async function registerRoutes(
 
   // Filtra o estado do jogo para ocultar informações privadas de cada jogador
   function filterGameStateForPlayer(state: GameState, playerId: string): GameState {
-    const filteredState = JSON.parse(JSON.stringify(state)); // Deep copy
+    const filteredState: GameState = structuredClone(state);
     
     // O drawnCard só deve ser visível para o jogador atual (que puxou a carta)
     // Se houver uma carta puxada, só o jogador que está no turno atual pode vê-la

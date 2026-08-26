@@ -168,5 +168,8 @@ export function getAnimationDuration(
 
 // Helper para gerar ID único para animações
 export function generateAnimationId(): string {
-  return `anim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return `anim_${globalThis.crypto.randomUUID()}`;
+  }
+  return `anim_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 }
