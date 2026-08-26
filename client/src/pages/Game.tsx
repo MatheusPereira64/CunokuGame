@@ -28,13 +28,14 @@ import { AbilityModal } from "@/components/game/AbilityModal";
 import { AbilityAction, hasSpecialAbility, getAbilityDescription } from "@/components/game/helpers";
 import { getSeatPositions } from "@/components/game/seatPositions";
 import { LandscapePrompt } from "@/components/game/LandscapePrompt";
-import { useIsPortrait, lockLandscape } from "@/hooks/use-landscape";
+import { useIsPortrait, lockLandscape, useIsCompactGame } from "@/hooks/use-landscape";
 
 export default function Game() {
   const [, params] = useRoute("/game/:code");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const isCompact = useIsCompactGame();
   const isPortrait = useIsPortrait();
   const { t } = useI18n();
   const roomCode = params?.code || "";
@@ -657,24 +658,29 @@ export default function Game() {
       {/* Barra superior */}
       <div
         className={cn(
-          "absolute top-0 left-0 right-0 z-50 pointer-events-none",
-          isMobile ? "p-2 flex flex-col gap-2" : "p-4 flex justify-between items-start"
+          "absolute top-0 left-0 right-0 z-50 pointer-events-none flex justify-between items-start",
+          isCompact ? "p-1.5 gap-1" : "p-4"
         )}
       >
-        <div className="flex items-center gap-2 pointer-events-auto">
+        <div className="flex items-center gap-1.5 pointer-events-auto">
           <Button
             variant="outline"
             size="sm"
             className={cn(
               "bg-black/20 text-white border-white/20 backdrop-blur-sm",
-              isMobile ? "text-xs px-2 py-1" : ""
+              isCompact ? "text-[10px] px-1.5 py-0.5 h-7" : ""
             )}
             onClick={() => setLocation("/")}
           >
-            <ArrowLeft className={cn("w-4 h-4", isMobile ? "mr-1" : "mr-2")} />
-            {isMobile ? "" : t("game.exit")}
+            <ArrowLeft className={cn("w-3.5 h-3.5", isCompact ? "mr-0" : "mr-2")} />
+            {isCompact ? "" : t("game.exit")}
           </Button>
-          <div className="[&_button]:bg-black/20 [&_button]:text-white [&_button]:border-white/20 [&_button]:backdrop-blur-sm [&_button]:hover:bg-black/30">
+          <div
+            className={cn(
+              "[&_button]:bg-black/20 [&_button]:text-white [&_button]:border-white/20 [&_button]:backdrop-blur-sm [&_button]:hover:bg-black/30",
+              isCompact && "[&_button]:h-7 [&_button]:w-7 [&_button]:p-0 scale-90 origin-left"
+            )}
+          >
             <VolumeControl />
           </div>
         </div>
@@ -682,20 +688,20 @@ export default function Game() {
         <div
           className={cn(
             "bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center pointer-events-auto cursor-pointer",
-            isMobile ? "px-3 py-1.5" : "px-6 py-2"
+            isCompact ? "px-2.5 py-1" : "px-6 py-2"
           )}
           onClick={handleCopyCode}
         >
-          <div className={cn("text-white/60 font-mono", isMobile ? "text-[10px]" : "text-xs")}>
+          <div className={cn("text-white/60 font-mono", isCompact ? "text-[8px] leading-tight" : "text-xs")}>
             {t("game.roomCode")}
           </div>
           <div
             className={cn(
-              "font-bold tracking-widest font-mono flex items-center gap-2",
-              isMobile ? "text-sm" : "text-xl"
+              "font-bold tracking-widest font-mono flex items-center gap-1",
+              isCompact ? "text-[11px]" : "text-xl"
             )}
           >
-            {roomCode} <Copy className={cn(isMobile ? "w-2.5 h-2.5" : "w-3 h-3")} />
+            {roomCode} <Copy className={cn(isCompact ? "w-2.5 h-2.5" : "w-3 h-3")} />
           </div>
         </div>
       </div>
@@ -704,10 +710,8 @@ export default function Game() {
       {isMyTurn && (
         <div
           className={cn(
-            "absolute z-40 pointer-events-none",
-            isMobile
-              ? "top-16 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)]"
-              : "top-20 left-1/2 transform -translate-x-1/2"
+            "absolute z-40 pointer-events-none left-1/2 -translate-x-1/2",
+            isCompact ? "top-8 max-w-[min(58vw,16rem)]" : "top-20"
           )}
         >
           <motion.div
@@ -715,21 +719,21 @@ export default function Game() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -20, opacity: 0 }}
             className={cn(
-              "bg-gradient-to-r from-yellow-500/90 to-yellow-600/90 backdrop-blur-md rounded-full border-2 border-yellow-400 shadow-2xl flex items-center",
-              isMobile ? "px-3 py-2 gap-2 flex-col" : "px-8 py-3 gap-4"
+              "bg-gradient-to-r from-yellow-500/90 to-yellow-600/90 backdrop-blur-md rounded-full border-2 border-yellow-400 shadow-xl flex items-center justify-center",
+              isCompact ? "px-3 py-1 gap-1.5" : "px-8 py-3 gap-4"
             )}
           >
-            <span className={cn("text-yellow-900 font-bold", isMobile ? "text-xs" : "text-lg")}>
+            <span className={cn("text-yellow-900 font-bold whitespace-nowrap", isCompact ? "text-[10px]" : "text-lg")}>
               {t("game.yourTurn")}
             </span>
             {phase === "draw" && (
-              <span className={cn("text-yellow-100 text-center", isMobile ? "text-[10px]" : "text-sm")}>
-                {isMobile ? t("game.drawFromDeckShort") : t("game.drawFromDeck")}
+              <span className={cn("text-yellow-100 text-center", isCompact ? "text-[9px] truncate" : "text-sm")}>
+                {isCompact ? t("game.drawFromDeckShort") : t("game.drawFromDeck")}
               </span>
             )}
             {phase === "action" && (
-              <span className={cn("text-yellow-100 text-center", isMobile ? "text-[10px]" : "text-sm")}>
-                {isMobile ? t("game.replaceOrDiscardShort") : t("game.replaceOrDiscard")}
+              <span className={cn("text-yellow-100 text-center", isCompact ? "text-[9px] truncate" : "text-sm")}>
+                {isCompact ? t("game.replaceOrDiscardShort") : t("game.replaceOrDiscard")}
               </span>
             )}
           </motion.div>
@@ -737,35 +741,39 @@ export default function Game() {
       )}
 
       {/* Info da rodada */}
-      <div className={cn("absolute z-40 pointer-events-none", isMobile ? "top-28 left-2" : "top-20 left-8")}>
+      <div
+        className={cn(
+          "absolute z-40 pointer-events-none",
+          isCompact ? "top-9 left-1.5" : "top-20 left-8"
+        )}
+      >
         <motion.div
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           className={cn(
-            "bg-black/60 backdrop-blur-md rounded-xl border-2 border-yellow-500/50 shadow-xl",
-            isMobile ? "px-3 py-2" : "px-6 py-3"
+            "bg-black/60 backdrop-blur-md rounded-lg border border-yellow-500/50 shadow-lg",
+            isCompact ? "px-2 py-1" : "px-6 py-3 border-2 rounded-xl"
           )}
         >
           <div className="text-center">
-            <div className={cn("font-bold text-yellow-400 mb-1", isMobile ? "text-sm" : "text-lg")}>
+            <div className={cn("font-bold text-yellow-400", isCompact ? "text-[10px] leading-tight" : "text-lg mb-1")}>
               {t("game.round")} {gameState.round}
               {gameState.round < 5 ? "/5" : ""}
             </div>
-            {gameState.round < 5 ? (
-              <div className={cn("text-white/80", isMobile ? "text-[10px]" : "text-xs")}>
-                {isMobile ? t("game.cunokuAfterRound5Short") : t("game.cunokuAfterRound5")}
-              </div>
-            ) : (
-              <div className={cn("text-white/80", isMobile ? "text-[10px]" : "text-xs")}>
-                {t("game.turn")}: {gameState.players[gameState.currentPlayerIndex]?.name || "Unknown"}
-              </div>
-            )}
+            {!isCompact &&
+              (gameState.round < 5 ? (
+                <div className="text-white/80 text-xs">{t("game.cunokuAfterRound5")}</div>
+              ) : (
+                <div className="text-white/80 text-xs">
+                  {t("game.turn")}: {gameState.players[gameState.currentPlayerIndex]?.name || "Unknown"}
+                </div>
+              ))}
           </div>
         </motion.div>
       </div>
 
-      {/* Dica de habilidade (esquerda) */}
-      {isMyTurn && phase === "action" && gameState.drawnCard && hasSpecialAbility(gameState.drawnCard) && !gameState.drawnFromDiscard && !isMobile && (
+      {/* Dica de habilidade (esquerda) — só desktop amplo */}
+      {isMyTurn && phase === "action" && gameState.drawnCard && hasSpecialAbility(gameState.drawnCard) && !gameState.drawnFromDiscard && !isCompact && (
         <div className="absolute left-8 bottom-32 z-40 pointer-events-none">
           <motion.div
             initial={{ x: -20, opacity: 0 }}
@@ -789,8 +797,8 @@ export default function Game() {
         </div>
       )}
 
-      {/* Dica de substituição (direita) */}
-      {isMyTurn && phase === "action" && gameState.drawnCard && !isMobile && (
+      {/* Dica de substituição (direita) — só desktop amplo */}
+      {isMyTurn && phase === "action" && gameState.drawnCard && !isCompact && (
         <div className="absolute right-8 bottom-32 z-40 pointer-events-none">
           <motion.div
             initial={{ x: 20, opacity: 0 }}
@@ -813,12 +821,18 @@ export default function Game() {
       )}
 
       {/* Mesa de jogo — zonas: oponentes (arco) | centro elevado | mão inferior */}
-      <div className={cn("flex-1 flex items-center justify-center relative min-h-0", isMobile ? "p-1.5" : "p-4 md:p-6")}>
+      <div
+        className={cn(
+          "flex-1 flex items-center justify-center relative min-h-0",
+          isCompact ? "p-1" : "p-4 md:p-6"
+        )}
+      >
         <div
           className={cn(
             "w-full relative felt-table shadow-2xl",
-            "max-w-6xl max-h-[min(100%,calc(100dvh-1rem))] aspect-[16/9]",
-            isMobile ? "rounded-2xl" : "rounded-[100px]"
+            isCompact
+              ? "max-w-none max-h-[calc(100dvh-0.5rem)] h-[calc(100dvh-0.5rem)] aspect-auto rounded-xl"
+              : "max-w-6xl max-h-[min(100%,calc(100dvh-1rem))] aspect-[16/9] rounded-[100px]"
           )}
         >
           {/* Oponentes no arco externo (sempre em paisagem) */}
@@ -835,7 +849,7 @@ export default function Game() {
                   registerCardPosition={registerCardRef}
                   opponentCount={opponents.length}
                   side={pos.side}
-                  compact={opponents.length >= 3 || isMobile}
+                  compact={opponents.length >= 3 || isCompact}
                   className="absolute z-20"
                   style={{
                     left: `${pos.left}%`,
@@ -869,7 +883,12 @@ export default function Game() {
           )}
 
           {/* Centro da mesa — baralho e descarte */}
-          <div className="absolute left-1/2 top-[48%] -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto">
+          <div
+            className={cn(
+              "absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto",
+              isCompact ? "top-[44%]" : "top-[48%]"
+            )}
+          >
             <CenterPile
               gameState={gameState}
               isMyTurn={!!isMyTurn}

@@ -14,6 +14,8 @@ import { audioManager } from "@/utils/audioManager";
 import { VolumeControl } from "@/components/VolumeControl";
 import { RulesDialog } from "@/components/RulesDialog";
 import { useI18n, type Language } from "@/contexts/i18n-context";
+import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
   // Toca música do menu assim que o componente montar
@@ -29,6 +31,19 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { t, language, setLanguage } = useI18n();
+  const isPortrait = useIsPortrait();
+  const isCompactGame = useIsCompactGame();
+  // Layout lado a lado só em paisagem (mobile horizontal); vertical mantém o menu empilhado
+  const isLandscapeMenu = isCompactGame && !isPortrait;
+  const menuBtnClass = cn(
+    "w-full",
+    isLandscapeMenu ? "text-sm py-3 h-auto min-h-0" : "text-xl py-8"
+  );
+  const menuIconClass = cn(isLandscapeMenu ? "mr-2 w-4 h-4" : "mr-3 w-6 h-6");
+  const dialogBodyClass = cn(
+    "overflow-visible",
+    isLandscapeMenu && "max-h-[min(85dvh,32rem)] overflow-y-auto py-2 space-y-3"
+  );
   const [languageOpen, setLanguageOpen] = useState(false);
   const [name, setName] = useState("");
   const [roomCode, setRoomCode] = useState("");
@@ -116,9 +131,14 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <div
+      className={cn(
+        "flex items-center justify-center relative overflow-hidden",
+        isLandscapeMenu ? "h-[100dvh] min-h-0 p-2 pt-10 pb-2" : "min-h-screen p-4"
+      )}
+    >
       {/* Language Selector - Top Left */}
-      <div className="absolute top-4 left-4 z-20">
+      <div className={cn("absolute z-20", isLandscapeMenu ? "top-2 left-2" : "top-4 left-4")}>
         <Select
           value={language}
           onValueChange={(value: Language) => {
@@ -128,8 +148,13 @@ export default function Home() {
           open={languageOpen}
           onOpenChange={setLanguageOpen}
         >
-          <SelectTrigger className="w-[140px] bg-white/90 text-indigo-900 border-indigo-200 hover:bg-white shadow-md">
-            <Languages className="mr-2 h-4 w-4" />
+          <SelectTrigger
+            className={cn(
+              "bg-white/90 text-indigo-900 border-indigo-200 hover:bg-white shadow-md",
+              isLandscapeMenu ? "w-[118px] h-8 text-xs" : "w-[140px]"
+            )}
+          >
+            <Languages className={cn("mr-2", isLandscapeMenu ? "h-3.5 w-3.5" : "h-4 w-4")} />
             <SelectValue />
           </SelectTrigger>
           <SelectContent position="popper" className="z-[100] bg-white" sideOffset={5}>
@@ -141,53 +166,78 @@ export default function Home() {
       </div>
 
       {/* Volume Control - Top Right */}
-      <div className="absolute top-4 right-4 z-20">
-        <div className="[&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md">
+      <div className={cn("absolute z-20", isLandscapeMenu ? "top-2 right-2" : "top-4 right-4")}>
+        <div
+          className={cn(
+            "[&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md",
+            isLandscapeMenu && "[&_button]:h-8 [&_button]:w-8 [&_button]:p-0 scale-90 origin-top-right"
+          )}
+        >
           <VolumeControl />
         </div>
       </div>
 
       {/* Decorative Background Elements */}
-      <div className="absolute inset-0 pointer-events-none">
-        <Spade className="absolute top-10 left-10 w-32 h-32 text-indigo-900/5 rotate-12" />
-        <Heart className="absolute bottom-10 right-10 w-40 h-40 text-red-900/5 -rotate-12" />
-        <Club className="absolute top-20 right-20 w-24 h-24 text-indigo-900/5 rotate-45" />
-        <Diamond className="absolute bottom-20 left-20 w-28 h-28 text-red-900/5 -rotate-45" />
-      </div>
+      {!isLandscapeMenu && (
+        <div className="absolute inset-0 pointer-events-none">
+          <Spade className="absolute top-10 left-10 w-32 h-32 text-indigo-900/5 rotate-12" />
+          <Heart className="absolute bottom-10 right-10 w-40 h-40 text-red-900/5 -rotate-12" />
+          <Club className="absolute top-20 right-20 w-24 h-24 text-indigo-900/5 rotate-45" />
+          <Diamond className="absolute bottom-20 left-20 w-28 h-28 text-red-900/5 -rotate-45" />
+        </div>
+      )}
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-md w-full relative z-10"
+        className={cn(
+          "w-full relative z-10",
+          isLandscapeMenu
+            ? "max-w-3xl flex flex-row items-center gap-5 px-1"
+            : "max-w-md"
+        )}
       >
-        <div className="text-center mb-12">
+        <div className={cn("text-center", isLandscapeMenu ? "mb-0 shrink-0 text-left w-[38%] max-w-[14rem]" : "mb-12")}>
           <motion.div
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 200 }}
-            className="inline-block"
+            className={cn("inline-block", isLandscapeMenu && "w-full")}
           >
-            <h1 className="text-6xl md:text-8xl font-black text-indigo-900 tracking-tighter mb-2" style={{ fontFamily: 'Noto Serif JP' }}>
+            <h1
+              className={cn(
+                "font-black text-indigo-900 tracking-tighter",
+                isLandscapeMenu ? "text-4xl mb-1" : "text-6xl md:text-8xl mb-2"
+              )}
+              style={{ fontFamily: 'Noto Serif JP' }}
+            >
               {t("menu.title")}
             </h1>
-            <div className="h-2 bg-red-600 w-full rounded-full" />
+            <div className={cn("bg-red-600 w-full rounded-full", isLandscapeMenu ? "h-1" : "h-2")} />
           </motion.div>
-          <p className="mt-4 text-xl text-gray-600 font-medium">{t("menu.subtitle")}</p>
+          <p
+            className={cn(
+              "text-gray-600 font-medium",
+              isLandscapeMenu ? "mt-1.5 text-xs leading-snug" : "mt-4 text-xl"
+            )}
+          >
+            {t("menu.subtitle")}
+          </p>
         </div>
 
-        <div className="grid gap-6">
+        <div className={cn("flex-1 min-w-0", isLandscapeMenu ? "grid grid-cols-2 gap-2" : "grid gap-6")}>
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="primary" size="lg" className="w-full text-xl py-8" onClick={() => { setMode("create"); setGameMode("multiplayer"); }}>
-                <Gamepad2 className="mr-3 w-6 h-6" /> {t("menu.createGame")}
+              <Button variant="primary" size="lg" className={menuBtnClass} onClick={() => { setMode("create"); setGameMode("multiplayer"); }}>
+                <Gamepad2 className={menuIconClass} /> {t("menu.createGame")}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md overflow-visible">
+            <DialogContent className={cn("sm:max-w-md overflow-visible", isLandscapeMenu && "max-h-[90dvh]")}>
               <DialogHeader>
-                <DialogTitle className="text-2xl font-display text-indigo-900">{t("create.title")}</DialogTitle>
+                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-xl" : "text-2xl")}>{t("create.title")}</DialogTitle>
                 <DialogDescription>{t("create.description")}</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4 overflow-visible">
+              <div className={cn("space-y-4 py-4 overflow-visible", dialogBodyClass)}>
                 <div className="space-y-2">
                   <Label htmlFor="hostName">{t("create.yourName")}</Label>
                   <Input 
@@ -343,16 +393,16 @@ export default function Home() {
 
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="secondary" size="lg" className="w-full text-xl py-8" onClick={() => { setMode("bots"); setGameMode("vs_bots"); }}>
-                <Bot className="mr-3 w-6 h-6" /> {t("menu.playBots")}
+              <Button variant="secondary" size="lg" className={menuBtnClass} onClick={() => { setMode("bots"); setGameMode("vs_bots"); }}>
+                <Bot className={menuIconClass} /> {t("menu.playBots")}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md overflow-visible">
+            <DialogContent className={cn("sm:max-w-md overflow-visible", isLandscapeMenu && "max-h-[90dvh]")}>
               <DialogHeader>
-                <DialogTitle className="text-2xl font-display text-indigo-900">{t("bots.title")}</DialogTitle>
+                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-xl" : "text-2xl")}>{t("bots.title")}</DialogTitle>
                 <DialogDescription>{t("bots.description")}</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4 overflow-visible">
+              <div className={cn("space-y-4 py-4 overflow-visible", dialogBodyClass)}>
                 <div className="space-y-2">
                   <Label htmlFor="botName">{t("bots.yourName")}</Label>
                   <Input 
@@ -433,16 +483,16 @@ export default function Home() {
 
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="secondary" size="lg" className="w-full text-xl py-8" onClick={() => setMode("join")}>
-                <Users className="mr-3 w-6 h-6" /> {t("menu.joinRoom")}
+              <Button variant="secondary" size="lg" className={menuBtnClass} onClick={() => setMode("join")}>
+                <Users className={menuIconClass} /> {t("menu.joinRoom")}
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className={cn("sm:max-w-md", isLandscapeMenu && "max-h-[90dvh]")}>
               <DialogHeader>
-                <DialogTitle className="text-2xl font-display text-indigo-900">{t("join.title")}</DialogTitle>
+                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-xl" : "text-2xl")}>{t("join.title")}</DialogTitle>
                 <DialogDescription>{t("join.description")}</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className={cn("space-y-4 py-4", dialogBodyClass)}>
                 <div className="space-y-2">
                   <Label htmlFor="joinName">{t("join.yourName")}</Label>
                   <Input 
@@ -475,13 +525,20 @@ export default function Home() {
             </DialogContent>
           </Dialog>
 
-          <RulesDialog />
+          <RulesDialog compact={isLandscapeMenu} />
         </div>
 
-        <div className="mt-12 text-center text-sm text-gray-500">
-          <p>{t("menu.copyright")}</p>
-        </div>
+        {!isLandscapeMenu && (
+          <div className="mt-12 text-center text-sm text-gray-500">
+            <p>{t("menu.copyright")}</p>
+          </div>
+        )}
       </motion.div>
+      {isLandscapeMenu && (
+        <p className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-gray-400 pointer-events-none">
+          {t("menu.copyright")}
+        </p>
+      )}
     </div>
   );
 }

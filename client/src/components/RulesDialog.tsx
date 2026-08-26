@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/Button";
 import { useI18n } from "@/contexts/i18n-context";
 import { BookOpen, Eye, Glasses, ArrowLeftRight, type LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 /** Mesmos ícones usados no selo das cartas (PlayingCard) */
 const ABILITY_RULES: {
@@ -41,7 +42,7 @@ function AbilityIconBadge({ Icon }: { Icon: LucideIcon }) {
   );
 }
 
-export function RulesDialog() {
+export function RulesDialog({ compact = false }: { compact?: boolean }) {
   const { t } = useI18n();
 
   return (
@@ -50,9 +51,12 @@ export function RulesDialog() {
         <Button
           variant="secondary"
           size="lg"
-          className="w-full text-xl py-8 bg-yellow-500 hover:bg-yellow-600 text-black font-bold border-yellow-600"
+          className={cn(
+            "w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold border-yellow-600",
+            compact ? "text-sm py-3 h-auto min-h-0" : "text-xl py-8"
+          )}
         >
-          <BookOpen className="mr-3 w-6 h-6" /> {t("menu.rules")}
+          <BookOpen className={cn(compact ? "mr-2 w-4 h-4" : "mr-3 w-6 h-6")} /> {t("menu.rules")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">

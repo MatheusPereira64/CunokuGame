@@ -5,7 +5,7 @@ import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
 import { cn } from "@/lib/utils";
 import { Eye } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsCompactGame } from "@/hooks/use-landscape";
 import type { SeatSide } from "./seatPositions";
 
 interface PlayerSeatProps {
@@ -38,25 +38,25 @@ export function PlayerSeat({
   style,
   className,
 }: PlayerSeatProps) {
-  const isMobile = useIsMobile();
+  const isCompact = useIsCompactGame();
   const previousRevealedState = useRef<Map<string, boolean>>(new Map());
 
-  const compact = compactProp ?? (opponentCount >= 4 || isMobile);
+  const compact = compactProp ?? (opponentCount >= 4 || isCompact);
 
   const cardSize = compact
-    ? isMobile
+    ? isCompact
       ? "w-7 h-10"
       : "w-10 h-14 md:w-12 md:h-[4.5rem]"
-    : isMobile
+    : isCompact
       ? "w-8 h-12"
       : "w-12 h-16 md:w-14 md:h-20";
 
   // Overlap do leque: mais forte em mesas lotadas
   const overlapClass = compact
-    ? isMobile
+    ? isCompact
       ? "-ml-4"
       : "-ml-6 md:-ml-7"
-    : isMobile
+    : isCompact
       ? "-ml-3"
       : "-ml-5 md:-ml-6";
 
@@ -65,7 +65,11 @@ export function PlayerSeat({
       className={cn(
         "flex justify-center items-end",
         // Limita o footprint mesmo com mãos grandes (punição)
-        compact ? "max-w-[7.5rem] md:max-w-[9rem]" : "max-w-[10rem] md:max-w-[12rem]"
+        isCompact
+          ? "max-w-[6.5rem]"
+          : compact
+            ? "max-w-[7.5rem] md:max-w-[9rem]"
+            : "max-w-[10rem] md:max-w-[12rem]"
       )}
     >
       {player.hand.map((card, i) => {
@@ -108,10 +112,10 @@ export function PlayerSeat({
               <div
                 className={cn(
                   "absolute bg-yellow-400 rounded-full shadow animate-pulse z-20",
-                  isMobile ? "-top-1 -right-1 p-0.5" : "-top-1.5 -right-1.5 p-0.5"
+                  isCompact ? "-top-1 -right-1 p-0.5" : "-top-1.5 -right-1.5 p-0.5"
                 )}
               >
-                <Eye className={cn("text-yellow-900", isMobile ? "w-2 h-2" : "w-2.5 h-2.5")} />
+                <Eye className={cn("text-yellow-900", isCompact ? "w-2 h-2" : "w-2.5 h-2.5")} />
               </div>
             )}
           </div>
@@ -126,17 +130,18 @@ export function PlayerSeat({
       isBot={player.isBot}
       score={player.score}
       isActive={isActive}
-      compact={compact || isMobile}
+      compact={compact || isCompact}
+      className={isCompact ? "scale-[0.85] origin-center" : undefined}
     />
   );
 
   // Avatar fica no lado de fora da mesa; leque aponta para o feltro
   const layoutClass =
     side === "left"
-      ? "flex-row-reverse items-center gap-1.5"
+      ? "flex-row-reverse items-center gap-1"
       : side === "right"
-        ? "flex-row items-center gap-1.5"
-        : "flex-col items-center gap-1";
+        ? "flex-row items-center gap-1"
+        : "flex-col items-center gap-0.5";
 
   return (
     <div
@@ -144,7 +149,7 @@ export function PlayerSeat({
       className={cn(
         "flex rounded-xl transition-all pointer-events-none",
         layoutClass,
-        isMobile ? "p-0.5" : "p-1",
+        isCompact ? "p-0" : "p-1",
         className
       )}
     >
