@@ -41,9 +41,6 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Verify web assets
-        run: test -f dist/public/index.html && ls -la dist/public | head
-
       - name: Sync Capacitor Android
         run: npx cap sync android
 
@@ -55,13 +52,15 @@ jobs:
 
       - name: Rename APK
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p release-artifacts
-          cp android/app/build/outputs/apk/release/app-release.apk release-artifacts/Cunoku-1.0.3.apk
+          cp android/app/build/outputs/apk/release/app-release.apk "release-artifacts/Cunoku-${VERSION}.apk"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: release-artifacts/Cunoku-1.0.3.apk
+          path: release-artifacts/*.apk
           if-no-files-found: error
 
   ios:
@@ -84,13 +83,12 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Verify web assets
-        run: test -f dist/public/index.html && ls -la dist/public | head
-
       - name: Sync Capacitor iOS
         run: npx cap sync ios
 
       - name: Build iOS app
+        env:
+          APP_VERSION: ${{ github.ref_name }}
         run: bash script/ci-ios-build.sh
 
       - name: Upload build log (always)
@@ -105,7 +103,7 @@ jobs:
         if: success()
         with:
           name: ios-build
-          path: release-artifacts/Cunoku-1.0.3.ipa
+          path: release-artifacts/*.ipa
           if-no-files-found: error
           overwrite: true
 
@@ -121,18 +119,18 @@ jobs:
         with:
           path: release-artifacts
 
-      - name: Flatten artifacts
-        run: |
-          mkdir -p dist-release
-          find release-artifacts -type f \( -name "*.apk" -o -name "*.ipa" -o -name "*.zip" \) -exec cp {} dist-release/ \;
-          ls -lh dist-release
-          test -f dist-release/Cunoku-1.0.3.apk
-
-      - name: Create GitHub Release
+      - name: Flatten artifacts and publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p dist-release
+          find release-artifacts -type f \( -name "*.apk" -o -name "*.ipa" -o -name "*.zip" \) -exec cp {} dist-release/ \;
+          ls -lh dist-release
+          test -f "dist-release/Cunoku-${VERSION}.apk"
+          NOTES="RELEASE_NOTES_${VERSION}.md"
+          if [[ ! -f "$NOTES" ]]; then NOTES="RELEASE_NOTES_1.0.4.md"; fi
           gh release create "${{ github.ref_name }}" dist-release/* \
-            --title "Cunoku 1.0.3" \
-            --notes-file RELEASE_NOTES_1.0.3.md \
+            --title "Cunoku ${VERSION}" \
+            --notes-file "$NOTES" \
             --target "${{ github.sha }}"

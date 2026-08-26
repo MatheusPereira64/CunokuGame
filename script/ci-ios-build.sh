@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
-# Compila o app Capacitor (simulador, sem certificado Apple) e gera Cunoku-1.0.3.ipa
+# Compila o app Capacitor (simulador, sem certificado Apple) e gera o IPA
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/ios/App"
 mkdir -p "$ROOT/release-artifacts"
+
+VERSION="${APP_VERSION:-}"
+VERSION="${VERSION#v}"
+if [[ -z "$VERSION" ]]; then
+  VERSION="$(node -p "require('$ROOT/package.json').version")"
+fi
+IPA_NAME="Cunoku-${VERSION}.ipa"
 
 # Capacitor sync regenera CapApp-SPM. No Xcode 15.4 o plugin @capacitor/app falha
 # (CAPPluginCall.reject) com capacitor-swift-pm 8.5 — o app web não usa esse plugin.
@@ -51,6 +58,7 @@ elif xcrun simctl list devices available | grep -q "iPhone 14"; then
   SIM_DEST="platform=iOS Simulator,name=iPhone 14"
 fi
 echo "==> destination: $SIM_DEST"
+echo "==> IPA: $IPA_NAME"
 
 DERIVED="$ROOT/ios/App/derived-sim"
 LOG="$ROOT/release-artifacts/xcodebuild.log"
@@ -105,6 +113,6 @@ mkdir -p "$STAGE/Payload"
 cp -R "$APP_PATH" "$STAGE/Payload/Cunoku.app"
 (
   cd "$STAGE"
-  zip -y -r "$ROOT/release-artifacts/Cunoku-1.0.3.ipa" Payload
+  zip -y -r "$ROOT/release-artifacts/$IPA_NAME" Payload
 )
-ls -lh "$ROOT/release-artifacts/Cunoku-1.0.3.ipa"
+ls -lh "$ROOT/release-artifacts/$IPA_NAME"

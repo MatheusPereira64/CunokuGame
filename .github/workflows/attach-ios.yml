@@ -60,16 +60,22 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: release-artifacts/Cunoku-1.0.3.ipa
+          path: release-artifacts/*.ipa
           if-no-files-found: error
 
-      - name: Attach IPA to GitHub Release v1.0.3
+      - name: Attach IPA to latest matching release
         if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          test -f "$GITHUB_WORKSPACE/release-artifacts/Cunoku-1.0.3.ipa"
-          gh release upload v1.0.3 \
-            "$GITHUB_WORKSPACE/release-artifacts/Cunoku-1.0.3.ipa" \
-            --clobber
-          gh release edit v1.0.3 --notes-file RELEASE_NOTES_1.0.3.md
+          VERSION=$(node -p "require('./package.json').version")
+          IPA="$GITHUB_WORKSPACE/release-artifacts/Cunoku-${VERSION}.ipa"
+          test -f "$IPA"
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            gh release upload "v${VERSION}" "$IPA" --clobber
+            if [[ -f "RELEASE_NOTES_${VERSION}.md" ]]; then
+              gh release edit "v${VERSION}" --notes-file "RELEASE_NOTES_${VERSION}.md"
+            fi
+          else
+            echo "Release v${VERSION} ainda não existe; IPA ficou só como artifact."
+          fi
