@@ -14,9 +14,11 @@ import { audioManager } from "@/utils/audioManager";
 import { VolumeControl } from "@/components/VolumeControl";
 import { RulesDialog } from "@/components/RulesDialog";
 import { InstallAppButton } from "@/components/InstallAppButton";
+import { ProfileDialog } from "@/components/ProfileDialog";
 import { useI18n, type Language } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
+import { loadProfile } from "@/lib/playerProfile";
 import {
   clearServerBase,
   isLikelyLocalHost,
@@ -71,7 +73,7 @@ export default function Home() {
   const dialogDescClass = cn(isLandscapeMenu && "text-xs leading-snug line-clamp-2");
   const dialogCtaClass = cn("w-full", isLandscapeMenu ? "mt-2 h-9 text-sm" : "mt-4");
   const [languageOpen, setLanguageOpen] = useState(false);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => loadProfile().displayName);
   const [roomCode, setRoomCode] = useState("");
   const [mode, setMode] = useState<"create" | "join" | "bots" | null>(null);
   const [gameMode, setGameMode] = useState<"multiplayer" | "vs_bots">("multiplayer");
@@ -255,9 +257,16 @@ export default function Home() {
         </Select>
       </div>
 
-      {/* Volume + instalar app - Top Right */}
+      {/* Volume + perfil + instalar app - Top Right */}
       <div className={cn("absolute z-20 flex items-center gap-2", isLandscapeMenu ? "top-2 right-2" : "top-4 right-4")}>
         <InstallAppButton compact={isLandscapeMenu} />
+        <ProfileDialog
+          compact={isLandscapeMenu}
+          onSaved={(p) => {
+            if (!name.trim() && p.displayName) setName(p.displayName);
+            else if (p.displayName) setName(p.displayName);
+          }}
+        />
         <div
           className={cn(
             "[&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md",

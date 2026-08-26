@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Copy, Wifi } from "lucide-react";
 import { useI18n } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
+import { loadProfile } from "@/lib/playerProfile";
 
 interface WaitingRoomProps {
   roomCode: string;
@@ -36,6 +37,7 @@ export function WaitingRoom({
   const isPortrait = useIsPortrait();
   const isCompactGame = useIsCompactGame();
   const isLandscape = isCompactGame && !isPortrait;
+  const profile = loadProfile();
 
   return (
     <div
@@ -139,7 +141,12 @@ export function WaitingRoom({
                       : "bg-gray-50 border border-gray-200"
                   )}
                 >
-                  <Avatar name={p.name} className={cn("scale-90", p.id === playerId && "ring-2 ring-indigo-400")} />
+                  <Avatar
+                    name={p.name}
+                    className={cn("scale-90", p.id === playerId && "ring-2 ring-indigo-400")}
+                    iconId={p.id === playerId ? profile.iconId : undefined}
+                    accent={p.id === playerId ? profile.accent : undefined}
+                  />
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-indigo-900 flex items-center gap-2 flex-wrap">
                       {p.name}

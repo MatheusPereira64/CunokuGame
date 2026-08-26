@@ -31,6 +31,11 @@ import { LandscapePrompt } from "@/components/game/LandscapePrompt";
 import { useIsPortrait, lockLandscape, useIsCompactGame } from "@/hooks/use-landscape";
 import { getLanJoinUrl, getNetworkMode } from "@/lib/gameServer";
 import { copyToClipboard } from "@/lib/clipboard";
+import {
+  hasRecordedMatchStats,
+  markMatchStatsRecorded,
+  recordMatchResult,
+} from "@/lib/playerProfile";
 
 export default function Game() {
   const [, params] = useRoute("/game/:code");
@@ -475,17 +480,26 @@ export default function Game() {
     };
   }, [gameState?.winnerId]);
 
-  // Fim de jogo: modal + som de vitória/derrota
+  // Fim de jogo: modal + som de vitória/derrota + estatísticas locais
   useEffect(() => {
-    if (gameState?.winnerId && me) {
+    if (gameState?.winnerId && me && playerId) {
       setGameOverModalOpen(true);
       if (gameState.winnerId === playerId) {
         audioManager.playGameWon();
       } else {
         audioManager.playGameLost();
       }
+
+      const matchId = roomCode || playerId;
+      if (!hasRecordedMatchStats(matchId)) {
+        recordMatchResult({
+          won: gameState.winnerId === playerId,
+          finalScore: me.score,
+        });
+        markMatchStatsRecorded(matchId);
+      }
     }
-  }, [gameState?.winnerId, playerId, me]);
+  }, [gameState?.winnerId, playerId, me, roomCode]);
 
   // Early returns APÓS todos os hooks
   if (!playerId || (!isOffline && !roomCode)) {
@@ -1006,6 +1020,7 @@ export default function Game() {
           onOpenChange={setGameOverModalOpen}
           players={gameState.players}
           winnerId={gameState.winnerId}
+          localPlayerId={playerId}
           onBackHome={() => setLocation("/")}
         />
       )}

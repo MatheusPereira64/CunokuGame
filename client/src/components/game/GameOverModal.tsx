@@ -12,19 +12,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { loadProfile } from "@/lib/playerProfile";
 
 interface GameOverModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   players: Player[];
   winnerId: string;
+  localPlayerId?: string;
   onBackHome: () => void;
 }
 
-export function GameOverModal({ open, onOpenChange, players, winnerId, onBackHome }: GameOverModalProps) {
+export function GameOverModal({
+  open,
+  onOpenChange,
+  players,
+  winnerId,
+  localPlayerId,
+  onBackHome,
+}: GameOverModalProps) {
   const isMobile = useIsMobile();
   const { t } = useI18n();
   const winnerName = players.find((p) => p.id === winnerId)?.name || "";
+  const profile = loadProfile();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -53,7 +63,12 @@ export function GameOverModal({ open, onOpenChange, players, winnerId, onBackHom
               <div key={p.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-gray-400 w-6">#{i + 1}</span>
-                  <Avatar name={p.name} className="scale-50 w-8 h-8" />
+                  <Avatar
+                    name={p.name}
+                    className="scale-50 w-8 h-8"
+                    iconId={p.id === localPlayerId ? profile.iconId : undefined}
+                    accent={p.id === localPlayerId ? profile.accent : undefined}
+                  />
                   <span className="font-bold text-gray-900">{p.name}</span>
                 </div>
                 <span className="font-mono font-bold text-xl">

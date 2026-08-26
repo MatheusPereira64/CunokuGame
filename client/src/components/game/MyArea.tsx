@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import { useI18n } from "@/contexts/i18n-context";
 import { ArrowUpDown } from "lucide-react";
+import { loadProfile } from "@/lib/playerProfile";
 
 interface MyAreaProps {
   gameState: GameState;
@@ -22,6 +23,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
   const isCompact = useIsCompactGame();
   const { t } = useI18n();
   const [selectedHandIndex, setSelectedHandIndex] = useState<number | null>(null);
+  const profile = loadProfile();
 
   // Descarte reativo: cartas conhecidas iguais ao topo da pilha, fora do meu turno
   const getMatchInfo = (): { canMatch: boolean; matchingCards: number[] } => {
@@ -242,7 +244,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
           isCompact ? "right-1 bottom-0 scale-[0.72]" : "-bottom-1 right-4 hidden md:block scale-90"
         )}
       >
-        <Avatar name={me.name} score={me.score} isActive={isMyTurn} position="left" compact={isCompact} />
+        <Avatar name={me.name} score={me.score} isActive={isMyTurn} position="left" compact={isCompact} iconId={profile.iconId} accent={profile.accent} />
       </div>
 
       {/* Botão Cunoku */}
