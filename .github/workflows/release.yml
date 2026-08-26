@@ -22,7 +22,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - uses: actions/setup-java@v4
@@ -40,6 +40,9 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+
+      - name: Verify web assets
+        run: test -f dist/public/index.html && ls -la dist/public | head
 
       - name: Sync Capacitor Android
         run: npx cap sync android
@@ -70,7 +73,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Install dependencies
@@ -80,6 +83,9 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+
+      - name: Verify web assets
+        run: test -f dist/public/index.html && ls -la dist/public | head
 
       - name: Sync Capacitor iOS
         run: npx cap sync ios
