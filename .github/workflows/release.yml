@@ -93,58 +93,27 @@ jobs:
       - name: Build iOS app
         working-directory: ios/App
         run: |
-          set -euo pipefail
-          mkdir -p ../../release-artifacts
-          xcodebuild -project App.xcodeproj -list
-          xcodebuild -project App.xcodeproj -scheme App -resolvePackageDependencies
-
-          UNSIGNED_FLAGS=(
-            CODE_SIGNING_ALLOWED=NO
-            CODE_SIGNING_REQUIRED=NO
-            CODE_SIGN_IDENTITY=
-            CODE_SIGN_STYLE=Manual
-            DEVELOPMENT_TEAM=
-          )
-
-          if xcodebuild \
+          set -euxo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/release-artifacts"
+          xcodebuild \
             -project App.xcodeproj \
             -scheme App \
             -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath derived \
-            "${UNSIGNED_FLAGS[@]}" \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath derived-sim \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            build; then
-            APP_PATH=$(find derived/Build/Products -name "App.app" -print -quit)
-            test -n "$APP_PATH"
-            mkdir -p Payload
-            cp -R "$APP_PATH" Payload/App.app
-            zip -r "$GITHUB_WORKSPACE/release-artifacts/Cunoku-1.0.3.ipa" Payload
-          else
-            echo "Build para device sem certificado falhou; gerando build de simulador."
-            xcodebuild \
-              -project App.xcodeproj \
-              -scheme App \
-              -configuration Release \
-              -sdk iphonesimulator \
-              -destination 'generic/platform=iOS Simulator' \
-              -derivedDataPath derived-sim \
-              COMPILER_INDEX_STORE_ENABLE=NO \
-              build
-            APP_PATH=$(find derived-sim/Build/Products -name "App.app" -print -quit)
-            test -n "$APP_PATH"
-            STAGE=$(mktemp -d)
-            cp -R "$APP_PATH" "$STAGE/App.app"
-            (cd "$STAGE" && zip -r "$GITHUB_WORKSPACE/release-artifacts/Cunoku-1.0.3-ios-simulator.zip" App.app)
-          fi
+            build
+          APP_PATH=$(find derived-sim/Build/Products -name "App.app" -print -quit)
+          test -n "$APP_PATH"
+          STAGE=$(mktemp -d)
+          cp -R "$APP_PATH" "$STAGE/App.app"
+          (cd "$STAGE" && zip -r "$GITHUB_WORKSPACE/release-artifacts/Cunoku-1.0.3-ios-simulator.zip" App.app)
 
       - uses: actions/upload-artifact@v4
         with:
           name: ios-build
-          path: |
-            release-artifacts/Cunoku-1.0.3.ipa
-            release-artifacts/Cunoku-1.0.3-ios-simulator.zip
+          path: release-artifacts/Cunoku-1.0.3-ios-simulator.zip
           if-no-files-found: error
           overwrite: true
 
