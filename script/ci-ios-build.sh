@@ -6,40 +6,45 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/ios/App"
 mkdir -p "$ROOT/release-artifacts"
 
-# Capacitor regenera CapApp-SPM/Package.swift no sync. Em path packages o SwiftPM
-# usa o nome da pasta ("app"), não o name do Package.swift ("CapacitorApp").
-if [[ -f "$ROOT/ios/App/CapApp-SPM/Package.swift" ]]; then
-  python3 - <<'PY'
-from pathlib import Path
-p = Path("CapApp-SPM/Package.swift")
-text = p.read_text(encoding="utf-8")
-# Normalize Windows paths Capacitor may emit on some hosts
-text2 = text.replace(r"..\..\..\node_modules\@capacitor\app", "../../../node_modules/@capacitor/app")
-text2 = text2.replace('.package(name: "CapacitorApp", path: "../../../node_modules/@capacitor/app")',
-                      '.package(path: "../../../node_modules/@capacitor/app")')
-# Critical: package identity for path deps is the directory name "app"
-text2 = text2.replace('.product(name: "CapacitorApp", package: "CapacitorApp")',
-                      '.product(name: "CapacitorApp", package: "app")')
-if text2 != text:
-    p.write_text(text2, encoding="utf-8")
-    print("patched CapApp-SPM/Package.swift for SwiftPM path package id 'app'")
-else:
-    print("CapApp-SPM/Package.swift already patched")
-print(p.read_text(encoding="utf-8"))
-PY
-fi
+# Capacitor sync regenera CapApp-SPM. No Xcode 15.4 o plugin @capacitor/app falha
+# (CAPPluginCall.reject) com capacitor-swift-pm 8.5 — o app web não usa esse plugin.
+cat > CapApp-SPM/Package.swift <<'EOF'
+// swift-tools-version: 5.9
+import PackageDescription
+
+let package = Package(
+    name: "CapApp-SPM",
+    platforms: [.iOS(.v15)],
+    products: [
+        .library(
+            name: "CapApp-SPM",
+            targets: ["CapApp-SPM"])
+    ],
+    dependencies: [
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.5.0")
+    ],
+    targets: [
+        .target(
+            name: "CapApp-SPM",
+            dependencies: [
+                .product(name: "Capacitor", package: "capacitor-swift-pm"),
+                .product(name: "Cordova", package: "capacitor-swift-pm")
+            ]
+        )
+    ]
+)
+EOF
+echo "==> CapApp-SPM/Package.swift (core only):"
+cat CapApp-SPM/Package.swift
 
 echo "==> Xcode"
 xcodebuild -version || true
-echo "==> schemes"
-xcodebuild -project App.xcodeproj -list || true
 echo "==> simulators"
 xcrun simctl list devices available || true
 
-# Xcode 15.4 on macos-14 typically has iPhone 15, not 16.
 SIM_DEST="generic/platform=iOS Simulator"
 if xcrun simctl list devices available | grep -q "iPhone 15"; then
-  SIM_DEST="platform=iOS Simulator,name=iPhone 15"
+  SIM_DEST="platform=iOS Simulator,name=iPhone 15,OS=18.2"
 elif xcrun simctl list devices available | grep -q "iPhone 16"; then
   SIM_DEST="platform=iOS Simulator,name=iPhone 16"
 elif xcrun simctl list devices available | grep -q "iPhone 14"; then
@@ -82,8 +87,8 @@ set -e
 
 if [[ "$XC" -ne 0 ]]; then
   echo "==> xcodebuild failed with exit $XC"
-  grep -E "error:|fatal error|unknown package|Unable to find|AppIcon|destination|package" "$LOG" | tail -150 || true
-  tail -80 "$LOG" || true
+  grep -E "error:|fatal error|unknown package|Unable to find|AppIcon|destination|BUILD FAILED" "$LOG" | tail -150 || true
+  tail -60 "$LOG" || true
   exit "$XC"
 fi
 
