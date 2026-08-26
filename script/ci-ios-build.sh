@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compila o app Capacitor e empacota Cunoku-1.0.3.ipa (sem certificado Apple).
+# Compila o app Capacitor (simulador, sem certificado Apple) e gera Cunoku-1.0.3.ipa
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -19,65 +19,77 @@ if old in text:
 PY
 fi
 
-echo "==> xcodebuild -list"
-xcodebuild -project App.xcodeproj -scheme App -list || true
+echo "==> Xcode / SDKs"
+xcodebuild -version || true
+xcodebuild -showsdks || true
+echo "==> schemes"
+xcodebuild -project App.xcodeproj -list || true
 echo "==> simulators"
 xcrun simctl list devices available || true
 
-pick_sim() {
-  if xcrun simctl list devices available | grep -q "iPhone 16"; then
-    echo "platform=iOS Simulator,name=iPhone 16"
-  elif xcrun simctl list devices available | grep -q "iPhone 15"; then
-    echo "platform=iOS Simulator,name=iPhone 15"
-  else
-    echo "generic/platform=iOS Simulator"
-  fi
-}
+SIM_DEST="generic/platform=iOS Simulator"
+if xcrun simctl list devices available | grep -q "iPhone 16"; then
+  SIM_DEST="platform=iOS Simulator,name=iPhone 16"
+elif xcrun simctl list devices available | grep -q "iPhone 15"; then
+  SIM_DEST="platform=iOS Simulator,name=iPhone 15"
+elif xcrun simctl list devices available | grep -q "iPhone 14"; then
+  SIM_DEST="platform=iOS Simulator,name=iPhone 14"
+fi
+echo "==> destination: $SIM_DEST"
 
-build_app() {
-  local sdk="$1"
-  local dest="$2"
-  local derived="$3"
-  echo "==> xcodebuild sdk=$sdk dest=$dest"
-  xcodebuild \
-    -project App.xcodeproj \
-    -scheme App \
-    -configuration Debug \
-    -sdk "$sdk" \
-    -destination "$dest" \
-    -derivedDataPath "$derived" \
-    CODE_SIGNING_ALLOWED=NO \
-    CODE_SIGNING_REQUIRED=NO \
-    CODE_SIGN_IDENTITY="" \
-    CODE_SIGN_STYLE=Manual \
-    COMPILER_INDEX_STORE_ENABLE=NO \
-    ONLY_ACTIVE_ARCH=YES \
-    build
-}
+DERIVED="$ROOT/ios/App/derived-sim"
+LOG="$ROOT/release-artifacts/xcodebuild.log"
+rm -rf "$DERIVED"
 
-DERIVED_DEV="$ROOT/ios/App/derived-device"
-DERIVED_SIM="$ROOT/ios/App/derived-sim"
-APP_PATH=""
+echo "==> resolve Swift packages"
+xcodebuild \
+  -project App.xcodeproj \
+  -scheme App \
+  -resolvePackageDependencies \
+  -derivedDataPath "$DERIVED" \
+  -skipPackagePluginValidation || true
 
-if build_app iphoneos "generic/platform=iOS" "$DERIVED_DEV"; then
-  APP_PATH="$(find "$DERIVED_DEV/Build/Products" -name "App.app" -print -quit || true)"
-else
-  echo "==> device build failed; trying iOS Simulator"
-  SIM_DEST="$(pick_sim)"
-  echo "==> simulator destination: $SIM_DEST"
-  build_app iphonesimulator "$SIM_DEST" "$DERIVED_SIM"
-  APP_PATH="$(find "$DERIVED_SIM/Build/Products" -name "App.app" -print -quit || true)"
+set +e
+xcodebuild \
+  -project App.xcodeproj \
+  -scheme App \
+  -configuration Debug \
+  -sdk iphonesimulator \
+  -destination "$SIM_DEST" \
+  -derivedDataPath "$DERIVED" \
+  -skipPackagePluginValidation \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_IDENTITY=- \
+  CODE_SIGN_STYLE=Manual \
+  DEVELOPMENT_TEAM= \
+  PROVISIONING_PROFILE_SPECIFIER= \
+  COMPILER_INDEX_STORE_ENABLE=NO \
+  ONLY_ACTIVE_ARCH=YES \
+  build 2>&1 | tee "$LOG"
+XC=${PIPESTATUS[0]}
+set -e
+
+if [[ "$XC" -ne 0 ]]; then
+  echo "==> xcodebuild failed with exit $XC"
+  echo "==> filtered errors:"
+  grep -E "error:|fatal error|Unable to find|requires a development team|AppIcon|No profiles|provisioning|destination|package|SPM|Swift" "$LOG" | tail -150 || true
+  echo "==> last 80 lines:"
+  tail -80 "$LOG" || true
+  exit "$XC"
 fi
 
+APP_PATH="$(find "$DERIVED/Build/Products" -name "App.app" -print -quit || true)"
 if [[ -z "$APP_PATH" ]]; then
-  echo "App.app not found"
+  echo "App.app not found under $DERIVED"
+  find "$DERIVED" -name "*.app" || true
   exit 1
 fi
 echo "==> using $APP_PATH"
 
 STAGE="$(mktemp -d)"
 mkdir -p "$STAGE/Payload"
-cp -R "$APP_PATH" "$STAGE/Payload/App.app"
+cp -R "$APP_PATH" "$STAGE/Payload/Cunoku.app"
 (
   cd "$STAGE"
   zip -y -r "$ROOT/release-artifacts/Cunoku-1.0.3.ipa" Payload

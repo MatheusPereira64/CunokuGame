@@ -11,8 +11,8 @@
 ### App nativo (Mac / Xcode)
 
 1. Baixe **`Cunoku-1.0.3.ipa`**
-2. Instale com Sideloadly, AltStore ou Xcode (é preciso uma conta Apple para assinar)
-3. O IPA desta release é gerado no CI **sem certificado** da App Store
+2. Assine e instale com Sideloadly, AltStore ou Xcode (conta Apple necessária)
+3. O IPA do CI é **sem certificado Apple** — não abre direto no iPhone até ser assinado no seu Mac/ferramenta
 
 ### Atalho na tela inicial (sem Mac)
 

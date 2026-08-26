@@ -23,8 +23,8 @@ concurrency:
 jobs:
   ios:
     name: Build iOS IPA
-    runs-on: macos-latest
-    timeout-minutes: 50
+    runs-on: macos-14
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +47,24 @@ jobs:
       - name: Build iOS IPA
         run: bash script/ci-ios-build.sh
 
-      - name: Upload to GitHub Release v1.0.3
+      - name: Upload build log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcodebuild-log
+          path: release-artifacts/xcodebuild.log
+          if-no-files-found: ignore
+
+      - name: Upload IPA artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: release-artifacts/Cunoku-1.0.3.ipa
+          if-no-files-found: error
+
+      - name: Attach IPA to GitHub Release v1.0.3
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

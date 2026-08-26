@@ -66,8 +66,8 @@ jobs:
 
   ios:
     name: Build iOS IPA
-    runs-on: macos-latest
-    timeout-minutes: 50
+    runs-on: macos-14
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -93,7 +93,16 @@ jobs:
       - name: Build iOS app
         run: bash script/ci-ios-build.sh
 
+      - name: Upload build log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcodebuild-log
+          path: release-artifacts/xcodebuild.log
+          if-no-files-found: ignore
+
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: ios-build
           path: release-artifacts/Cunoku-1.0.3.ipa
