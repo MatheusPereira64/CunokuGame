@@ -11,7 +11,7 @@ on:
       - "package-lock.json"
       - "client/**"
       - "script/**"
-      - "vite.config.ts"
+      - ".github/workflows/attach-ios.yml"
 
 permissions:
   contents: write
@@ -45,24 +45,7 @@ jobs:
         run: npx cap sync ios
 
       - name: Build iOS Simulator
-        working-directory: ios/App
-        run: |
-          set -euxo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/release-artifacts"
-          xcodebuild \
-            -project App.xcodeproj \
-            -scheme App \
-            -configuration Release \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath derived-sim \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            build
-          APP_PATH=$(find derived-sim/Build/Products -name "App.app" -print -quit)
-          test -n "$APP_PATH"
-          STAGE=$(mktemp -d)
-          cp -R "$APP_PATH" "$STAGE/App.app"
-          (cd "$STAGE" && zip -r "$GITHUB_WORKSPACE/release-artifacts/Cunoku-1.0.3-ios-simulator.zip" App.app)
+        run: bash script/ci-ios-build.sh
 
       - name: Upload to GitHub Release v1.0.3
         env:
