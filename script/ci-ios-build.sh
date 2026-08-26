@@ -6,32 +6,42 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/ios/App"
 mkdir -p "$ROOT/release-artifacts"
 
+# Capacitor regenera CapApp-SPM/Package.swift no sync. Em path packages o SwiftPM
+# usa o nome da pasta ("app"), não o name do Package.swift ("CapacitorApp").
 if [[ -f "$ROOT/ios/App/CapApp-SPM/Package.swift" ]]; then
   python3 - <<'PY'
 from pathlib import Path
 p = Path("CapApp-SPM/Package.swift")
 text = p.read_text(encoding="utf-8")
-old = '.package(name: "CapacitorApp", path: "../../../node_modules/@capacitor/app")'
-new = '.package(path: "../../../node_modules/@capacitor/app")'
-if old in text:
-    p.write_text(text.replace(old, new), encoding="utf-8")
-    print("patched CapApp-SPM/Package.swift path package")
+# Normalize Windows paths Capacitor may emit on some hosts
+text2 = text.replace(r"..\..\..\node_modules\@capacitor\app", "../../../node_modules/@capacitor/app")
+text2 = text2.replace('.package(name: "CapacitorApp", path: "../../../node_modules/@capacitor/app")',
+                      '.package(path: "../../../node_modules/@capacitor/app")')
+# Critical: package identity for path deps is the directory name "app"
+text2 = text2.replace('.product(name: "CapacitorApp", package: "CapacitorApp")',
+                      '.product(name: "CapacitorApp", package: "app")')
+if text2 != text:
+    p.write_text(text2, encoding="utf-8")
+    print("patched CapApp-SPM/Package.swift for SwiftPM path package id 'app'")
+else:
+    print("CapApp-SPM/Package.swift already patched")
+print(p.read_text(encoding="utf-8"))
 PY
 fi
 
-echo "==> Xcode / SDKs"
+echo "==> Xcode"
 xcodebuild -version || true
-xcodebuild -showsdks || true
 echo "==> schemes"
 xcodebuild -project App.xcodeproj -list || true
 echo "==> simulators"
 xcrun simctl list devices available || true
 
+# Xcode 15.4 on macos-14 typically has iPhone 15, not 16.
 SIM_DEST="generic/platform=iOS Simulator"
-if xcrun simctl list devices available | grep -q "iPhone 16"; then
-  SIM_DEST="platform=iOS Simulator,name=iPhone 16"
-elif xcrun simctl list devices available | grep -q "iPhone 15"; then
+if xcrun simctl list devices available | grep -q "iPhone 15"; then
   SIM_DEST="platform=iOS Simulator,name=iPhone 15"
+elif xcrun simctl list devices available | grep -q "iPhone 16"; then
+  SIM_DEST="platform=iOS Simulator,name=iPhone 16"
 elif xcrun simctl list devices available | grep -q "iPhone 14"; then
   SIM_DEST="platform=iOS Simulator,name=iPhone 14"
 fi
@@ -47,7 +57,7 @@ xcodebuild \
   -scheme App \
   -resolvePackageDependencies \
   -derivedDataPath "$DERIVED" \
-  -skipPackagePluginValidation || true
+  -skipPackagePluginValidation 2>&1 | tee "$ROOT/release-artifacts/xcodebuild-resolve.log" || true
 
 set +e
 xcodebuild \
@@ -72,9 +82,7 @@ set -e
 
 if [[ "$XC" -ne 0 ]]; then
   echo "==> xcodebuild failed with exit $XC"
-  echo "==> filtered errors:"
-  grep -E "error:|fatal error|Unable to find|requires a development team|AppIcon|No profiles|provisioning|destination|package|SPM|Swift" "$LOG" | tail -150 || true
-  echo "==> last 80 lines:"
+  grep -E "error:|fatal error|unknown package|Unable to find|AppIcon|destination|package" "$LOG" | tail -150 || true
   tail -80 "$LOG" || true
   exit "$XC"
 fi
