@@ -10,12 +10,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
+import { cn } from "@/lib/utils";
 
 export function VolumeControl() {
   const [musicVolume, setMusicVolume] = useState(audioManager.getMusicVolume());
   const [sfxVolume, setSfxVolume] = useState(audioManager.getSfxVolume());
   const [isMuted, setIsMuted] = useState(audioManager.getMuted());
   const [isOpen, setIsOpen] = useState(false);
+  const isPortrait = useIsPortrait();
+  const isCompactGame = useIsCompactGame();
+  const isLandscapeMenu = isCompactGame && !isPortrait;
 
   // Atualiza estados quando o diálogo abre
   useEffect(() => {
@@ -60,11 +65,16 @@ export function VolumeControl() {
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Configurações de Áudio</DialogTitle>
+      <DialogContent
+        className={cn(
+          "sm:max-w-md",
+          isLandscapeMenu && "max-h-[min(92dvh,22rem)] w-[min(96vw,28rem)] p-3 gap-2 overflow-y-auto"
+        )}
+      >
+        <DialogHeader className={cn(isLandscapeMenu && "pr-6")}>
+          <DialogTitle className={cn(isLandscapeMenu && "text-base")}>Configurações de Áudio</DialogTitle>
         </DialogHeader>
-        <div className="space-y-6 py-4">
+        <div className={cn(isLandscapeMenu ? "space-y-3 py-1" : "space-y-6 py-4")}>
           {/* Controle de Mute */}
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium">Som</label>
@@ -130,4 +140,3 @@ export function VolumeControl() {
     </Dialog>
   );
 }
-

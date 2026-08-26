@@ -26,7 +26,7 @@ export function UpdateAvailableDialog() {
         else setOpen(true);
       }}
     >
-      <DialogContent className="sm:max-w-md border-indigo-200">
+      <DialogContent className="sm:max-w-md border-indigo-200 max-h-[min(92dvh,24rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-indigo-900 font-display text-xl">
             <Sparkles className="w-5 h-5 text-amber-500" />

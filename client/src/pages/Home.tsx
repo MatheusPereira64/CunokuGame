@@ -50,10 +50,26 @@ export default function Home() {
     isLandscapeMenu ? "text-sm py-3 h-auto min-h-0" : "text-xl py-8"
   );
   const menuIconClass = cn(isLandscapeMenu ? "mr-2 w-4 h-4" : "mr-3 w-6 h-6");
-  const dialogBodyClass = cn(
-    "overflow-visible",
-    isLandscapeMenu && "max-h-[min(85dvh,32rem)] overflow-y-auto py-2 space-y-3"
+  /** Dialog encaixa em tela baixa (celular deitado) sem cortar o botão de ação */
+  const dialogContentClass = cn(
+    "sm:max-w-md",
+    isLandscapeMenu
+      ? "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2 overflow-hidden flex flex-col"
+      : "overflow-visible"
   );
+  const dialogBodyClass = cn(
+    isLandscapeMenu
+      ? "min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-2 py-1 pr-1"
+      : "space-y-4 py-4 overflow-visible"
+  );
+  const dialogInputClass = cn(isLandscapeMenu ? "text-sm h-9 py-1.5" : "text-lg py-6");
+  const dialogSelectClass = cn(
+    "w-full",
+    isLandscapeMenu ? "text-sm h-9 py-1.5" : "text-lg py-6"
+  );
+  const dialogHeaderClass = cn(isLandscapeMenu && "space-y-0.5 pr-6 text-left");
+  const dialogDescClass = cn(isLandscapeMenu && "text-xs leading-snug line-clamp-2");
+  const dialogCtaClass = cn("w-full", isLandscapeMenu ? "mt-2 h-9 text-sm" : "mt-4");
   const [languageOpen, setLanguageOpen] = useState(false);
   const [name, setName] = useState("");
   const [roomCode, setRoomCode] = useState("");
@@ -317,57 +333,67 @@ export default function Home() {
                 <Gamepad2 className={menuIconClass} /> {t("menu.createGame")}
               </Button>
             </DialogTrigger>
-            <DialogContent className={cn("sm:max-w-md overflow-visible", isLandscapeMenu && "max-h-[90dvh]")}>
-              <DialogHeader>
-                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-xl" : "text-2xl")}>
+            <DialogContent className={dialogContentClass}>
+              <DialogHeader className={dialogHeaderClass}>
+                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-lg" : "text-2xl")}>
                   {createStep === "network" ? t("create.networkTitle") : t("create.title")}
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className={dialogDescClass}>
                   {createStep === "network" ? t("create.networkDescription") : t("create.description")}
                 </DialogDescription>
               </DialogHeader>
 
               {createStep === "network" ? (
-                <div className={cn("space-y-3 py-2", dialogBodyClass)}>
+                <div className={cn(dialogBodyClass, isLandscapeMenu && "grid grid-cols-2 gap-2 space-y-0")}>
                   <button
                     type="button"
-                    className="w-full text-left rounded-xl border-2 border-indigo-200 hover:border-indigo-500 bg-white p-4 transition-colors"
+                    className={cn(
+                      "w-full text-left rounded-xl border-2 border-indigo-200 hover:border-indigo-500 bg-white transition-colors",
+                      isLandscapeMenu ? "p-2.5" : "p-4"
+                    )}
                     onClick={() => {
                       setNetworkChoice("lan");
                       setCreateStep("form");
                     }}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-lg bg-indigo-100 p-2 text-indigo-800">
-                        <Wifi className="w-5 h-5" />
+                    <div className={cn("flex items-start", isLandscapeMenu ? "gap-2" : "gap-3")}>
+                      <div className={cn("rounded-lg bg-indigo-100 text-indigo-800", isLandscapeMenu ? "p-1.5" : "p-2")}>
+                        <Wifi className={isLandscapeMenu ? "w-4 h-4" : "w-5 h-5"} />
                       </div>
                       <div>
-                        <div className="font-bold text-indigo-900">{t("create.networkLan")}</div>
-                        <p className="text-sm text-gray-600 mt-1">{t("create.networkLanDesc")}</p>
+                        <div className={cn("font-bold text-indigo-900", isLandscapeMenu && "text-sm")}>{t("create.networkLan")}</div>
+                        <p className={cn("text-gray-600", isLandscapeMenu ? "text-[11px] mt-0.5 leading-snug" : "text-sm mt-1")}>
+                          {t("create.networkLanDesc")}
+                        </p>
                       </div>
                     </div>
                   </button>
                   <button
                     type="button"
-                    className="w-full text-left rounded-xl border-2 border-red-200 hover:border-red-500 bg-white p-4 transition-colors"
+                    className={cn(
+                      "w-full text-left rounded-xl border-2 border-red-200 hover:border-red-500 bg-white transition-colors",
+                      isLandscapeMenu ? "p-2.5" : "p-4"
+                    )}
                     onClick={() => {
                       setNetworkChoice("server");
                       setCreateStep("form");
                     }}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-lg bg-red-100 p-2 text-red-700">
-                        <Cloud className="w-5 h-5" />
+                    <div className={cn("flex items-start", isLandscapeMenu ? "gap-2" : "gap-3")}>
+                      <div className={cn("rounded-lg bg-red-100 text-red-700", isLandscapeMenu ? "p-1.5" : "p-2")}>
+                        <Cloud className={isLandscapeMenu ? "w-4 h-4" : "w-5 h-5"} />
                       </div>
                       <div>
-                        <div className="font-bold text-indigo-900">{t("create.networkServer")}</div>
-                        <p className="text-sm text-gray-600 mt-1">{t("create.networkServerDesc")}</p>
+                        <div className={cn("font-bold text-indigo-900", isLandscapeMenu && "text-sm")}>{t("create.networkServer")}</div>
+                        <p className={cn("text-gray-600", isLandscapeMenu ? "text-[11px] mt-0.5 leading-snug" : "text-sm mt-1")}>
+                          {t("create.networkServerDesc")}
+                        </p>
                       </div>
                     </div>
                   </button>
                 </div>
               ) : (
-              <div className={cn("space-y-4 py-4 overflow-visible", dialogBodyClass)}>
+              <div className={dialogBodyClass}>
                 <button
                   type="button"
                   className="inline-flex items-center text-sm text-indigo-700 hover:text-indigo-900 font-medium"
@@ -377,61 +403,66 @@ export default function Home() {
                   {t("create.backToNetwork")}
                 </button>
                 {networkChoice === "lan" && (
-                  <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+                  <div className={cn(
+                    "rounded-lg bg-amber-50 border border-amber-200 text-amber-800",
+                    isLandscapeMenu ? "px-2 py-1 text-xs" : "px-3 py-2 text-sm"
+                  )}>
                     {t("create.lanHint")}
                   </div>
                 )}
-                <div className="space-y-2">
-                  <Label htmlFor="hostName">{t("create.yourName")}</Label>
-                  <Input 
-                    id="hostName" 
-                    placeholder={t("create.namePlaceholder")} 
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="text-lg py-6"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="maxPlayers">{t("create.maxPlayers")}</Label>
-                  <Select 
-                    value={maxPlayers.toString()} 
-                    onValueChange={(value) => {
-                      const newMax = parseInt(value);
-                      setMaxPlayers(newMax);
-                      // Ajusta botCount se necessário
-                      if (botCount > newMax - 1) {
-                        setBotCount(newMax - 1);
-                      }
-                      setMaxPlayersOpen(false);
-                    }}
-                    open={maxPlayersOpen}
-                    onOpenChange={(open) => {
-                      setMaxPlayersOpen(open);
-                      if (open) {
-                        setBotCountOpen(false);
-                        setBotDifficultyOpen(false);
-                      }
-                    }}
-                  >
-                    <SelectTrigger id="maxPlayers" className="text-lg py-6 w-full">
-                      <SelectValue placeholder={t("create.maxPlayers")} />
-                    </SelectTrigger>
-                    <SelectContent 
-                      position="popper"
-                      className="z-[100] auto-height bg-white"
-                      sideOffset={5}
+                <div className={cn(isLandscapeMenu ? "grid grid-cols-2 gap-2" : "space-y-4")}>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="hostName">{t("create.yourName")}</Label>
+                    <Input 
+                      id="hostName" 
+                      placeholder={t("create.namePlaceholder")} 
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className={dialogInputClass}
+                    />
+                  </div>
+                  
+                  <div className="space-y-1.5">
+                    <Label htmlFor="maxPlayers">{t("create.maxPlayers")}</Label>
+                    <Select 
+                      value={maxPlayers.toString()} 
+                      onValueChange={(value) => {
+                        const newMax = parseInt(value);
+                        setMaxPlayers(newMax);
+                        // Ajusta botCount se necessário
+                        if (botCount > newMax - 1) {
+                          setBotCount(newMax - 1);
+                        }
+                        setMaxPlayersOpen(false);
+                      }}
+                      open={maxPlayersOpen}
+                      onOpenChange={(open) => {
+                        setMaxPlayersOpen(open);
+                        if (open) {
+                          setBotCountOpen(false);
+                          setBotDifficultyOpen(false);
+                        }
+                      }}
                     >
-                      <SelectItem value="2">2 {t("create.players")}</SelectItem>
-                      <SelectItem value="3">3 {t("create.players")}</SelectItem>
-                      <SelectItem value="4">4 {t("create.players")}</SelectItem>
-                      <SelectItem value="5">5 {t("create.players")}</SelectItem>
-                      <SelectItem value="6">6 {t("create.players")}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                      <SelectTrigger id="maxPlayers" className={dialogSelectClass}>
+                        <SelectValue placeholder={t("create.maxPlayers")} />
+                      </SelectTrigger>
+                      <SelectContent 
+                        position="popper"
+                        className="z-[100] auto-height bg-white"
+                        sideOffset={5}
+                      >
+                        <SelectItem value="2">2 {t("create.players")}</SelectItem>
+                        <SelectItem value="3">3 {t("create.players")}</SelectItem>
+                        <SelectItem value="4">4 {t("create.players")}</SelectItem>
+                        <SelectItem value="5">5 {t("create.players")}</SelectItem>
+                        <SelectItem value="6">6 {t("create.players")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex items-center space-x-2">
                     <input
                       type="checkbox"
@@ -447,8 +478,8 @@ export default function Home() {
                 </div>
 
                 {includeBots && (
-                  <>
-                    <div className="space-y-2">
+                  <div className={cn(isLandscapeMenu ? "grid grid-cols-2 gap-2" : "space-y-4")}>
+                    <div className="space-y-1.5">
                       <Label htmlFor="createBotCount">
                         {t("create.botCount").replace("{max}", (maxPlayers - 1).toString())}
                       </Label>
@@ -468,7 +499,7 @@ export default function Home() {
                           }
                         }}
                       >
-                        <SelectTrigger id="createBotCount" className="text-lg py-6 w-full">
+                        <SelectTrigger id="createBotCount" className={dialogSelectClass}>
                           <SelectValue placeholder={t("create.botCount")} />
                         </SelectTrigger>
                         <SelectContent 
@@ -489,7 +520,7 @@ export default function Home() {
                         </p>
                       )}
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <Label htmlFor="createBotDifficulty">{t("create.botDifficulty")}</Label>
                       <Select 
                         value={botDifficulty} 
@@ -506,7 +537,7 @@ export default function Home() {
                           }
                         }}
                       >
-                        <SelectTrigger id="createBotDifficulty" className="text-lg py-6 w-full">
+                        <SelectTrigger id="createBotDifficulty" className={dialogSelectClass}>
                           <SelectValue placeholder={t("create.botDifficulty")} />
                         </SelectTrigger>
                         <SelectContent 
@@ -520,17 +551,26 @@ export default function Home() {
                         </SelectContent>
                       </Select>
                     </div>
-                  </>
+                  </div>
                 )}
 
                 <Button 
-                  className="w-full mt-4" 
+                  className={cn(dialogCtaClass, isLandscapeMenu && "hidden")} 
                   onClick={handleCreate} 
                   isLoading={createRoom.isPending}
                 >
                   {t("create.createRoom")} <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </div>
+              )}
+              {isLandscapeMenu && createStep === "form" && (
+                <Button 
+                  className={dialogCtaClass} 
+                  onClick={handleCreate} 
+                  isLoading={createRoom.isPending}
+                >
+                  {t("create.createRoom")} <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
               )}
             </DialogContent>
           </Dialog>
@@ -541,87 +581,93 @@ export default function Home() {
                 <Bot className={menuIconClass} /> {t("menu.playBots")}
               </Button>
             </DialogTrigger>
-            <DialogContent className={cn("sm:max-w-md overflow-visible", isLandscapeMenu && "max-h-[90dvh]")}>
-              <DialogHeader>
-                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-xl" : "text-2xl")}>{t("bots.title")}</DialogTitle>
-                <DialogDescription>{t("bots.description")}</DialogDescription>
+            <DialogContent className={dialogContentClass}>
+              <DialogHeader className={dialogHeaderClass}>
+                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-lg" : "text-2xl")}>{t("bots.title")}</DialogTitle>
+                <DialogDescription className={dialogDescClass}>{t("bots.description")}</DialogDescription>
               </DialogHeader>
-              <div className={cn("space-y-4 py-4 overflow-visible", dialogBodyClass)}>
-                <div className="space-y-2">
+              <div className={dialogBodyClass}>
+                <div className="space-y-1.5">
                   <Label htmlFor="botName">{t("bots.yourName")}</Label>
                   <Input 
                     id="botName" 
                     placeholder={t("bots.namePlaceholder")} 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="text-lg py-6"
+                    className={dialogInputClass}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="botCount">{t("bots.botCount")}</Label>
-                  <Select 
-                    value={botCount.toString()} 
-                    onValueChange={(value) => {
-                      setBotCount(parseInt(value));
-                      setBotCountOpen(false);
-                    }}
-                    open={botCountOpen}
-                    onOpenChange={(open) => {
-                      setBotCountOpen(open);
-                      if (open) setBotDifficultyOpen(false);
-                    }}
-                  >
-                    <SelectTrigger id="botCount" className="text-lg py-6 w-full">
-                      <SelectValue placeholder={t("bots.botCount")} />
-                    </SelectTrigger>
-                    <SelectContent 
-                      position="popper"
-                      className="z-[100] auto-height bg-white"
-                      sideOffset={5}
+                <div className={cn(isLandscapeMenu ? "grid grid-cols-2 gap-2" : "contents")}>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="botCount">{t("bots.botCount")}</Label>
+                    <Select 
+                      value={botCount.toString()} 
+                      onValueChange={(value) => {
+                        setBotCount(parseInt(value));
+                        setBotCountOpen(false);
+                      }}
+                      open={botCountOpen}
+                      onOpenChange={(open) => {
+                        setBotCountOpen(open);
+                        if (open) setBotDifficultyOpen(false);
+                      }}
                     >
-                      <SelectItem value="1">1 {t("bots.bot")}</SelectItem>
-                      <SelectItem value="2">2 {t("bots.bots")}</SelectItem>
-                      <SelectItem value="3">3 {t("bots.bots")}</SelectItem>
-                      <SelectItem value="4">4 {t("bots.bots")}</SelectItem>
-                      <SelectItem value="5">5 {t("bots.bots")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="botDifficulty">{t("bots.botDifficulty")}</Label>
-                  <Select 
-                    value={botDifficulty} 
-                    onValueChange={(value: "easy" | "medium" | "hard") => {
-                      setBotDifficulty(value);
-                      setBotDifficultyOpen(false);
-                    }}
-                    open={botDifficultyOpen}
-                    onOpenChange={(open) => {
-                      setBotDifficultyOpen(open);
-                      if (open) setBotCountOpen(false);
-                    }}
-                  >
-                    <SelectTrigger id="botDifficulty" className="text-lg py-6 w-full">
-                      <SelectValue placeholder={t("bots.botDifficulty")} />
-                    </SelectTrigger>
-                    <SelectContent 
-                      position="popper"
-                      className="z-[100] auto-height bg-white"
-                      sideOffset={5}
+                      <SelectTrigger id="botCount" className={dialogSelectClass}>
+                        <SelectValue placeholder={t("bots.botCount")} />
+                      </SelectTrigger>
+                      <SelectContent 
+                        position="popper"
+                        className="z-[100] auto-height bg-white"
+                        sideOffset={5}
+                      >
+                        <SelectItem value="1">1 {t("bots.bot")}</SelectItem>
+                        <SelectItem value="2">2 {t("bots.bots")}</SelectItem>
+                        <SelectItem value="3">3 {t("bots.bots")}</SelectItem>
+                        <SelectItem value="4">4 {t("bots.bots")}</SelectItem>
+                        <SelectItem value="5">5 {t("bots.bots")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="botDifficulty">{t("bots.botDifficulty")}</Label>
+                    <Select 
+                      value={botDifficulty} 
+                      onValueChange={(value: "easy" | "medium" | "hard") => {
+                        setBotDifficulty(value);
+                        setBotDifficultyOpen(false);
+                      }}
+                      open={botDifficultyOpen}
+                      onOpenChange={(open) => {
+                        setBotDifficultyOpen(open);
+                        if (open) setBotCountOpen(false);
+                      }}
                     >
-                      <SelectItem value="easy">{t("create.difficulty.easy")}</SelectItem>
-                      <SelectItem value="medium">{t("create.difficulty.medium")}</SelectItem>
-                      <SelectItem value="hard">{t("create.difficulty.hard")}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                      <SelectTrigger id="botDifficulty" className={dialogSelectClass}>
+                        <SelectValue placeholder={t("bots.botDifficulty")} />
+                      </SelectTrigger>
+                      <SelectContent 
+                        position="popper"
+                        className="z-[100] auto-height bg-white"
+                        sideOffset={5}
+                      >
+                        <SelectItem value="easy">{t("create.difficulty.easy")}</SelectItem>
+                        <SelectItem value="medium">{t("create.difficulty.medium")}</SelectItem>
+                        <SelectItem value="hard">{t("create.difficulty.hard")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <Button 
-                  className="w-full mt-4" 
-                  onClick={handleCreate}
-                >
+                {!isLandscapeMenu && (
+                  <Button className={dialogCtaClass} onClick={handleCreate}>
+                    {t("bots.startGame")} <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+              {isLandscapeMenu && (
+                <Button className={dialogCtaClass} onClick={handleCreate}>
                   {t("bots.startGame")} <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
-              </div>
+              )}
             </DialogContent>
           </Dialog>
 
@@ -631,52 +677,65 @@ export default function Home() {
                 <Users className={menuIconClass} /> {t("menu.joinRoom")}
               </Button>
             </DialogTrigger>
-            <DialogContent className={cn("sm:max-w-md", isLandscapeMenu && "max-h-[90dvh]")}>
-              <DialogHeader>
-                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-xl" : "text-2xl")}>{t("join.title")}</DialogTitle>
-                <DialogDescription>{t("join.description")}</DialogDescription>
+            <DialogContent className={dialogContentClass}>
+              <DialogHeader className={dialogHeaderClass}>
+                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-lg" : "text-2xl")}>{t("join.title")}</DialogTitle>
+                <DialogDescription className={dialogDescClass}>{t("join.description")}</DialogDescription>
               </DialogHeader>
-              <div className={cn("space-y-4 py-4", dialogBodyClass)}>
-                <div className="space-y-2">
-                  <Label htmlFor="joinName">{t("join.yourName")}</Label>
-                  <Input 
-                    id="joinName" 
-                    placeholder={t("join.namePlaceholder")} 
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="text-lg py-6"
-                  />
+              <div className={dialogBodyClass}>
+                <div className={cn(isLandscapeMenu ? "grid grid-cols-2 gap-2" : "space-y-4")}>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="joinName">{t("join.yourName")}</Label>
+                    <Input 
+                      id="joinName" 
+                      placeholder={t("join.namePlaceholder")} 
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className={dialogInputClass}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="roomCode">{t("join.roomCode")}</Label>
+                    <Input 
+                      id="roomCode" 
+                      placeholder={t("join.roomCodePlaceholder")} 
+                      maxLength={4}
+                      value={roomCode}
+                      onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                      className={cn(dialogInputClass, "font-mono tracking-widest uppercase")}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label htmlFor="hostAddress">{t("join.hostAddress")}</Label>
                   <Input
                     id="hostAddress"
                     placeholder={t("join.hostAddressPlaceholder")}
                     value={hostAddress}
                     onChange={(e) => setHostAddress(e.target.value)}
-                    className="text-lg py-6 font-mono"
+                    className={cn(dialogInputClass, "font-mono")}
                   />
-                  <p className="text-xs text-gray-500">{t("join.hostAddressHint")}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="roomCode">{t("join.roomCode")}</Label>
-                  <Input 
-                    id="roomCode" 
-                    placeholder={t("join.roomCodePlaceholder")} 
-                    maxLength={4}
-                    value={roomCode}
-                    onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                    className="text-lg py-6 font-mono tracking-widest uppercase"
-                  />
+                  {!isLandscapeMenu && (
+                    <p className="text-xs text-gray-500">{t("join.hostAddressHint")}</p>
+                  )}
                 </div>
                 <Button 
-                  className="w-full mt-4" 
+                  className={cn(dialogCtaClass, isLandscapeMenu && "hidden")} 
                   onClick={handleJoin} 
                   isLoading={joinRoom.isPending}
                 >
                   {t("join.joinRoom")} <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </div>
+              {isLandscapeMenu && (
+                <Button 
+                  className={dialogCtaClass} 
+                  onClick={handleJoin} 
+                  isLoading={joinRoom.isPending}
+                >
+                  {t("join.joinRoom")} <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
+              )}
             </DialogContent>
           </Dialog>
 
