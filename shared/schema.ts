@@ -18,6 +18,8 @@ export interface Card {
   rank: Rank;
   value: number; // Game value (King=0, Joker=-1, etc)
   isFaceUp: boolean;
+  /** Dono atual da carta (opcional; usado na distribuição) */
+  ownerId?: string;
 }
 
 export interface Player {

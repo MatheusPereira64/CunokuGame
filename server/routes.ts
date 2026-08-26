@@ -151,7 +151,7 @@ export async function registerRoutes(
           }
           (roomsMap.get(code) as any).playerNames.set(playerId, name);
 
-          let state = room.gameState as GameState;
+          let state = room.gameState;
           
           // Se o jogo já está em andamento, envia o estado atual
           if (state) {

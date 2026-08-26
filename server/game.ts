@@ -208,8 +208,8 @@ export class GameLogic {
     privateMessage?: { playerId: string; message: string; card?: Card; playerName?: string; targetPlayerId?: string; targetCardIndex?: number };
     swapInfo?: { player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number }
   } {
-    const newState = JSON.parse(JSON.stringify(state)); // Deep copy
-    const playerIndex = newState.players.findIndex(p => p.id === playerId);
+    const newState: GameState = JSON.parse(JSON.stringify(state)); // Deep copy
+    const playerIndex = newState.players.findIndex((p: Player) => p.id === playerId);
     
     if (playerIndex === -1) {
       return { newState: state };
@@ -326,9 +326,10 @@ export class GameLogic {
         if (newState.drawnFromDiscard) {
           return { newState };
         }
+        const abilityRank = newState.drawnCard.rank;
         const abilityResult = this.handleAbility(
           newState,
-          newState.drawnCard.rank,
+          abilityRank,
           playerId,
           action.targetPlayerId,
           action.targetCardIndex,
@@ -342,12 +343,12 @@ export class GameLogic {
           if (abilityResult.swapInfo) {
             // Troca de cartas - log público detalhado
             newState.logs.push(`${newState.players[playerIndex].name} trocou a carta ${abilityResult.swapInfo.player1CardIndex} de ${abilityResult.swapInfo.player1Name} com a carta ${abilityResult.swapInfo.player2CardIndex} de ${abilityResult.swapInfo.player2Name}`);
-          } else if (rank === "7" || rank === "8") {
+          } else if (abilityRank === "7" || abilityRank === "8") {
             // Ver própria carta - log simples
             newState.logs.push(`${newState.players[playerIndex].name} usou habilidade para ver uma de suas cartas`);
-          } else if (rank === "5" || rank === "6") {
+          } else if (abilityRank === "5" || abilityRank === "6") {
             // Ver carta de oponente - log simples (detalhes são privados)
-            const targetPlayer = newState.players.find(p => p.id === action.targetPlayerId);
+            const targetPlayer = newState.players.find((p: Player) => p.id === action.targetPlayerId);
             if (targetPlayer) {
               newState.logs.push(`${newState.players[playerIndex].name} usou habilidade para ver uma carta de ${targetPlayer.name}`);
             }
@@ -386,10 +387,10 @@ export class GameLogic {
                 targetCardIndex: action.targetCardIndex
               },
               swapInfo: abilityResult.swapInfo ? {
-                player1Id: newState.players.find(p => p.name === abilityResult.swapInfo!.player1Name)?.id || "",
+                player1Id: newState.players.find((p: Player) => p.name === abilityResult.swapInfo!.player1Name)?.id || "",
                 player1Name: abilityResult.swapInfo.player1Name,
                 player1CardIndex: abilityResult.swapInfo.player1CardIndex,
-                player2Id: newState.players.find(p => p.name === abilityResult.swapInfo!.player2Name)?.id || "",
+                player2Id: newState.players.find((p: Player) => p.name === abilityResult.swapInfo!.player2Name)?.id || "",
                 player2Name: abilityResult.swapInfo.player2Name,
                 player2CardIndex: abilityResult.swapInfo.player2CardIndex
               } : undefined
@@ -398,8 +399,8 @@ export class GameLogic {
           
           // Se há informação de troca, retorna para enviar notificação de animação
           if (abilityResult.swapInfo) {
-            const player1 = newState.players.find(p => p.name === abilityResult.swapInfo!.player1Name);
-            const player2 = newState.players.find(p => p.name === abilityResult.swapInfo!.player2Name);
+            const player1 = newState.players.find((p: Player) => p.name === abilityResult.swapInfo!.player1Name);
+            const player2 = newState.players.find((p: Player) => p.name === abilityResult.swapInfo!.player2Name);
             return {
               newState,
               swapInfo: {
