@@ -1,0 +1,140 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Web build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Assemble release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Rename APK
+        run: |
+          mkdir -p release-artifacts
+          cp android/app/build/outputs/apk/release/app-release.apk release-artifacts/Cunoku-1.0.3.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: release-artifacts/Cunoku-1.0.3.apk
+          if-no-files-found: error
+
+  ios:
+    name: Build iOS IPA
+    runs-on: macos-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Web build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Build unsigned IPA
+        working-directory: ios/App
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath derived \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+          APP_PATH=$(find derived/Build/Products -name "App.app" -print -quit)
+          test -n "$APP_PATH"
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/App.app
+          zip -r Cunoku-1.0.3.ipa Payload
+          mkdir -p ../../release-artifacts
+          mv Cunoku-1.0.3.ipa ../../release-artifacts/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: release-artifacts/Cunoku-1.0.3.ipa
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p dist-release
+          find release-artifacts -type f \( -name "*.apk" -o -name "*.ipa" \) -exec cp {} dist-release/ \;
+          ls -lh dist-release
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist-release/* \
+            --title "Cunoku 1.0.3" \
+            --notes-file RELEASE_NOTES_1.0.3.md \
+            --target "${{ github.sha }}"

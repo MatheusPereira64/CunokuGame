@@ -7,10 +7,15 @@ const config: CapacitorConfig = {
   server: {
     // Permite HTTP na LAN (partida Wi‑Fi local)
     androidScheme: "https",
+    iosScheme: "https",
     cleartext: true,
   },
   android: {
     allowMixedContent: true,
+  },
+  ios: {
+    contentInset: "automatic",
+    scheme: "Cunoku",
   },
   plugins: {
     SplashScreen: {
