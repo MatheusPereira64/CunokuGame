@@ -11,6 +11,7 @@ class AudioManager {
   private sfxVolume: number = 0.7;
   private isMuted: boolean = false;
   private userInteracted: boolean = false;
+  private audioCtx: AudioContext | null = null;
 
   constructor() {
     // Carrega volumes salvos do localStorage
@@ -140,6 +141,129 @@ class AudioManager {
     sound.play().catch(err => {
       console.warn('Failed to play game lost sound:', err);
     });
+  }
+
+  // ============================================
+  // SFX sintetizados via Web Audio (sem arquivos)
+  // ============================================
+
+  private getAudioContext(): AudioContext | null {
+    if (typeof window === "undefined") return null;
+    const Ctor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctor) return null;
+    if (!this.audioCtx) {
+      this.audioCtx = new Ctor();
+    }
+    if (this.audioCtx.state === "suspended") {
+      this.audioCtx.resume().catch(() => {});
+    }
+    return this.audioCtx;
+  }
+
+  private canPlaySfx(): boolean {
+    return !this.isMuted && this.userInteracted && this.sfxVolume > 0;
+  }
+
+  /** Ruído filtrado curto: som de carta deslizando na mesa */
+  playCardSlide(): void {
+    if (!this.canPlaySfx()) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const duration = 0.18;
+    const bufferSize = Math.floor(ctx.sampleRate * duration);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(2600, ctx.currentTime);
+    filter.Q.value = 0.8;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(this.sfxVolume * 0.35, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+    source.connect(filter).connect(gain).connect(ctx.destination);
+    source.start();
+  }
+
+  /** Estalo curto: som de carta virando */
+  playCardFlip(): void {
+    if (!this.canPlaySfx()) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(680, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1150, ctx.currentTime + 0.06);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(this.sfxVolume * 0.25, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.09);
+
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1);
+  }
+
+  /** Dois deslizes em sequência: troca de cartas */
+  playSwap(): void {
+    if (!this.canPlaySfx()) return;
+    this.playCardSlide();
+    setTimeout(() => this.playCardSlide(), 160);
+  }
+
+  /** Zumbido grave: punição por descarte errado */
+  playPenalty(): void {
+    if (!this.canPlaySfx()) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const osc = ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(180, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(90, ctx.currentTime + 0.3);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(this.sfxVolume * 0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  }
+
+  /** Dois toques suaves ascendentes: começou o seu turno */
+  playYourTurn(): void {
+    if (!this.canPlaySfx()) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const playNote = (freq: number, startOffset: number) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + startOffset);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, ctx.currentTime + startOffset);
+      gain.gain.linearRampToValueAtTime(this.sfxVolume * 0.22, ctx.currentTime + startOffset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startOffset + 0.28);
+
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + startOffset);
+      osc.stop(ctx.currentTime + startOffset + 0.3);
+    };
+
+    playNote(659.25, 0); // Mi5
+    playNote(880, 0.14); // Lá5
   }
 
   /**

@@ -5,6 +5,7 @@ import { ReplaceAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./t
 
 interface CardReplaceAnimationProps extends BaseAnimationProps {
   data: ReplaceAnimationData;
+  isOwnPlayer?: boolean;
 }
 
 export function CardReplaceAnimation({

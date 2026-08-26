@@ -35,7 +35,7 @@ export interface GameState {
   discardPile: Card[];
   players: Player[];
   currentPlayerIndex: number;
-  turnPhase: "draw" | "action" | "discard" | "finished";
+  turnPhase: "waiting" | "draw" | "action" | "discard" | "finished";
   drawnCard: Card | null; // The card currently drawn but not yet placed/discarded
   drawnFromDiscard: boolean; // True if drawnCard was taken from discard pile (can't use abilities)
   round: number;

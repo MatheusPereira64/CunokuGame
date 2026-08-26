@@ -66,10 +66,11 @@ export function useGameSocket(roomCode: string, playerId: string) {
               drawnFromDiscard: false,
               round: 0,
               currentPlayerIndex: 0,
-              turnPhase: "waiting" as any,
+              turnPhase: "waiting",
               isFinalRound: false,
               finalRoundDeclarerId: null,
-              winnerId: null
+              winnerId: null,
+              logs: []
             };
             console.log("Setting game state to lobby state with", lobbyState.players.length, "players:", lobbyState.players.map(p => p.name));
             setGameState(lobbyState);

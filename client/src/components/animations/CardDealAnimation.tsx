@@ -57,7 +57,11 @@ export function CardDealAnimation({
     // Distribui cada carta em sequência
     const timers = dealingSequence.map((card, index) => {
       return setTimeout(() => {
-        setDealtCards(prev => new Set([...prev, `${card.playerId}_${card.cardIndex}`]));
+        setDealtCards(prev => {
+          const next = new Set(prev);
+          next.add(`${card.playerId}_${card.cardIndex}`);
+          return next;
+        });
       }, card.delay);
     });
 
