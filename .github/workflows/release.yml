@@ -90,38 +90,68 @@ jobs:
       - name: Sync Capacitor iOS
         run: npx cap sync ios
 
-      - name: Build unsigned IPA
+      - name: Build iOS app
         working-directory: ios/App
         run: |
           set -euo pipefail
-          xcodebuild \
+          mkdir -p ../../release-artifacts
+          xcodebuild -project App.xcodeproj -list
+          xcodebuild -project App.xcodeproj -scheme App -resolvePackageDependencies
+
+          UNSIGNED_FLAGS=(
+            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGN_IDENTITY=
+            CODE_SIGN_STYLE=Manual
+            DEVELOPMENT_TEAM=
+          )
+
+          if xcodebuild \
             -project App.xcodeproj \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath derived \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            build
-          APP_PATH=$(find derived/Build/Products -name "App.app" -print -quit)
-          test -n "$APP_PATH"
-          mkdir -p Payload
-          cp -R "$APP_PATH" Payload/App.app
-          zip -r Cunoku-1.0.3.ipa Payload
-          mkdir -p ../../release-artifacts
-          mv Cunoku-1.0.3.ipa ../../release-artifacts/
+            "${UNSIGNED_FLAGS[@]}" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            build; then
+            APP_PATH=$(find derived/Build/Products -name "App.app" -print -quit)
+            test -n "$APP_PATH"
+            mkdir -p Payload
+            cp -R "$APP_PATH" Payload/App.app
+            zip -r "$GITHUB_WORKSPACE/release-artifacts/Cunoku-1.0.3.ipa" Payload
+          else
+            echo "Build para device sem certificado falhou; gerando build de simulador."
+            xcodebuild \
+              -project App.xcodeproj \
+              -scheme App \
+              -configuration Release \
+              -sdk iphonesimulator \
+              -destination 'generic/platform=iOS Simulator' \
+              -derivedDataPath derived-sim \
+              COMPILER_INDEX_STORE_ENABLE=NO \
+              build
+            APP_PATH=$(find derived-sim/Build/Products -name "App.app" -print -quit)
+            test -n "$APP_PATH"
+            STAGE=$(mktemp -d)
+            cp -R "$APP_PATH" "$STAGE/App.app"
+            (cd "$STAGE" && zip -r "$GITHUB_WORKSPACE/release-artifacts/Cunoku-1.0.3-ios-simulator.zip" App.app)
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ios-ipa
-          path: release-artifacts/Cunoku-1.0.3.ipa
+          name: ios-build
+          path: |
+            release-artifacts/Cunoku-1.0.3.ipa
+            release-artifacts/Cunoku-1.0.3-ios-simulator.zip
           if-no-files-found: error
+          overwrite: true
 
   publish:
     name: Publish GitHub Release
     needs: [android, ios]
+    if: ${{ always() && needs.android.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -133,8 +163,9 @@ jobs:
       - name: Flatten artifacts
         run: |
           mkdir -p dist-release
-          find release-artifacts -type f \( -name "*.apk" -o -name "*.ipa" \) -exec cp {} dist-release/ \;
+          find release-artifacts -type f \( -name "*.apk" -o -name "*.ipa" -o -name "*.zip" \) -exec cp {} dist-release/ \;
           ls -lh dist-release
+          test -f dist-release/Cunoku-1.0.3.apk
 
       - name: Create GitHub Release
         env:
