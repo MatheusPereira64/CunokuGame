@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { GameState, Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useI18n } from "@/contexts/i18n-context";
+import { ArrowUpDown } from "lucide-react";
 
 interface MyAreaProps {
   gameState: GameState;
@@ -54,6 +55,10 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
 
   const matchInfo = getMatchInfo();
   const discardInfo = getDiscardInfo();
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // Pode trocar a carta comprada por qualquer carta da mão
+  const canReplace = isMyTurn && phase === "action" && !!gameState.drawnCard;
 
   const handleCardClick = (cardIndex: number) => {
     // Descarte reativo fora do turno
@@ -79,33 +84,78 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
     setSelectedHandIndex(cardIndex === selectedHandIndex ? null : cardIndex);
   };
 
+  // Leque quando mão grande; botões de descarte sempre compactos para não subir a mão
+  const useFanOverlap = !isMobile && me.hand.length > 5;
+  const showDiscardButtons = isMyTurn && phase === "draw" && gameState.discardPile.length > 0;
+
   return (
     <div
       className={cn(
-        "absolute left-0 right-0 flex flex-col items-center",
-        isMobile ? "bottom-2" : "bottom-8"
+        "absolute left-0 right-0 flex flex-col items-center z-30 player-hand-zone",
+        isMobile ? "bottom-1" : "bottom-3"
       )}
     >
-      {/* Minha mão */}
-      <div className={cn("flex items-start", isMobile ? "gap-1 overflow-x-auto pb-2 w-full px-2" : "gap-4")}>
+      {/* Minha mão — faixa inferior reservada, sem invadir o centro */}
+      <div
+        className={cn(
+          "flex items-end justify-center",
+          isMobile
+            ? "gap-1 overflow-x-auto pb-1 w-full px-2"
+            : useFanOverlap
+              ? "gap-0 max-w-[85%] "
+              : "gap-3"
+        )}
+      >
         {me.hand.map((card, i) => {
           const canMatchThisCard = !isMyTurn && matchInfo.canMatch && matchInfo.matchingCards.includes(i);
           const isKnownCard = me.knownCards[i.toString()] || me.knownCards[i];
-          const canQuickDiscard = isMyTurn && phase === "draw" && gameState.discardPile.length > 0;
+          const canQuickDiscard = showDiscardButtons;
           const isSafeDiscard = canQuickDiscard && discardInfo.matchingCards.includes(i);
 
           return (
             <motion.div
               key={card.id || i}
               className={cn(
-                "flex flex-col items-center",
-                isMobile ? "min-w-[80px] flex-shrink-0" : "min-w-[120px]"
+                "relative flex flex-col items-center group",
+                isMobile
+                  ? "min-w-[64px] flex-shrink-0"
+                  : useFanOverlap
+                    ? cn("shrink-0", i > 0 && "-ml-8 md:-ml-12")
+                    : "min-w-[88px]"
               )}
-              whileHover={(isMyTurn || canMatchThisCard || canQuickDiscard) && !isMobile ? { y: -20 } : {}}
+              style={useFanOverlap ? { zIndex: hoveredIndex === i ? 40 : i + 1 } : undefined}
+              whileHover={(isMyTurn || canMatchThisCard || canQuickDiscard) && !isMobile ? { y: -12 } : {}}
+              onHoverStart={() => setHoveredIndex(i)}
+              onHoverEnd={() => setHoveredIndex((prev) => (prev === i ? null : prev))}
             >
+              {/* Seta de troca: hover na carta quando pode substituir a comprada */}
+              <AnimatePresence>
+                {canReplace && hoveredIndex === i && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6, scale: 0.8 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 4, scale: 0.85 }}
+                    transition={{ duration: 0.15 }}
+                    className={cn(
+                      "absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center",
+                      isMobile ? "-top-7" : "-top-9"
+                    )}
+                  >
+                    <div className="rounded-full bg-green-500 text-white shadow-lg shadow-green-500/40 p-1.5 ring-2 ring-green-300/80">
+                      <ArrowUpDown className={cn(isMobile ? "w-3.5 h-3.5" : "w-5 h-5")} strokeWidth={2.5} />
+                    </div>
+                    {!isMobile && (
+                      <span className="mt-1 text-[10px] font-bold uppercase tracking-wide text-green-300 drop-shadow-md whitespace-nowrap">
+                        {t("game.swapHint")}
+                      </span>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div
                 onClick={() => handleCardClick(i)}
-                className="w-full"
+                className="w-full relative"
                 ref={(el) => registerCardPosition(`${me.id}_${i}`, el, card)}
               >
                 <PlayingCard
@@ -114,8 +164,12 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                   selected={selectedHandIndex === i}
                   className={cn(
                     "transition-all mx-auto",
-                    isMobile ? "w-16 h-24" : "w-24 h-36 md:w-32 md:h-48",
-                    isMyTurn && phase === "action" && gameState.drawnCard
+                    isMobile
+                      ? "w-14 h-20"
+                      : useFanOverlap
+                        ? "w-16 h-24 md:w-20 md:h-28"
+                        : "w-[4.5rem] h-[6.5rem] md:w-24 md:h-36",
+                    canReplace
                       ? "cursor-pointer hover:ring-4 ring-green-400 ring-4 ring-green-400/50"
                       : "",
                     canMatchThisCard ? "cursor-pointer hover:ring-4 ring-orange-400" : "",
@@ -124,11 +178,11 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                 />
               </div>
 
-              {isKnownCard && (
+              {isKnownCard && !showDiscardButtons && (
                 <div
                   className={cn(
-                    "text-center mt-1 font-bold text-yellow-400 uppercase tracking-wider",
-                    isMobile ? "text-[10px]" : "text-xs mt-2"
+                    "text-center mt-0.5 font-bold text-yellow-400 uppercase tracking-wider",
+                    isMobile ? "text-[9px]" : "text-[10px]"
                   )}
                 >
                   {t("game.known")}
@@ -137,42 +191,36 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
               {canMatchThisCard && (
                 <div
                   className={cn(
-                    "text-center mt-1 font-bold text-orange-400 uppercase tracking-wider animate-pulse",
-                    isMobile ? "text-[10px]" : "text-xs"
+                    "text-center mt-0.5 font-bold text-orange-400 uppercase tracking-wider animate-pulse",
+                    isMobile ? "text-[9px]" : "text-[10px]"
                   )}
                 >
                   {t("game.match")}
                 </div>
               )}
 
-              {/* Botão de descarte rápido */}
+              {/* Botão de descarte rápido — só ícone, baixo footprint */}
               {canQuickDiscard && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={cn("mt-2 w-full", isMobile ? "px-1" : "mt-3 px-2")}
+                  className="mt-1 w-full px-0.5"
                 >
                   <Button
                     size="sm"
                     variant="primary"
+                    title={isSafeDiscard ? t("game.discardSafe") : t("game.punishmentRisk")}
                     className={cn(
-                      "w-full h-auto rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white border-red-800 shadow-lg",
-                      isMobile ? "text-[10px] px-1 py-1" : "text-xs px-2 py-2"
+                      "w-full h-auto rounded-md font-bold bg-red-600 hover:bg-red-700 text-white border-red-800 shadow",
+                      "text-[10px] px-1 py-0.5"
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
                       sendAction({ type: "discard_from_hand", cardIndex: i });
                     }}
                   >
-                    {isMobile
-                      ? isSafeDiscard ? "✓" : "⚠"
-                      : isSafeDiscard ? t("game.discardSafe") : t("game.discardRisk")}
+                    {isSafeDiscard ? "✓" : "⚠"}
                   </Button>
-                  {!isSafeDiscard && !isMobile && (
-                    <div className="text-center mt-1 text-xs text-red-400 font-semibold">
-                      {t("game.punishmentRisk")}
-                    </div>
-                  )}
                 </motion.div>
               )}
             </motion.div>
@@ -196,31 +244,26 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
         </motion.div>
       )}
 
-      {/* Meu avatar */}
+      {/* Meu avatar — canto, fora da mão */}
       {!isMobile && (
-        <div className="absolute bottom-4 right-12 hidden md:block">
+        <div className="absolute -bottom-1 right-4 hidden md:block scale-90 origin-bottom-right">
           <Avatar name={me.name} score={me.score} isActive={isMyTurn} position="left" />
         </div>
       )}
 
       {/* Botão Cunoku */}
       {isMyTurn && phase === "draw" && gameState.round >= 5 && (
-        <div className={cn("absolute", isMobile ? "right-2 bottom-20" : "right-12 bottom-32")}>
+        <div className={cn("absolute", isMobile ? "right-1 bottom-16" : "right-4 bottom-28")}>
           <Button
             variant="destructive"
             className={cn(
               "rounded-full shadow-xl shadow-red-900/50 font-black border-4 border-red-400",
-              isMobile ? "w-16 h-16 text-sm" : "w-24 h-24 text-xl"
+              isMobile ? "w-14 h-14 text-xs" : "w-20 h-20 text-lg"
             )}
             onClick={() => sendAction({ type: "declare_finish" })}
           >
             {isMobile ? t("game.cunokuShort") : t("game.cunoku")}
           </Button>
-          {!isMobile && (
-            <div className="text-center mt-2 text-xs text-white/60">
-              {t("game.round")} {gameState.round}
-            </div>
-          )}
         </div>
       )}
     </div>

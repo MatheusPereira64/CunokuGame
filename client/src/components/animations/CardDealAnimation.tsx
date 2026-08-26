@@ -143,68 +143,71 @@ export function CardDealAnimation({
             );
           })}
 
-          {/* Indicador de distribuição */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="absolute top-6 left-1/2 transform -translate-x-1/2 z-[10001]"
-          >
-            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 backdrop-blur-md rounded-xl px-8 py-4 shadow-xl">
-              <div className="text-white font-bold text-xl text-center mb-2">
-                🃏 Distribuindo Cartas
+          {/* Indicador de distribuição — centralizado no topo da mesa */}
+          <div className="absolute top-4 md:top-6 left-0 right-0 z-[10001] flex justify-center px-4 pointer-events-none">
+            <motion.div
+              initial={{ opacity: 0, y: -16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="max-w-[min(92vw,36rem)]"
+            >
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 backdrop-blur-md rounded-2xl px-5 py-3 md:px-8 md:py-4 shadow-2xl border border-white/10">
+                <div className="text-white font-bold text-base md:text-xl text-center mb-2">
+                  Distribuindo Cartas
+                </div>
+                <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
+                  {playerProgress.map((player, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-1.5 bg-white/20 rounded-lg px-2.5 py-1"
+                    >
+                      <span className="text-white/90 text-xs md:text-sm truncate max-w-[5.5rem]">
+                        {player.name}
+                      </span>
+                      <span className="text-emerald-100 font-mono text-xs md:text-sm tabular-nums">
+                        {player.dealt}/{player.total}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              
-              {/* Progresso por jogador */}
-              <div className="flex flex-wrap justify-center gap-4 mt-2">
-                {playerProgress.map((player, index) => (
-                  <div key={index} className="flex items-center gap-2 bg-white/20 rounded-lg px-3 py-1">
-                    <span className="text-white/90 text-sm">{player.name}</span>
-                    <span className="text-emerald-200 font-mono text-sm">
-                      {player.dealt}/{player.total}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
 
           {/* Efeito de brilho no deck */}
           <motion.div
-            animate={{ 
+            animate={{
               scale: [1, 1.2, 1],
               opacity: [0.3, 0.6, 0.3],
             }}
-            transition={{ 
+            transition={{
               duration: 0.3,
               repeat: Infinity,
               ease: "easeInOut",
             }}
             style={{
-              position: 'absolute',
+              position: "absolute",
               left: deckPosition.x,
               top: deckPosition.y,
-              x: '-50%',
-              y: '-50%',
+              x: "-50%",
+              y: "-50%",
             }}
           >
             <div className="w-28 h-28 bg-emerald-400 rounded-full blur-xl" />
           </motion.div>
 
-          {/* Contador total de cartas distribuídas */}
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-[10001]"
-          >
-            <div className="bg-white/90 text-emerald-700 font-bold text-2xl px-6 py-3 rounded-full shadow-lg flex items-center gap-2">
-              <span>{dealtCards.size}</span>
-              <span className="text-emerald-500">/</span>
-              <span className="text-emerald-600">{dealingSequence.length}</span>
-              <span className="text-sm font-normal text-emerald-600 ml-1">cartas</span>
-            </div>
-          </motion.div>
+          {/* Contador total — centralizado na base */}
+          <div className="absolute bottom-4 md:bottom-8 left-0 right-0 z-[10001] flex justify-center pointer-events-none">
+            <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+              <div className="bg-white/90 text-emerald-700 font-bold text-lg md:text-2xl px-5 py-2 md:px-6 md:py-3 rounded-full shadow-lg flex items-center gap-2">
+                <span>{dealtCards.size}</span>
+                <span className="text-emerald-500">/</span>
+                <span className="text-emerald-600">{dealingSequence.length}</span>
+                <span className="text-sm font-normal text-emerald-600 ml-1">cartas</span>
+              </div>
+            </motion.div>
+          </div>
 
           {/* Linhas de conexão para cada jogador */}
           <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }}>

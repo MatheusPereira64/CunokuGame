@@ -27,12 +27,15 @@ import { GameOverModal } from "@/components/game/GameOverModal";
 import { AbilityModal } from "@/components/game/AbilityModal";
 import { AbilityAction, hasSpecialAbility, getAbilityDescription } from "@/components/game/helpers";
 import { getSeatPositions } from "@/components/game/seatPositions";
+import { LandscapePrompt } from "@/components/game/LandscapePrompt";
+import { useIsPortrait, lockLandscape } from "@/hooks/use-landscape";
 
 export default function Game() {
   const [, params] = useRoute("/game/:code");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const isPortrait = useIsPortrait();
   const { t } = useI18n();
   const roomCode = params?.code || "";
 
@@ -419,6 +422,15 @@ export default function Game() {
     }
   }, [onlineRevealedCard, isOffline, setOnlineRevealedCard, revealOpponentCardInHand]);
 
+  // Trava orientação em paisagem quando possível (PWA / fullscreen)
+  useEffect(() => {
+    let unlock: (() => void) | undefined;
+    lockLandscape().then((fn) => {
+      unlock = fn;
+    });
+    return () => unlock?.();
+  }, []);
+
   // Detecta declaração de Cunoku (offline)
   const prevFinalRound = useRef(false);
   useEffect(() => {
@@ -618,9 +630,13 @@ export default function Game() {
   const opponents = gameState.players.filter((p) => p.id !== playerId);
   const seatPositions = getSeatPositions(opponents.length);
   const currentTurnPlayerId = gameState.players[gameState.currentPlayerIndex]?.id;
+  // Em paisagem (incl. celular deitado) usa assentos em arco; em retrato o overlay impede jogar
+  const useArcSeats = !isPortrait;
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white relative overflow-hidden flex flex-col pwa-safe">
+    <div className="min-h-[100dvh] bg-neutral-900 text-white relative overflow-hidden flex flex-col pwa-safe game-landscape">
+      {isPortrait && <LandscapePrompt />}
+
       {/* Sistema de animações de cartas */}
       <AnimationRenderer
         currentAnimation={currentAnimation}
@@ -796,29 +812,17 @@ export default function Game() {
         </div>
       )}
 
-      {/* Mesa de jogo */}
-      <div className={cn("flex-1 flex items-center justify-center relative", isMobile ? "p-2" : "p-4 md:p-8")}>
+      {/* Mesa de jogo — zonas: oponentes (arco) | centro elevado | mão inferior */}
+      <div className={cn("flex-1 flex items-center justify-center relative min-h-0", isMobile ? "p-1.5" : "p-4 md:p-6")}>
         <div
           className={cn(
-            "w-full relative felt-table shadow-2xl flex items-center justify-center",
-            isMobile ? "rounded-3xl min-h-[calc(100vh-200px)]" : "max-w-6xl aspect-[16/9] rounded-[100px]"
+            "w-full relative felt-table shadow-2xl",
+            "max-w-6xl max-h-[min(100%,calc(100dvh-1rem))] aspect-[16/9]",
+            isMobile ? "rounded-2xl" : "rounded-[100px]"
           )}
         >
-          {/* Oponentes: assentos elípticos no desktop, fileira no topo no mobile */}
-          {isMobile ? (
-            <div className="absolute top-0 left-0 right-0 flex justify-center items-start h-auto pt-4 gap-2 flex-wrap">
-              {opponents.map((p) => (
-                <PlayerSeat
-                  key={p.id}
-                  player={p}
-                  isActive={currentTurnPlayerId === p.id}
-                  showAllCards={!!gameState.winnerId}
-                  revealedCardKeys={revealedOpponentCardsInHand}
-                  registerCardPosition={registerCardRef}
-                />
-              ))}
-            </div>
-          ) : (
+          {/* Oponentes no arco externo (sempre em paisagem) */}
+          {useArcSeats ? (
             opponents.map((p, i) => {
               const pos = seatPositions[i] ?? seatPositions[seatPositions.length - 1];
               return (
@@ -829,6 +833,9 @@ export default function Game() {
                   showAllCards={!!gameState.winnerId}
                   revealedCardKeys={revealedOpponentCardsInHand}
                   registerCardPosition={registerCardRef}
+                  opponentCount={opponents.length}
+                  side={pos.side}
+                  compact={opponents.length >= 3 || isMobile}
                   className="absolute z-20"
                   style={{
                     left: `${pos.left}%`,
@@ -838,21 +845,44 @@ export default function Game() {
                 />
               );
             })
+          ) : (
+            <div
+              className={cn(
+                "absolute top-0 left-0 right-0 flex justify-center items-start pt-2 px-1 z-20",
+                opponents.length >= 4 ? "gap-1 flex-wrap" : "gap-2"
+              )}
+            >
+              {opponents.map((p) => (
+                <PlayerSeat
+                  key={p.id}
+                  player={p}
+                  isActive={currentTurnPlayerId === p.id}
+                  showAllCards={!!gameState.winnerId}
+                  revealedCardKeys={revealedOpponentCardsInHand}
+                  registerCardPosition={registerCardRef}
+                  opponentCount={opponents.length}
+                  side="top"
+                  compact
+                />
+              ))}
+            </div>
           )}
 
-          {/* Centro: baralho, carta comprada e descarte */}
-          <CenterPile
-            gameState={gameState}
-            isMyTurn={!!isMyTurn}
-            phase={phase}
-            deckRef={deckRef}
-            discardRef={discardRef}
-            onDrawDeck={() => sendAction({ type: "draw_deck" })}
-            onDiscardDrawn={() => sendAction({ type: "discard_drawn" })}
-            onUseAbility={() => setAbilityModalOpen(true)}
-          />
+          {/* Centro da mesa — baralho e descarte */}
+          <div className="absolute left-1/2 top-[48%] -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto">
+            <CenterPile
+              gameState={gameState}
+              isMyTurn={!!isMyTurn}
+              phase={phase}
+              deckRef={deckRef}
+              discardRef={discardRef}
+              onDrawDeck={() => sendAction({ type: "draw_deck" })}
+              onDiscardDrawn={() => sendAction({ type: "discard_drawn" })}
+              onUseAbility={() => setAbilityModalOpen(true)}
+            />
+          </div>
 
-          {/* Minha área (mão, descarte rápido, Cunoku) */}
+          {/* Minha área — faixa inferior reservada */}
           {me && (
             <MyArea
               gameState={gameState}

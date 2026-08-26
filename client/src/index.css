@@ -69,9 +69,10 @@
     0 25px 60px -12px rgba(0, 0, 0, 0.8);
   border: 16px solid #3b2420;
   border-radius: 120px;
+  /* Reserva visual implícita: centro ~30–55% / mão ~0–28% inferior */
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-height: 500px) {
   .felt-table {
     border: 8px solid #3b2420;
     border-radius: 24px;
@@ -84,6 +85,17 @@
   padding-right: env(safe-area-inset-right, 0);
   padding-bottom: env(safe-area-inset-bottom, 0);
   padding-left: env(safe-area-inset-left, 0);
+}
+
+/* Tela de jogo: encaixa em landscape curto (celular deitado) */
+.game-landscape {
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
+.player-hand-zone {
+  /* Evita que a mão “suba” sobre o baralho */
+  max-height: 32%;
 }
 
 /* Evita zoom acidental por duplo toque nos controles do jogo */
