@@ -54,5 +54,10 @@ export async function ensureSchema(db: WorkerDb): Promise<void> {
       updated_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  await db.execute(sql`ALTER TABLE rank_players ADD COLUMN IF NOT EXISTS frame_id TEXT NOT NULL DEFAULT 'none'`);
+  await db.execute(sql`ALTER TABLE rank_players ADD COLUMN IF NOT EXISTS title_id TEXT NOT NULL DEFAULT 'none'`);
+  await db.execute(sql`ALTER TABLE rank_players ADD COLUMN IF NOT EXISTS banner_id TEXT NOT NULL DEFAULT 'default'`);
+  await db.execute(sql`ALTER TABLE rank_players ADD COLUMN IF NOT EXISTS progress JSONB NOT NULL DEFAULT '{}'::jsonb`);
+  await db.execute(sql`ALTER TABLE rank_players ADD COLUMN IF NOT EXISTS achievements JSONB NOT NULL DEFAULT '[]'::jsonb`);
   schemaReady = true;
 }

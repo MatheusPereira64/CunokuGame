@@ -504,25 +504,49 @@ export default function Game() {
 
       const matchId = roomCode || playerId;
       if (!hasRecordedMatchStats(matchId)) {
+        const won = gameState.winnerId === playerId;
         recordMatchResult({
-          won: gameState.winnerId === playerId,
+          won,
           finalScore: me.score,
         });
         markMatchStatsRecorded(matchId);
-        if (
-          isRankLoggedIn() &&
-          countsForGlobalRank(isOffline, gameState.players, playerId)
-        ) {
+
+        if (isRankLoggedIn()) {
+          const isPvp = countsForGlobalRank(isOffline, gameState.players, playerId);
+          const mode = isPvp ? "pvp" : isOffline ? "offline" : "bots";
+          const difficulty =
+            botDifficulty ||
+            (sessionStorage.getItem(`offline_difficulty_${playerId}`) as
+              | "easy"
+              | "medium"
+              | "hard"
+              | null) ||
+            "medium";
+
           void reportRankMatchResult({
-            won: gameState.winnerId === playerId,
+            won,
             finalScore: me.score,
-          }).catch((err) => {
-            console.warn("Rank match sync failed:", err);
-          });
+            mode,
+            botDifficulty: mode === "pvp" ? undefined : difficulty,
+          })
+            .then((profile) => {
+              if (profile?.newlyUnlocked?.length) {
+                toast({
+                  title: t("achieve.unlockedToast"),
+                  description: profile.newlyUnlocked
+                    .map((id) => t(`achieve.${id}.title`))
+                    .join(", "),
+                  duration: 4500,
+                });
+              }
+            })
+            .catch((err) => {
+              console.warn("Rank match sync failed:", err);
+            });
         }
       }
     }
-  }, [gameState?.winnerId, playerId, me, roomCode, isOffline, gameState?.players]);
+  }, [gameState?.winnerId, playerId, me, roomCode, isOffline, gameState?.players, botDifficulty, toast, t]);
 
   // Early returns APÓS todos os hooks
   if (!playerId || (!isOffline && !roomCode)) {

@@ -15,6 +15,8 @@ import { Trophy } from "lucide-react";
 import { fetchLeaderboard, fetchRankMe, type LeaderboardEntry, type PublicRankProfile } from "@/lib/rankAuth";
 import { RankBadge } from "@/components/RankBadge";
 import { effectiveRank } from "@shared/rank";
+import { FRAME_STYLES, type FrameId } from "@shared/cosmetics";
+import { getProfileAccent, getProfileIcon, type ProfileAccent, type ProfileIconId } from "@/lib/playerProfile";
 
 function buildDevMockLeaderboard(): { entries: LeaderboardEntry[]; me: PublicRankProfile } {
   const raw = [
@@ -45,6 +47,9 @@ function buildDevMockLeaderboard(): { entries: LeaderboardEntry[]; me: PublicRan
       rank: effectiveRank(r.wins, position),
       iconId: r.iconId,
       accent: r.accent,
+      frameId: position <= 3 ? "gold_ring" : position <= 10 ? "bronze_ring" : "none",
+      titleId: position === 1 ? "entity_contender" : position <= 5 ? "card_shark" : "none",
+      bannerId: "default",
     };
   });
 
@@ -55,11 +60,15 @@ function buildDevMockLeaderboard(): { entries: LeaderboardEntry[]; me: PublicRan
     displayName: self.displayName,
     iconId: self.iconId,
     accent: self.accent,
+    frameId: self.frameId,
+    titleId: self.titleId,
+    bannerId: self.bannerId,
     wins: self.wins,
     gamesPlayed: self.wins + 20,
     bestScore: self.bestScore,
     rank: self.rank,
     position: self.position,
+    achievements: [],
   };
 
   return { entries, me };
@@ -178,7 +187,12 @@ export function LeaderboardDialog({ compact = false }: LeaderboardDialogProps) {
             <p className="text-sm text-gray-500 py-6 text-center">{t("rank.empty")}</p>
           )}
           <ul className="space-y-1.5">
-            {entries.map((e) => (
+            {entries.map((e) => {
+              const Icon = getProfileIcon((e.iconId as ProfileIconId) || "spade");
+              const accent = getProfileAccent((e.accent as ProfileAccent) || "indigo");
+              const frameClass =
+                e.frameId && e.frameId in FRAME_STYLES ? FRAME_STYLES[e.frameId as FrameId] : "";
+              return (
               <li
                 key={e.nickname}
                 className={cn(
@@ -188,9 +202,23 @@ export function LeaderboardDialog({ compact = false }: LeaderboardDialogProps) {
                 )}
               >
                 <span className="w-8 text-center font-mono text-sm font-bold text-gray-400">#{e.position}</span>
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0",
+                    accent.bg,
+                    accent.text,
+                    accent.ring,
+                    frameClass,
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-indigo-900 truncate">{e.displayName}</div>
-                  <div className="text-[11px] text-gray-500 truncate">@{e.nickname}</div>
+                  <div className="text-[11px] text-gray-500 truncate">
+                    @{e.nickname}
+                    {e.titleId && e.titleId !== "none" ? ` · ${t(`cosmetic.title.${e.titleId}`)}` : ""}
+                  </div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-sm font-mono font-bold text-indigo-900">{e.wins}W</div>
@@ -200,7 +228,8 @@ export function LeaderboardDialog({ compact = false }: LeaderboardDialogProps) {
                 </div>
                 <RankBadge rank={e.rank} compact />
               </li>
-            ))}
+              );
+            })}
           </ul>
         </div>
       </DialogContent>

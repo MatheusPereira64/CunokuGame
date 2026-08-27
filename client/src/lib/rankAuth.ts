@@ -120,6 +120,9 @@ export async function syncRankProfile(patch: {
   displayName?: string;
   iconId?: string;
   accent?: string;
+  frameId?: string;
+  titleId?: string;
+  bannerId?: string;
 }): Promise<PublicRankProfile | null> {
   const token = getRankToken();
   if (!token) return null;
@@ -143,6 +146,8 @@ export async function syncRankProfile(patch: {
 export async function reportRankMatchResult(input: {
   won: boolean;
   finalScore: number;
+  mode: "pvp" | "bots" | "offline";
+  botDifficulty?: "easy" | "medium" | "hard";
 }): Promise<PublicRankProfile | null> {
   const token = getRankToken();
   if (!token) return null;

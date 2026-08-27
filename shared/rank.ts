@@ -1,5 +1,7 @@
 /** Ranks globais por vitórias; Entity = TOP 10 no leaderboard. */
 
+import type { AchievementProgress } from "./achievements";
+
 export const RANK_TIERS = [
   "bronze",
   "silver",
@@ -20,11 +22,19 @@ export type PublicRankProfile = {
   displayName: string;
   iconId: string;
   accent: string;
+  frameId: string;
+  titleId: string;
+  bannerId: string;
   wins: number;
   gamesPlayed: number;
   bestScore: number | null;
   rank: RankTier;
   position: number | null;
+  achievements: string[];
+  /** Presente em /me; omitido no leaderboard público. */
+  progress?: AchievementProgress;
+  /** Conquistas desbloqueadas nesta resposta de match-result. */
+  newlyUnlocked?: string[];
 };
 
 export type LeaderboardEntry = {
@@ -36,6 +46,9 @@ export type LeaderboardEntry = {
   rank: RankTier;
   iconId: string;
   accent: string;
+  frameId: string;
+  titleId: string;
+  bannerId: string;
 };
 
 export const ENTITY_TOP_N = 10;

@@ -33,9 +33,26 @@ import {
   type PublicRankProfile,
 } from "@/lib/rankAuth";
 import { RankBadge } from "@/components/RankBadge";
-import { ArrowLeft, Globe, UserRound } from "lucide-react";
+import { ArrowLeft, Check, Globe, Lock, Trophy, UserRound } from "lucide-react";
+import {
+  ACHIEVEMENTS,
+  progressValue,
+  type AchievementProgress,
+  DEFAULT_PROGRESS,
+} from "@shared/achievements";
+import {
+  BANNER_IDS,
+  BANNER_STYLES,
+  FRAME_IDS,
+  FRAME_STYLES,
+  TITLE_IDS,
+  isCosmeticUnlocked,
+  type BannerId,
+  type FrameId,
+} from "@shared/cosmetics";
 
 type ProfileView = "profile" | "account";
+type AccountTab = "look" | "achievements";
 
 interface ProfileDialogProps {
   compact?: boolean;
@@ -50,17 +67,33 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
 
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<ProfileView>("profile");
+  const [accountTab, setAccountTab] = useState<AccountTab>("look");
   const [profile, setProfile] = useState<PlayerProfile>(() => loadProfile());
   const [name, setName] = useState(profile.displayName);
   const [iconId, setIconId] = useState<ProfileIconId>(profile.iconId);
   const [accent, setAccent] = useState<ProfileAccent>(profile.accent);
 
   const [rankProfile, setRankProfile] = useState<PublicRankProfile | null>(null);
+  const [frameId, setFrameId] = useState<string>("none");
+  const [titleId, setTitleId] = useState<string>("none");
+  const [bannerId, setBannerId] = useState<string>("default");
+  const [cosmeticBusy, setCosmeticBusy] = useState(false);
+  const [cosmeticError, setCosmeticError] = useState<string | null>(null);
+
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
   const [nickname, setNickname] = useState("");
   const [pin, setPin] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const applyRankProfile = (rp: PublicRankProfile | null) => {
+    setRankProfile(rp);
+    if (rp) {
+      setFrameId(rp.frameId || "none");
+      setTitleId(rp.titleId || "none");
+      setBannerId(rp.bannerId || "default");
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -70,14 +103,16 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
     setIconId(p.iconId);
     setAccent(p.accent);
     setView("profile");
+    setAccountTab("look");
     setAuthError(null);
+    setCosmeticError(null);
     setPin("");
     if (isRankLoggedIn()) {
       void fetchRankMe()
-        .then((rp) => setRankProfile(rp))
-        .catch(() => setRankProfile(null));
+        .then((rp) => applyRankProfile(rp))
+        .catch(() => applyRankProfile(null));
     } else {
-      setRankProfile(null);
+      applyRankProfile(null);
     }
   }, [open]);
 
@@ -96,13 +131,27 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
           iconId: next.iconId,
           accent: next.accent,
         });
-        if (synced) setRankProfile(synced);
+        if (synced) applyRankProfile(synced);
       } catch {
         // local save still ok
       }
     }
     onSaved?.(next);
     setOpen(false);
+  };
+
+  const handleSaveCosmetics = async () => {
+    setCosmeticBusy(true);
+    setCosmeticError(null);
+    try {
+      const synced = await syncRankProfile({ frameId, titleId, bannerId });
+      if (synced) applyRankProfile(synced);
+    } catch (err: any) {
+      const code = String(err?.message || "");
+      setCosmeticError(code === "cosmetic_locked" ? t("cosmetic.locked") : t("rank.error.generic"));
+    } finally {
+      setCosmeticBusy(false);
+    }
   };
 
   const handleAuth = async () => {
@@ -120,9 +169,9 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
               accent,
             })
           : await loginRankAccount({ nickname, pin });
-      setRankProfile(rp);
+      applyRankProfile(rp);
       setPin("");
-      setView("profile");
+      setAccountTab("look");
     } catch (err: any) {
       const code = String(err?.message || "");
       const key =
@@ -143,11 +192,15 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
 
   const handleLogout = () => {
     logoutRank();
-    setRankProfile(null);
+    applyRankProfile(null);
   };
 
   const rate = winRate(profile.stats);
   const inputClass = isLandscapeMenu ? "h-9 text-sm" : "text-lg py-5";
+  const achievements = rankProfile?.achievements ?? [];
+  const progress: AchievementProgress = rankProfile?.progress ?? DEFAULT_PROGRESS;
+  const bannerClass =
+    bannerId in BANNER_STYLES ? BANNER_STYLES[bannerId as BannerId] : BANNER_STYLES.default;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -169,7 +222,7 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
           "sm:max-w-md overflow-hidden flex flex-col",
           isLandscapeMenu
             ? "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2"
-            : "max-h-[min(92dvh,36rem)] gap-3",
+            : "max-h-[min(92dvh,40rem)] gap-3",
         )}
       >
         <DialogHeader className={cn(isLandscapeMenu && "pr-6 space-y-0.5")}>
@@ -353,16 +406,194 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
             >
               {rankProfile ? (
                 <div className="space-y-3">
-                  <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 flex items-center justify-between gap-2">
+                  <div
+                    className={cn(
+                      "rounded-xl border border-indigo-200 p-3 flex items-center justify-between gap-2",
+                      bannerClass,
+                    )}
+                  >
                     <div className="min-w-0">
-                      <div className="font-bold text-indigo-900 truncate">@{rankProfile.nickname}</div>
-                      <div className="text-xs text-indigo-700">
+                      <div className="font-bold truncate">@{rankProfile.nickname}</div>
+                      {titleId !== "none" && (
+                        <div className="text-xs opacity-80 truncate">{t(`cosmetic.title.${titleId}`)}</div>
+                      )}
+                      <div className="text-xs opacity-70">
                         {rankProfile.position ? `#${rankProfile.position} · ` : ""}
                         {rankProfile.wins}W
                       </div>
                     </div>
-                    <RankBadge rank={rankProfile.rank} compact={isLandscapeMenu} />
+                    <div
+                      className={cn(
+                        "w-12 h-12 rounded-full border-2 flex items-center justify-center bg-white/80",
+                        FRAME_STYLES[(frameId as FrameId) || "none"],
+                      )}
+                    >
+                      <RankBadge rank={rankProfile.rank} compact />
+                    </div>
                   </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={accountTab === "look" ? "primary" : "outline"}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setAccountTab("look")}
+                    >
+                      {t("cosmetic.tabLook")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={accountTab === "achievements" ? "primary" : "outline"}
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => setAccountTab("achievements")}
+                    >
+                      <Trophy className="w-3.5 h-3.5 mr-1" />
+                      {t("achieve.tab")}
+                    </Button>
+                  </div>
+
+                  {accountTab === "look" ? (
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <Label>{t("cosmetic.frame")}</Label>
+                        <div className="grid grid-cols-5 gap-1.5">
+                          {FRAME_IDS.map((id) => {
+                            const unlocked = isCosmeticUnlocked("frame", id, achievements);
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                disabled={!unlocked}
+                                onClick={() => unlocked && setFrameId(id)}
+                                className={cn(
+                                  "relative aspect-square rounded-xl border-2 bg-white flex items-center justify-center",
+                                  frameId === id ? "border-indigo-600" : "border-gray-200",
+                                  !unlocked && "opacity-50",
+                                  FRAME_STYLES[id],
+                                )}
+                                title={t(`cosmetic.frame.${id}`)}
+                              >
+                                {!unlocked && <Lock className="w-3.5 h-3.5 text-gray-500" />}
+                                {unlocked && frameId === id && <Check className="w-4 h-4 text-indigo-700" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label>{t("cosmetic.titleLabel")}</Label>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {TITLE_IDS.map((id) => {
+                            const unlocked = isCosmeticUnlocked("title", id, achievements);
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                disabled={!unlocked}
+                                onClick={() => unlocked && setTitleId(id)}
+                                className={cn(
+                                  "rounded-lg border px-2 py-1.5 text-left text-xs font-medium truncate",
+                                  titleId === id
+                                    ? "border-indigo-600 bg-indigo-50 text-indigo-900"
+                                    : "border-gray-200 bg-white text-gray-700",
+                                  !unlocked && "opacity-50",
+                                )}
+                              >
+                                {!unlocked && <Lock className="w-3 h-3 inline mr-1" />}
+                                {t(`cosmetic.title.${id}`)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label>{t("cosmetic.banner")}</Label>
+                        <div className="grid grid-cols-5 gap-1.5">
+                          {BANNER_IDS.map((id) => {
+                            const unlocked = isCosmeticUnlocked("banner", id, achievements);
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                disabled={!unlocked}
+                                onClick={() => unlocked && setBannerId(id)}
+                                className={cn(
+                                  "h-9 rounded-lg border-2",
+                                  BANNER_STYLES[id],
+                                  bannerId === id ? "border-indigo-700" : "border-gray-200",
+                                  !unlocked && "opacity-50",
+                                )}
+                                title={t(`cosmetic.banner.${id}`)}
+                              >
+                                {!unlocked && <Lock className="w-3 h-3 mx-auto text-gray-600" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {cosmeticError && <p className="text-xs text-red-600">{cosmeticError}</p>}
+                      <Button
+                        variant="primary"
+                        className="w-full"
+                        isLoading={cosmeticBusy}
+                        onClick={() => void handleSaveCosmetics()}
+                      >
+                        {t("cosmetic.save")}
+                      </Button>
+                    </div>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {ACHIEVEMENTS.filter((a) => a.id !== "pvp_100_title").map((def) => {
+                        const unlocked = achievements.includes(def.id);
+                        const current = progressValue(progress, def.stat);
+                        const target = def.threshold;
+                        const showProgress =
+                          def.stat === "bestScore"
+                            ? progress.bestScore === null
+                              ? `— / ≤${target}`
+                              : `${progress.bestScore} / ≤${target}`
+                            : `${Math.min(current, target)} / ${target}`;
+                        return (
+                          <li
+                            key={def.id}
+                            className={cn(
+                              "rounded-lg border px-2.5 py-2",
+                              unlocked ? "border-emerald-300 bg-emerald-50/70" : "border-gray-100 bg-white",
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-sm font-semibold text-indigo-900 truncate">
+                                  {t(`achieve.${def.id}.title`)}
+                                </div>
+                                <div className="text-[11px] text-gray-600 leading-snug">
+                                  {t(`achieve.${def.id}.desc`)}
+                                </div>
+                                {def.reward && (
+                                  <div className="text-[10px] text-amber-700 mt-0.5">
+                                    {t("achieve.reward")}: {t(`cosmetic.${def.reward.type}.${def.reward.id}`)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-right shrink-0">
+                                {unlocked ? (
+                                  <Check className="w-4 h-4 text-emerald-600 ml-auto" />
+                                ) : (
+                                  <span className="text-[10px] font-mono text-gray-500">{showProgress}</span>
+                                )}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+
                   <Button variant="outline" className="w-full" onClick={handleLogout}>
                     {t("rank.logout")}
                   </Button>

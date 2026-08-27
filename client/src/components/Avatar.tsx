@@ -5,6 +5,7 @@ import {
   type ProfileAccent,
   type ProfileIconId,
 } from "@/lib/playerProfile";
+import { FRAME_STYLES, type FrameId } from "@shared/cosmetics";
 
 interface AvatarProps {
   name: string;
@@ -18,6 +19,8 @@ interface AvatarProps {
   /** Ícone do perfil local (só jogador humano local) */
   iconId?: ProfileIconId;
   accent?: ProfileAccent;
+  frameId?: string;
+  titleLabel?: string;
 }
 
 export function Avatar({
@@ -30,10 +33,14 @@ export function Avatar({
   compact,
   iconId,
   accent,
+  frameId,
+  titleLabel,
 }: AvatarProps) {
   const initials = name.slice(0, 2).toUpperCase();
   const accentStyle = accent ? getProfileAccent(accent) : null;
   const Icon = iconId ? getProfileIcon(iconId) : null;
+  const frameClass =
+    frameId && frameId in FRAME_STYLES ? FRAME_STYLES[frameId as FrameId] : "";
 
   return (
     <div className={cn("flex flex-col items-center relative", compact ? "gap-1" : "gap-2", className)}>
@@ -42,7 +49,8 @@ export function Avatar({
           "rounded-full border-4 flex items-center justify-center font-bold shadow-lg transition-all duration-300 relative",
           compact ? "w-10 h-10 text-sm" : "w-16 h-16 text-xl",
           isActive ? "border-yellow-400 scale-110 shadow-yellow-400/50" : accentStyle?.ring ?? "border-gray-200",
-          isBot ? "bg-slate-100 text-slate-600" : accentStyle ? `${accentStyle.bg} ${accentStyle.text}` : "bg-white text-indigo-900"
+          isBot ? "bg-slate-100 text-slate-600" : accentStyle ? `${accentStyle.bg} ${accentStyle.text}` : "bg-white text-indigo-900",
+          !isActive && frameClass,
         )}
       >
         {isBot ? (
@@ -72,6 +80,9 @@ export function Avatar({
         )}
       >
         <div className={cn("truncate", compact ? "max-w-[64px]" : "max-w-[100px]")}>{name}</div>
+        {titleLabel && !compact && (
+          <div className="text-[10px] text-amber-200/90 truncate max-w-[100px]">{titleLabel}</div>
+        )}
         {!compact && <div className="text-xs text-yellow-400 font-mono">Score: {score}</div>}
         {compact && <div className="text-[9px] text-yellow-400 font-mono leading-tight">{score} pts</div>}
       </div>

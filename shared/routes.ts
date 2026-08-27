@@ -103,6 +103,9 @@ export const api = {
         displayName: z.string().max(24).optional(),
         iconId: z.string().max(32).optional(),
         accent: z.string().max(32).optional(),
+        frameId: z.string().max(32).optional(),
+        titleId: z.string().max(32).optional(),
+        bannerId: z.string().max(32).optional(),
       }),
     },
     matchResult: {
@@ -111,6 +114,8 @@ export const api = {
       input: z.object({
         won: z.boolean(),
         finalScore: z.number(),
+        mode: z.enum(["pvp", "bots", "offline"]).default("pvp"),
+        botDifficulty: z.enum(["easy", "medium", "hard"]).optional(),
       }),
     },
     leaderboard: {
