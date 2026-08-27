@@ -18,9 +18,10 @@ jobs:
     name: Build and deploy Worker
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # URL de Deployments; secrets vêm do repositório (não só do environment)
+    # Aceita CLOUDFLARE_API_TOKEN (correto) ou CLOUDFLARE_API_TOKE (typo legado)
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_API_TOKE: ${{ secrets.CLOUDFLARE_API_TOKE }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
@@ -36,20 +37,26 @@ jobs:
       - name: Build frontend
         run: npm run build:cf
 
-      - name: Verify Cloudflare credentials
+      - name: Resolve Cloudflare credentials
+        id: cf
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::Secret CLOUDFLARE_API_TOKEN ausente. Configure em Settings → Secrets and variables → Actions."
+          TOKEN="${CLOUDFLARE_API_TOKEN:-$CLOUDFLARE_API_TOKE}"
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Secret CLOUDFLARE_API_TOKEN ausente. Configure em Settings → Secrets (não use o nome truncado CLOUDFLARE_API_TOKE)."
             exit 1
           fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_API_TOKE" ]; then
+            echo "::warning::Usando secret legado CLOUDFLARE_API_TOKE. Renomeie para CLOUDFLARE_API_TOKEN."
+          fi
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
 
       # DATABASE_URL já fica no Worker via: npx wrangler secret put DATABASE_URL
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          apiToken: ${{ steps.cf.outputs.token }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ steps.cf.outputs.token }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

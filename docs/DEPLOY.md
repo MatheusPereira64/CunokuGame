@@ -83,7 +83,7 @@ npm run dev:cf
 Arquivo `.dev.vars` (não commitado):
 
 ```
-DATABASE_URL=postgresql://user:pass@host/db
+DATABASE_URL=<connection string do Neon/Postgres>
 ```
 
 ## Arquitetura

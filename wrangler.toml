@@ -24,7 +24,7 @@ new_sqlite_classes = ["RoomDurableObject"]
 # [[hyperdrive]]
 # binding = "HYPERDRIVE"
 # id = "YOUR_HYPERDRIVE_ID"
-# localConnectionString = "postgresql://postgres:postgres@127.0.0.1:5432/cunoku"
+# localConnectionString = "<DATABASE_URL do Postgres local>"
 
 # Sem Hyperdrive: use `wrangler secret put DATABASE_URL` (Neon recomendado)
 

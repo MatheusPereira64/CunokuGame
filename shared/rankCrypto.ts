@@ -46,7 +46,17 @@ export async function hashPin(pin: string, saltHex?: string): Promise<{ hash: st
 
 export async function verifyPin(pin: string, saltHex: string, expectedHash: string): Promise<boolean> {
   const { hash } = await hashPin(pin, saltHex);
-  return hash === expectedHash;
+  return timingSafeEqualHex(hash, expectedHash);
+}
+
+/** Comparação em tempo constante (evita timing attacks em hashes hex). */
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
 }
 
 export async function hashToken(token: string): Promise<string> {

@@ -43,7 +43,7 @@ export class DatabaseStorage implements IStorage {
       // Check if error is from Neon when it shouldn't be
       if (err.stack?.includes('@neondatabase/serverless') && !process.env.DATABASE_URL?.includes('neon.tech')) {
         console.error("⚠️ ERROR: Using Neon driver but DATABASE_URL is not from Neon!");
-        console.error("DATABASE_URL preview:", process.env.DATABASE_URL ? `${process.env.DATABASE_URL.substring(0, 50)}...` : 'none');
+        console.error("DATABASE_URL set:", process.env.DATABASE_URL ? "yes" : "no");
       }
       
       // Try to extract more information from the error
