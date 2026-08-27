@@ -171,5 +171,8 @@ export function generateAnimationId(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
     return `anim_${globalThis.crypto.randomUUID()}`;
   }
-  return `anim_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  const bytes = new Uint8Array(6);
+  globalThis.crypto.getRandomValues(bytes);
+  const suffix = Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 9);
+  return `anim_${Date.now()}_${suffix}`;
 }

@@ -3,6 +3,8 @@
  * Controla músicas de fundo e efeitos sonoros
  */
 
+import { randomFloat } from "@shared/secureRandom";
+
 type MusicTrack = "menu" | "game";
 
 class AudioManager {
@@ -224,7 +226,7 @@ class AudioManager {
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+      data[i] = (randomFloat() * 2 - 1) * (1 - i / bufferSize);
     }
 
     const source = ctx.createBufferSource();

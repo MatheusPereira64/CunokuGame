@@ -1,4 +1,5 @@
 import { GameState, GameAction, Player } from "@shared/schema";
+import { randomChance, randomInt } from "@shared/secureRandom";
 
 export type BotDifficulty = "easy" | "medium" | "hard";
 
@@ -50,7 +51,7 @@ export class BotPlayer {
 
     if (this.difficulty === "medium") {
       // Medium: 70% deck, 30% discard
-      return Math.random() < 0.7 ? { type: "draw_deck" } : { type: "draw_discard" };
+      return randomChance(0.7) ? { type: "draw_deck" } : { type: "draw_discard" };
     }
 
     // Hard: analyze discard pile card value
@@ -70,10 +71,10 @@ export class BotPlayer {
 
     if (this.difficulty === "easy") {
       // Easy: 50% discard, 50% swap random card
-      if (Math.random() < 0.5) {
+      if (randomChance(0.5)) {
         return { type: "discard_drawn" };
       }
-      const randomIdx = Math.floor(Math.random() * 4);
+      const randomIdx = randomInt(4);
       return { type: "replace_card", handIndex: randomIdx };
     }
 

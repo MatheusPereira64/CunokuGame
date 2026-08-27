@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { PlayingCard } from "../PlayingCard";
 import { DiscardAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
+import { randomFloat } from "@shared/secureRandom";
 
 interface CardDiscardAnimationProps extends BaseAnimationProps {
   data: DiscardAnimationData;
@@ -220,8 +221,8 @@ export function CardDiscardAnimation({
                     rotate: 0,
                   }}
                   animate={{
-                    x: targetPosition.x + (Math.random() - 0.5) * 150,
-                    y: targetPosition.y + (Math.random() - 0.5) * 150,
+                    x: targetPosition.x + (randomFloat() - 0.5) * 150,
+                    y: targetPosition.y + (randomFloat() - 0.5) * 150,
                     scale: [0, 1.2, 0],
                     rotate: 360,
                   }}

@@ -22,6 +22,10 @@ allprojects {
         google()
         mavenCentral()
     }
+    // Lock de versões para builds previsíveis (Sonar / supply-chain)
+    dependencyLocking {
+        lockAllConfigurations()
+    }
 }
 
 task clean(type: Delete) {

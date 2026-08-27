@@ -1,4 +1,5 @@
 import { Card, GameState, Player, Rank, Suit, RANKS, SUITS } from "@shared/schema";
+import { randomInt, shuffleInPlace } from "@shared/secureRandom";
 
 export class GameLogic {
   static createInitialState(players: Player[]): GameState {
@@ -59,11 +60,7 @@ export class GameLogic {
       deck.push({ id: crypto.randomUUID(), suit: "hearts", rank: "Joker", value: -1, isFaceUp: false });
     }
 
-    // Shuffle
-    for (let i = deck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
+    shuffleInPlace(deck);
     return deck;
   }
 
@@ -133,8 +130,8 @@ export class GameLogic {
           return { success: false, message: "Must select two different players to swap" };
         }
         
-        const cardIdx1 = cardIdx !== undefined ? cardIdx : Math.floor(Math.random() * player1.hand.length);
-        const cardIdx2 = targetCardIdx2 !== undefined ? targetCardIdx2 : Math.floor(Math.random() * player2.hand.length);
+        const cardIdx1 = cardIdx !== undefined ? cardIdx : randomInt(player1.hand.length);
+        const cardIdx2 = targetCardIdx2 !== undefined ? targetCardIdx2 : randomInt(player2.hand.length);
         
         if (cardIdx1 < 0 || cardIdx1 >= player1.hand.length ||
             cardIdx2 < 0 || cardIdx2 >= player2.hand.length) {
@@ -168,8 +165,8 @@ export class GameLogic {
           return { success: false, message: "Target player not found" };
         }
         
-        const sourceCardIdx = cardIdx !== undefined ? cardIdx : Math.floor(Math.random() * sourcePlayer.hand.length);
-        const finalTargetCardIdx = targetCardIdx !== undefined ? targetCardIdx : Math.floor(Math.random() * targetPlayer.hand.length);
+        const sourceCardIdx = cardIdx !== undefined ? cardIdx : randomInt(sourcePlayer.hand.length);
+        const finalTargetCardIdx = targetCardIdx !== undefined ? targetCardIdx : randomInt(targetPlayer.hand.length);
         
         if (sourceCardIdx < 0 || sourceCardIdx >= sourcePlayer.hand.length ||
             finalTargetCardIdx < 0 || finalTargetCardIdx >= targetPlayer.hand.length) {
@@ -233,10 +230,7 @@ export class GameLogic {
           newState.deck = [...newState.discardPile];
           newState.discardPile = topDiscard ? [topDiscard] : [];
           // Embaralha
-          for (let i = newState.deck.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [newState.deck[i], newState.deck[j]] = [newState.deck[j], newState.deck[i]];
-          }
+          shuffleInPlace(newState.deck);
           newState.logs.push("Baralho reciclado e embaralhado");
         }
         const drawnCard = newState.deck.pop();
@@ -541,10 +535,7 @@ export class GameLogic {
                   newState.deck = [...newState.discardPile];
                   newState.discardPile = topDiscardCard ? [topDiscardCard] : [];
                   // Embaralha
-                  for (let j = newState.deck.length - 1; j > 0; j--) {
-                    const k = Math.floor(Math.random() * (j + 1));
-                    [newState.deck[j], newState.deck[k]] = [newState.deck[k], newState.deck[j]];
-                  }
+                  shuffleInPlace(newState.deck);
                 }
                 const penaltyCard = newState.deck.pop();
                 if (penaltyCard) {

@@ -1,5 +1,6 @@
 import { GameState, GameAction, Card, Player } from "@shared/schema";
 import { BotPlayer } from "@/utils/botPlayer";
+import { randomInt, shuffleInPlace } from "@shared/secureRandom";
 
 /**
  * Processa uma ação do jogador no jogo offline
@@ -33,10 +34,7 @@ export function processOfflineAction(
         newState.deck = [...newState.discardPile];
         newState.discardPile = topDiscard ? [topDiscard] : [];
         // Embaralha
-        for (let i = newState.deck.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [newState.deck[i], newState.deck[j]] = [newState.deck[j], newState.deck[i]];
-        }
+          shuffleInPlace(newState.deck);
         newState.logs.push("Baralho reciclado e embaralhado");
       }
       const drawnCard = newState.deck.pop();
@@ -138,8 +136,8 @@ export function processOfflineAction(
         if (action.targetPlayerId && action.targetPlayerId !== playerId) {
           const targetPlayer = newState.players.find(p => p.id === action.targetPlayerId);
           if (targetPlayer) {
-            const sourceCardIdx = action.targetCardIndex !== undefined ? action.targetCardIndex : Math.floor(Math.random() * player.hand.length);
-            const targetCardIdx = action.targetCardIndex2 !== undefined ? action.targetCardIndex2 : Math.floor(Math.random() * targetPlayer.hand.length);
+            const sourceCardIdx = action.targetCardIndex !== undefined ? action.targetCardIndex : randomInt(player.hand.length);
+            const targetCardIdx = action.targetCardIndex2 !== undefined ? action.targetCardIndex2 : randomInt(targetPlayer.hand.length);
             
             if (sourceCardIdx >= 0 && sourceCardIdx < player.hand.length &&
                 targetCardIdx >= 0 && targetCardIdx < targetPlayer.hand.length) {
@@ -288,10 +286,7 @@ export function processOfflineAction(
                 const topDiscardCard = newState.discardPile.pop();
                 newState.deck = [...newState.discardPile];
                 newState.discardPile = topDiscardCard ? [topDiscardCard] : [];
-                for (let j = newState.deck.length - 1; j > 0; j--) {
-                  const k = Math.floor(Math.random() * (j + 1));
-                  [newState.deck[j], newState.deck[k]] = [newState.deck[k], newState.deck[j]];
-                }
+                shuffleInPlace(newState.deck);
               }
               const penaltyCard = newState.deck.pop();
               if (penaltyCard) {
