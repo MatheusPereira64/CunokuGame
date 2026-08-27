@@ -18,9 +18,10 @@ jobs:
     name: Build and deploy Worker
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment:
-      name: production
-      url: https://cunoku.cunokugame.workers.dev
+    # URL de Deployments; secrets vêm do repositório (não só do environment)
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,11 +36,20 @@ jobs:
       - name: Build frontend
         run: npm run build:cf
 
+      - name: Verify Cloudflare credentials
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Secret CLOUDFLARE_API_TOKEN ausente. Configure em Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
       # DATABASE_URL já fica no Worker via: npx wrangler secret put DATABASE_URL
-      # (não sincronizar aqui — secret vazio no GitHub derrubava o deploy)
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

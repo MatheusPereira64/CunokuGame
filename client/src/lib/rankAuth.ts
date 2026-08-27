@@ -40,11 +40,30 @@ export function logoutRank(): void {
   }
 }
 
+async function parseJson<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (trimmed.startsWith("<!") || trimmed.startsWith("<html")) {
+    throw new Error(
+      "Servidor online indisponível neste dispositivo (resposta HTML em vez de API). Atualize o app ou verifique a conexão.",
+    );
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Resposta inválida do servidor (HTTP ${res.status})`);
+  }
+}
+
 async function parseError(res: Response): Promise<string> {
   try {
-    const data = (await res.json()) as { message?: string };
+    const data = (await res.clone().json()) as { message?: string };
     return data.message || `HTTP ${res.status}`;
   } catch {
+    const text = await res.text().catch(() => "");
+    if (text.trim().startsWith("<!") || text.trim().startsWith("<html")) {
+      return "API online não encontrada neste app — use a versão atualizada.";
+    }
     return `HTTP ${res.status}`;
   }
 }
@@ -62,7 +81,7 @@ export async function registerRankAccount(input: {
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await parseError(res));
-  const data = (await res.json()) as { token: string; profile: PublicRankProfile };
+  const data = await parseJson<{ token: string; profile: PublicRankProfile }>(res);
   saveSession(data.token, data.profile.playerId);
   return data.profile;
 }
@@ -77,7 +96,7 @@ export async function loginRankAccount(input: {
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await parseError(res));
-  const data = (await res.json()) as { token: string; profile: PublicRankProfile };
+  const data = await parseJson<{ token: string; profile: PublicRankProfile }>(res);
   saveSession(data.token, data.profile.playerId);
   return data.profile;
 }
@@ -93,7 +112,7 @@ export async function fetchRankMe(): Promise<PublicRankProfile | null> {
     return null;
   }
   if (!res.ok) throw new Error(await parseError(res));
-  const data = (await res.json()) as { profile: PublicRankProfile };
+  const data = await parseJson<{ profile: PublicRankProfile }>(res);
   return data.profile;
 }
 
@@ -117,7 +136,7 @@ export async function syncRankProfile(patch: {
     return null;
   }
   if (!res.ok) throw new Error(await parseError(res));
-  const data = (await res.json()) as { profile: PublicRankProfile };
+  const data = await parseJson<{ profile: PublicRankProfile }>(res);
   return data.profile;
 }
 
@@ -140,7 +159,7 @@ export async function reportRankMatchResult(input: {
     return null;
   }
   if (!res.ok) throw new Error(await parseError(res));
-  const data = (await res.json()) as { profile: PublicRankProfile };
+  const data = await parseJson<{ profile: PublicRankProfile }>(res);
   return data.profile;
 }
 
@@ -160,6 +179,6 @@ export function countsForGlobalRank(
 export async function fetchLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
   const res = await fetch(apiUrl(`/api/rank/leaderboard?limit=${limit}`));
   if (!res.ok) throw new Error(await parseError(res));
-  const data = (await res.json()) as { entries: LeaderboardEntry[] };
+  const data = await parseJson<{ entries: LeaderboardEntry[] }>(res);
   return data.entries ?? [];
 }

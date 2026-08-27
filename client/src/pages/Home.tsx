@@ -24,10 +24,12 @@ import { APP_VERSION } from "@/lib/appVersion";
 import {
   clearServerBase,
   isLikelyLocalHost,
+  isNativeApp,
   normalizeServerBase,
   setLanJoinUrl,
   setNetworkMode,
   setServerBase,
+  DEFAULT_CLOUD_SERVER,
   type NetworkMode,
 } from "@/lib/gameServer";
 
@@ -171,7 +173,12 @@ export default function Home() {
         return;
       }
     } else {
-      clearServerBase();
+      // Cloud: no APK aponta explicitamente para o Worker; no browser same-origin
+      if (isNativeApp()) {
+        setServerBase(DEFAULT_CLOUD_SERVER);
+      } else {
+        clearServerBase();
+      }
       setLanJoinUrl(null);
       setNetworkMode("server");
     }
@@ -213,7 +220,11 @@ export default function Home() {
       setLanJoinUrl(normalized);
       setNetworkMode("lan");
     } else {
-      clearServerBase();
+      if (isNativeApp()) {
+        setServerBase(DEFAULT_CLOUD_SERVER);
+      } else {
+        clearServerBase();
+      }
       setLanJoinUrl(null);
       setNetworkMode("server");
     }
