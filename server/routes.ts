@@ -16,6 +16,16 @@ import {
   handleStartGame,
   type RoomSessionData,
 } from "./roomHandlers";
+import { ensureRankSchema } from "./rankEnsure";
+import {
+  bearerToken,
+  getLeaderboard,
+  getMe,
+  loginRankPlayer,
+  recordRankMatch,
+  registerRankPlayer,
+  updateRankProfile,
+} from "@shared/rankService";
 
 type RoomLive = {
   sockets: Map<string, WebSocket>;
@@ -87,6 +97,88 @@ export async function registerRoutes(
     const room = await storage.getRoom(req.params.code);
     if (!room) return res.status(404).json({ message: "Room not found" });
     res.json(room);
+  });
+
+  app.post(api.rank.register.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const input = api.rank.register.input.parse(req.body);
+      const result = await registerRankPlayer(db, input);
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      res.status(201).json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.post(api.rank.login.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const input = api.rank.login.input.parse(req.body);
+      const result = await loginRankPlayer(db, input);
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.get(api.rank.me.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const token = bearerToken(req.header("authorization"));
+      if (!token) return res.status(401).json({ message: "unauthorized" });
+      const result = await getMe(db, token);
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.patch(api.rank.profile.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const token = bearerToken(req.header("authorization"));
+      if (!token) return res.status(401).json({ message: "unauthorized" });
+      const input = api.rank.profile.input.parse(req.body);
+      const result = await updateRankProfile(db, token, input);
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.post(api.rank.matchResult.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const token = bearerToken(req.header("authorization"));
+      if (!token) return res.status(401).json({ message: "unauthorized" });
+      const input = api.rank.matchResult.input.parse(req.body);
+      const result = await recordRankMatch(db, token, input);
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.get(api.rank.leaderboard.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const limit = Number(req.query.limit || "50");
+      const entries = await getLeaderboard(db, limit);
+      res.json({ entries });
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
   });
 
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });

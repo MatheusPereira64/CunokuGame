@@ -67,6 +67,26 @@ export const insertRoomSchema = createInsertSchema(rooms).omit({ id: true, creat
 export type Room = typeof rooms.$inferSelect;
 export type InsertRoom = z.infer<typeof insertRoomSchema>;
 
+/** Contas leves para ranking global (apelido + PIN). */
+export const rankPlayers = pgTable("rank_players", {
+  id: text("id").primaryKey(),
+  nickname: text("nickname").notNull().unique(),
+  pinHash: text("pin_hash").notNull(),
+  pinSalt: text("pin_salt").notNull(),
+  displayName: text("display_name").notNull().default(""),
+  iconId: text("icon_id").notNull().default("spade"),
+  accent: text("accent").notNull().default("indigo"),
+  wins: integer("wins").notNull().default(0),
+  gamesPlayed: integer("games_played").notNull().default(0),
+  bestScore: integer("best_score"),
+  authTokenHash: text("auth_token_hash"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type RankPlayer = typeof rankPlayers.$inferSelect;
+export type InsertRankPlayer = typeof rankPlayers.$inferInsert;
+
 // === API TYPES ===
 export type CreateRoomRequest = { playerName: string; gameMode?: "multiplayer" | "vs_bots"; botDifficulty?: "easy" | "medium" | "hard" };
 export type JoinRoomRequest = { code: string; name: string };

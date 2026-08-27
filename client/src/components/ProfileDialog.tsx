@@ -23,6 +23,16 @@ import {
   type ProfileAccent,
   type ProfileIconId,
 } from "@/lib/playerProfile";
+import {
+  fetchRankMe,
+  isRankLoggedIn,
+  loginRankAccount,
+  logoutRank,
+  registerRankAccount,
+  syncRankProfile,
+  type PublicRankProfile,
+} from "@/lib/rankAuth";
+import { RankBadge } from "@/components/RankBadge";
 import { UserRound } from "lucide-react";
 
 interface ProfileDialogProps {
@@ -42,6 +52,13 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
   const [iconId, setIconId] = useState<ProfileIconId>(profile.iconId);
   const [accent, setAccent] = useState<ProfileAccent>(profile.accent);
 
+  const [rankProfile, setRankProfile] = useState<PublicRankProfile | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register">("register");
+  const [nickname, setNickname] = useState("");
+  const [pin, setPin] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!open) return;
     const p = loadProfile();
@@ -49,13 +66,74 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
     setName(p.displayName);
     setIconId(p.iconId);
     setAccent(p.accent);
+    setAuthError(null);
+    setPin("");
+    if (isRankLoggedIn()) {
+      void fetchRankMe()
+        .then((rp) => setRankProfile(rp))
+        .catch(() => setRankProfile(null));
+    } else {
+      setRankProfile(null);
+    }
   }, [open]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const next = saveProfile({ displayName: name, iconId, accent });
     setProfile(next);
+    if (isRankLoggedIn()) {
+      try {
+        const synced = await syncRankProfile({
+          displayName: next.displayName,
+          iconId: next.iconId,
+          accent: next.accent,
+        });
+        if (synced) setRankProfile(synced);
+      } catch {
+        // local save still ok
+      }
+    }
     onSaved?.(next);
     setOpen(false);
+  };
+
+  const handleAuth = async () => {
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      const local = loadProfile();
+      const rp =
+        authMode === "register"
+          ? await registerRankAccount({
+              nickname,
+              pin,
+              displayName: name || local.displayName || undefined,
+              iconId,
+              accent,
+            })
+          : await loginRankAccount({ nickname, pin });
+      setRankProfile(rp);
+      setPin("");
+    } catch (err: any) {
+      const code = String(err?.message || "");
+      const key =
+        code === "nickname_taken"
+          ? "rank.error.nicknameTaken"
+          : code === "invalid_credentials"
+            ? "rank.error.credentials"
+            : code === "invalid_nickname"
+              ? "rank.error.nickname"
+              : code === "invalid_pin"
+                ? "rank.error.pin"
+                : "rank.error.generic";
+      setAuthError(t(key));
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleLogout = () => {
+    logoutRank();
+    setRankProfile(null);
   };
 
   const rate = winRate(profile.stats);
@@ -68,7 +146,7 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
           size="icon"
           className={cn(
             "bg-white/90 text-indigo-900 border border-indigo-200 hover:bg-white shadow-md",
-            isLandscapeMenu && "h-8 w-8"
+            isLandscapeMenu && "h-8 w-8",
           )}
           aria-label={t("profile.title")}
         >
@@ -79,7 +157,7 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
         className={cn(
           "sm:max-w-md",
           isLandscapeMenu &&
-            "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2 overflow-hidden flex flex-col"
+            "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2 overflow-hidden flex flex-col",
         )}
       >
         <DialogHeader className={cn(isLandscapeMenu && "pr-6 space-y-0.5")}>
@@ -97,7 +175,7 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
           className={cn(
             isLandscapeMenu
               ? "min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-3 py-1 pr-1"
-              : "space-y-5 py-2"
+              : "space-y-5 py-2",
           )}
         >
           <div className="space-y-1.5">
@@ -124,7 +202,7 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
                     "aspect-square rounded-xl border-2 flex items-center justify-center transition-colors",
                     iconId === id
                       ? "border-indigo-600 bg-indigo-50 text-indigo-800"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-indigo-300"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-indigo-300",
                   )}
                   aria-label={id}
                 >
@@ -145,7 +223,7 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
                   className={cn(
                     "w-8 h-8 rounded-full border-2 transition-transform",
                     a.soft,
-                    accent === a.id ? "scale-110 border-indigo-900 ring-2 ring-indigo-300" : "border-white"
+                    accent === a.id ? "scale-110 border-indigo-900 ring-2 ring-indigo-300" : "border-white",
                   )}
                   aria-label={a.id}
                 />
@@ -182,9 +260,88 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
             </div>
           </div>
           <p className="text-[11px] text-gray-500 leading-snug">{t("profile.bestScoreHint")}</p>
+
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-indigo-900">{t("rank.accountTitle")}</h3>
+              {rankProfile && <RankBadge rank={rankProfile.rank} compact />}
+            </div>
+            <p className="text-[11px] text-indigo-700/80 leading-snug">{t("rank.accountHint")}</p>
+
+            {rankProfile ? (
+              <div className="space-y-2">
+                <div className="text-sm text-indigo-900">
+                  <span className="font-semibold">@{rankProfile.nickname}</span>
+                  {rankProfile.position ? ` · #${rankProfile.position}` : ""}
+                  <span className="text-indigo-600"> · {rankProfile.wins}W</span>
+                </div>
+                <Button variant="outline" size="sm" className="w-full" onClick={handleLogout}>
+                  {t("rank.logout")}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={authMode === "register" ? "primary" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setAuthMode("register")}
+                  >
+                    {t("rank.register")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={authMode === "login" ? "primary" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setAuthMode("login")}
+                  >
+                    {t("rank.login")}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="rankNick">{t("rank.nickname")}</Label>
+                    <Input
+                      id="rankNick"
+                      value={nickname}
+                      onChange={(e) => setNickname(e.target.value)}
+                      placeholder="apelido"
+                      maxLength={16}
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="rankPin">{t("rank.pin")}</Label>
+                    <Input
+                      id="rankPin"
+                      type="password"
+                      inputMode="numeric"
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      placeholder="****"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                </div>
+                {authError && <p className="text-xs text-red-600">{authError}</p>}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => void handleAuth()}
+                  isLoading={authBusy}
+                >
+                  {authMode === "register" ? t("rank.registerSubmit") : t("rank.loginSubmit")}
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
-        <Button variant="primary" className={cn("w-full", isLandscapeMenu && "h-9 text-sm")} onClick={handleSave}>
+        <Button variant="primary" className={cn("w-full", isLandscapeMenu && "h-9 text-sm")} onClick={() => void handleSave()}>
           {t("profile.save")}
         </Button>
       </DialogContent>

@@ -36,6 +36,7 @@ import {
   markMatchStatsRecorded,
   recordMatchResult,
 } from "@/lib/playerProfile";
+import { isRankLoggedIn, reportRankMatchResult, countsForGlobalRank } from "@/lib/rankAuth";
 
 export default function Game() {
   const [, params] = useRoute("/game/:code");
@@ -497,9 +498,20 @@ export default function Game() {
           finalScore: me.score,
         });
         markMatchStatsRecorded(matchId);
+        if (
+          isRankLoggedIn() &&
+          countsForGlobalRank(isOffline, gameState.players, playerId)
+        ) {
+          void reportRankMatchResult({
+            won: gameState.winnerId === playerId,
+            finalScore: me.score,
+          }).catch((err) => {
+            console.warn("Rank match sync failed:", err);
+          });
+        }
       }
     }
-  }, [gameState?.winnerId, playerId, me, roomCode]);
+  }, [gameState?.winnerId, playerId, me, roomCode, isOffline, gameState?.players]);
 
   // Early returns APÓS todos os hooks
   if (!playerId || (!isOffline && !roomCode)) {

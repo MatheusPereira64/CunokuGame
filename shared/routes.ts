@@ -72,6 +72,52 @@ export const api = {
       },
     },
   },
+  rank: {
+    register: {
+      method: 'POST' as const,
+      path: '/api/rank/register',
+      input: z.object({
+        nickname: z.string().min(3).max(16),
+        pin: z.string().regex(/^\d{4,6}$/),
+        displayName: z.string().max(24).optional(),
+        iconId: z.string().max(32).optional(),
+        accent: z.string().max(32).optional(),
+      }),
+    },
+    login: {
+      method: 'POST' as const,
+      path: '/api/rank/login',
+      input: z.object({
+        nickname: z.string().min(3).max(16),
+        pin: z.string().regex(/^\d{4,6}$/),
+      }),
+    },
+    me: {
+      method: 'GET' as const,
+      path: '/api/rank/me',
+    },
+    profile: {
+      method: 'PATCH' as const,
+      path: '/api/rank/me',
+      input: z.object({
+        displayName: z.string().max(24).optional(),
+        iconId: z.string().max(32).optional(),
+        accent: z.string().max(32).optional(),
+      }),
+    },
+    matchResult: {
+      method: 'POST' as const,
+      path: '/api/rank/match-result',
+      input: z.object({
+        won: z.boolean(),
+        finalScore: z.number(),
+      }),
+    },
+    leaderboard: {
+      method: 'GET' as const,
+      path: '/api/rank/leaderboard',
+    },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {

@@ -3,6 +3,7 @@ import { api } from "../../shared/routes";
 import { createStorage, pingDb } from "./storage";
 import type { Env } from "./env";
 import { RoomDurableObject } from "./room-do";
+import { handleRankApi } from "./rankApi";
 
 export { RoomDurableObject };
 
@@ -26,11 +27,14 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
       status: 204,
       headers: {
         "access-control-allow-origin": "*",
-        "access-control-allow-methods": "GET,POST,OPTIONS",
-        "access-control-allow-headers": "content-type",
+        "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
+        "access-control-allow-headers": "content-type, authorization",
       },
     });
   }
+
+  const rankRes = await handleRankApi(request, env, path, method);
+  if (rankRes) return rankRes;
 
   if (method === "GET" && path === "/api/health") {
     const dbOk = await pingDb(env).catch(() => false);

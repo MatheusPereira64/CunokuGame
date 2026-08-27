@@ -15,6 +15,7 @@ import { VolumeControl } from "@/components/VolumeControl";
 import { RulesDialog } from "@/components/RulesDialog";
 import { InstallAppButton } from "@/components/InstallAppButton";
 import { ProfileDialog } from "@/components/ProfileDialog";
+import { LeaderboardDialog } from "@/components/LeaderboardDialog";
 import { useI18n, type Language } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
@@ -258,9 +259,10 @@ export default function Home() {
         </Select>
       </div>
 
-      {/* Volume + perfil + instalar app - Top Right */}
+      {/* Volume + ranking + perfil + instalar app - Top Right */}
       <div className={cn("absolute z-20 flex items-center gap-2", isLandscapeMenu ? "top-2 right-2" : "top-4 right-4")}>
         <InstallAppButton compact={isLandscapeMenu} />
+        <LeaderboardDialog compact={isLandscapeMenu} />
         <ProfileDialog
           compact={isLandscapeMenu}
           onSaved={(p) => {
