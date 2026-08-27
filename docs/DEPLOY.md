@@ -19,7 +19,7 @@ O servidor Node (`npm run dev` / `npm start`) continua válido para **LAN / Capa
    ```
    Depois descomente o bloco `[[hyperdrive]]` em [`wrangler.toml`](../wrangler.toml) com o `id` retornado.
 
-## 2. Secrets e login
+## 2. Secrets e login (local)
 
 ```bash
 npx wrangler login
@@ -27,11 +27,19 @@ npx wrangler secret put DATABASE_URL
 # cole a connection string do Neon
 ```
 
-No GitHub Actions, configure:
+## 2b. Secrets do GitHub Actions (obrigatório para CI)
 
-- `CLOUDFLARE_API_TOKEN` (permissão Workers / Account)
-- `CLOUDFLARE_ACCOUNT_ID`
-- `DATABASE_URL`
+Em **GitHub → Settings → Secrets and variables → Actions → New repository secret**, crie:
+
+| Secret | Onde pegar |
+|--------|------------|
+| `CLOUDFLARE_ACCOUNT_ID` | `98533e6d6fee8bc0cace27496f700c10` (já da sua conta) ou Dashboard → Overview → Account ID |
+| `CLOUDFLARE_API_TOKEN` | [Create Token](https://dash.cloudflare.com/profile/api-tokens) → template **Edit Cloudflare Workers** (ou Custom: Account → Workers Scripts Edit + Account Settings Read) |
+| `DATABASE_URL` | Mesma connection string do Neon |
+
+Sem esses três, o workflow falha no passo **Deploy to Cloudflare**.
+
+Opcional (Deployments no GitHub): em **Settings → Environments**, crie `production` se ainda não existir (o workflow já usa `environment: production`).
 
 ## 3. Deploy manual
 
@@ -41,11 +49,15 @@ npm run deploy:cf
 
 Isso gera o frontend (`dist/public`) e publica o Worker `cunoku` com assets SPA + rotas `/api/*` e `/ws`.
 
-URL típica: `https://cunoku.<subdomain>.workers.dev`
+URL atual: https://cunoku.cunokugame.workers.dev
 
 ## 4. Deploy automático (CI)
 
-O workflow [`.github/workflows/deploy-cloudflare.yml`](../.github/workflows/deploy-cloudflare.yml) faz deploy a cada push em `main`.
+O workflow [`.github/workflows/deploy-cloudflare.yml`](../.github/workflows/deploy-cloudflare.yml):
+
+- Dispara em **push na `main`** ou **Actions → Deploy Cloudflare → Run workflow**
+- Publica no Cloudflare
+- Aparece em **GitHub → Deployments** (environment `production`)
 
 ## 5. Testar
 

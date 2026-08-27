@@ -9,11 +9,18 @@ concurrency:
   group: cloudflare-deploy
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  deployments: write
+
 jobs:
   deploy:
     name: Build and deploy Worker
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment:
+      name: production
+      url: https://cunoku.cunokugame.workers.dev
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +41,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
+          # Sincroniza DATABASE_URL do GitHub → secret do Worker (Neon)
           secrets: |
             DATABASE_URL
         env:
