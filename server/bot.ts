@@ -1,5 +1,4 @@
 import { GameState, GameAction, Player } from "@shared/schema";
-import { randomUUID } from "crypto";
 
 export type BotDifficulty = "easy" | "medium" | "hard";
 
@@ -8,8 +7,8 @@ export class BotPlayer {
   name: string;
   difficulty: BotDifficulty;
 
-  constructor(name: string, difficulty: BotDifficulty = "medium") {
-    this.id = randomUUID();
+  constructor(name: string, difficulty: BotDifficulty = "medium", id?: string) {
+    this.id = id ?? crypto.randomUUID();
     this.name = name;
     this.difficulty = difficulty;
   }

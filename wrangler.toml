@@ -1,0 +1,32 @@
+name = "cunoku"
+main = "worker/src/index.ts"
+compatibility_date = "2025-03-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+preview_urls = true
+
+# Frontend: npm run build:cf → dist/public
+[assets]
+directory = "./dist/public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/ws", "/ws/*"]
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "RoomDurableObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RoomDurableObject"]
+
+# Opcional: descomente após criar o Hyperdrive (wrangler hyperdrive create ...)
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "YOUR_HYPERDRIVE_ID"
+# localConnectionString = "postgresql://postgres:postgres@127.0.0.1:5432/cunoku"
+
+# Sem Hyperdrive: use `wrangler secret put DATABASE_URL` (Neon recomendado)
+
+[alias]
+"@shared" = "./shared"

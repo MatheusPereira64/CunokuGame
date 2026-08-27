@@ -39,4 +39,8 @@ describe("apiUrl / wsUrl with default origin", () => {
   it("wsUrl termina com /ws", () => {
     expect(wsUrl().endsWith("/ws")).toBe(true);
   });
+
+  it("wsUrl com código de sala inclui query code", () => {
+    expect(wsUrl("ab12")).toContain("code=AB12");
+  });
 });

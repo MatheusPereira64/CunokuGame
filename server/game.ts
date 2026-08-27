@@ -1,5 +1,4 @@
 import { Card, GameState, Player, Rank, Suit, RANKS, SUITS } from "@shared/schema";
-import { randomUUID } from "crypto";
 
 export class GameLogic {
   static createInitialState(players: Player[]): GameState {
@@ -47,7 +46,7 @@ export class GameLogic {
         RANKS.forEach(rank => {
           if (rank === "Joker") return; // Handle jokers separately
           deck.push({
-            id: randomUUID(),
+            id: crypto.randomUUID(),
             suit,
             rank,
             value: this.getCardValue(rank),
@@ -56,8 +55,8 @@ export class GameLogic {
         });
       });
       // Add 2 Jokers per deck
-      deck.push({ id: randomUUID(), suit: "spades", rank: "Joker", value: -1, isFaceUp: false });
-      deck.push({ id: randomUUID(), suit: "hearts", rank: "Joker", value: -1, isFaceUp: false });
+      deck.push({ id: crypto.randomUUID(), suit: "spades", rank: "Joker", value: -1, isFaceUp: false });
+      deck.push({ id: crypto.randomUUID(), suit: "hearts", rank: "Joker", value: -1, isFaceUp: false });
     }
 
     // Shuffle

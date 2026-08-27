@@ -1,217 +1,105 @@
-# Guia de Deploy - Cunoku Game
+# Deploy Cloudflare (Cunoku)
 
-Este guia explica como fazer deploy do jogo para que outras pessoas possam jogar online, mesmo que não estejam na sua rede local.
+Guia para hospedar o jogo online no **Cloudflare Workers** (API + WebSocket via Durable Objects + frontend estático).
 
-## 📋 Pré-requisitos
+O servidor Node (`npm run dev` / `npm start`) continua válido para **LAN / Capacitor local**.
 
-1. **Conta no GitHub** (já tem o código lá)
-2. **Banco de dados PostgreSQL** (gratuito disponível)
-3. **Serviço de hospedagem** (opções gratuitas abaixo)
+## Pré-requisitos
 
----
+1. Conta [Cloudflare](https://dash.cloudflare.com)
+2. Postgres (recomendado: [Neon](https://neon.tech) gratuito)
+3. Node 22+ e Wrangler (`npm i` já inclui)
 
-## 🚀 Opção 1: Railway (Recomendado - Mais Fácil)
+## 1. Banco de dados
 
-Railway é uma plataforma que facilita o deploy de aplicações Node.js.
-
-### Passos:
-
-1. **Criar conta no Railway**
-   - Acesse: https://railway.app
-   - Faça login com GitHub
-
-2. **Criar novo projeto**
-   - Clique em "New Project"
-   - Selecione "Deploy from GitHub repo"
-   - Escolha seu repositório `CunokuGame`
-
-3. **Configurar banco de dados**
-   - No projeto, clique em "New" → "Database" → "PostgreSQL"
-   - Railway criará automaticamente um banco PostgreSQL
-   - Copie a `DATABASE_URL` que aparece (será usada depois)
-
-4. **Configurar variáveis de ambiente**
-   - No projeto, vá em "Variables"
-   - Adicione:
-     ```
-     NODE_ENV=production
-     DATABASE_URL=<cole a URL do banco aqui>
-     PORT=5000
-     ```
-
-5. **Configurar build e start**
-   - Railway detecta automaticamente o `package.json`
-   - Certifique-se de que os scripts estão corretos:
-     - `build`: `tsx script/build.ts`
-     - `start`: `cross-env NODE_ENV=production node dist/index.cjs`
-
-6. **Deploy**
-   - Railway fará o deploy automaticamente
-   - Após o deploy, você receberá uma URL (ex: `https://cunoku-game.up.railway.app`)
-
-7. **Configurar domínio (opcional)**
-   - No projeto, vá em "Settings" → "Domains"
-   - Adicione um domínio personalizado se quiser
-
----
-
-## 🌐 Opção 2: Render
-
-Render também oferece hospedagem gratuita.
-
-### Passos:
-
-1. **Criar conta no Render**
-   - Acesse: https://render.com
-   - Faça login com GitHub
-
-2. **Criar banco de dados PostgreSQL**
-   - Clique em "New" → "PostgreSQL"
-   - Escolha o plano gratuito
-   - Copie a `Internal Database URL`
-
-3. **Criar Web Service**
-   - Clique em "New" → "Web Service"
-   - Conecte seu repositório GitHub
-   - Configure:
-     - **Build Command**: `npm run build`
-     - **Start Command**: `npm start`
-     - **Environment**: `Node`
-
-4. **Adicionar variáveis de ambiente**
+1. Crie um projeto no Neon e copie a **connection string** (`DATABASE_URL`)
+2. (Opcional) Hyperdrive no Cloudflare para pool de conexões na edge:
+   ```bash
+   npx wrangler hyperdrive create cunoku-db --connection-string="$DATABASE_URL"
    ```
-   NODE_ENV=production
-   DATABASE_URL=<URL do banco criado>
-   PORT=10000
-   ```
+   Depois descomente o bloco `[[hyperdrive]]` em [`wrangler.toml`](../wrangler.toml) com o `id` retornado.
 
-5. **Deploy**
-   - Render fará o deploy automaticamente
-   - Você receberá uma URL (ex: `https://cunoku-game.onrender.com`)
+## 2. Secrets e login
 
----
-
-## 🗄️ Opção 3: Neon Database (Banco de Dados Gratuito)
-
-Se quiser usar apenas o banco de dados gratuito do Neon:
-
-1. **Criar conta no Neon**
-   - Acesse: https://neon.tech
-   - Crie uma conta gratuita
-
-2. **Criar projeto**
-   - Crie um novo projeto PostgreSQL
-   - Copie a `Connection String` (DATABASE_URL)
-
-3. **Usar com Railway ou Render**
-   - Use a `DATABASE_URL` do Neon nas variáveis de ambiente
-
----
-
-## 🔧 Configurações Importantes
-
-### Variáveis de Ambiente Necessárias:
-
-```env
-NODE_ENV=production
-DATABASE_URL=postgresql://user:password@host:port/database
-PORT=5000  # ou a porta que o serviço fornecer
+```bash
+npx wrangler login
+npx wrangler secret put DATABASE_URL
+# cole a connection string do Neon
 ```
 
-### Scripts do package.json (já configurados):
+No GitHub Actions, configure:
 
-```json
-{
-  "scripts": {
-    "build": "tsx script/build.ts",
-    "start": "cross-env NODE_ENV=production node dist/index.cjs"
-  }
-}
+- `CLOUDFLARE_API_TOKEN` (permissão Workers / Account)
+- `CLOUDFLARE_ACCOUNT_ID`
+- `DATABASE_URL`
+
+## 3. Deploy manual
+
+```bash
+npm run deploy:cf
 ```
 
----
+Isso gera o frontend (`dist/public`) e publica o Worker `cunoku` com assets SPA + rotas `/api/*` e `/ws`.
 
-## 📝 Passos Adicionais Após Deploy
+URL típica: `https://cunoku.<subdomain>.workers.dev`
 
-1. **Executar migrações do banco de dados**
-   - O servidor agora cria as tabelas automaticamente na primeira inicialização
-   - Se isso não funcionar, você pode executar manualmente:
-   ```bash
-   npm run db:push
-   ```
-   - Ou usar o script de inicialização:
-   ```bash
-   npm run db:init
-   ```
+## 4. Deploy automático (CI)
 
-2. **Verificar logs do servidor**
-   - Verifique os logs do Railway/Render para ver se há erros
-   - Procure por mensagens como "Database tables created successfully" ou "Database tables verified"
+O workflow [`.github/workflows/deploy-cloudflare.yml`](../.github/workflows/deploy-cloudflare.yml) faz deploy a cada push em `main`.
 
-3. **Testar a aplicação**
-   - Acesse a URL fornecida
-   - Crie uma sala de jogo
-   - Compartilhe o código da sala com outra pessoa
-   - Teste se ambos conseguem se conectar
+## 5. Testar
 
-4. **WebSocket**
-   - Certifique-se de que o serviço suporta WebSockets
-   - Railway e Render suportam WebSockets nativamente
+1. Abra a URL do Worker
+2. Crie uma sala e copie o código
+3. Em outra aba/dispositivo, entre na sala
+4. Confirme lobby + início da partida (WebSocket)
+5. Health: `GET /api/health`
 
----
+## 6. Capacitor / app nativo
 
-## 🐛 Troubleshooting
+No modo **servidor** do menu, use a URL HTTPS do Cloudflare (mesma origem para API e `wss`).
 
-### Erro: "DATABASE_URL must be set"
-- Verifique se a variável `DATABASE_URL` está configurada corretamente
-- Certifique-se de que o banco de dados está ativo
-- No Railway: Vá em "Variables" e verifique se `DATABASE_URL` está presente
+## 7. Dev local Cloudflare
 
-### Erro 400 ao criar sala
-- **Problema mais comum**: Tabelas do banco de dados não foram criadas
-- **Solução**: O servidor agora cria as tabelas automaticamente na primeira inicialização
-- Verifique os logs do servidor para ver se há erros de banco de dados
-- Procure por mensagens como "Database tables created successfully" ou "Database tables verified"
-- Se persistir, execute manualmente: `npm run db:push` ou `npm run db:init`
-- Verifique se a `DATABASE_URL` está correta e o banco está acessível
-- Verifique os logs detalhados no console do servidor (Railway/Render)
+```bash
+# Com Postgres local ou DATABASE_URL no .dev.vars:
+# DATABASE_URL=postgresql://...
+npm run dev:cf
+```
 
-### Erro: "Connection refused" no WebSocket
-- Verifique se o serviço suporta WebSockets
-- Railway e Render suportam, mas alguns serviços podem precisar de configuração adicional
+Arquivo `.dev.vars` (não commitado):
 
-### Erro: "Port already in use"
-- Use a porta fornecida pelo serviço (geralmente via variável `PORT`)
-- Railway e Render definem automaticamente a porta
+```
+DATABASE_URL=postgresql://user:pass@host/db
+```
 
----
+## Arquitetura
 
-## 🎮 Como Jogar Após Deploy
+```
+Browser / APK
+  → Assets (Vite)          Workers Assets
+  → REST /api/rooms*       Worker
+  → WSS /ws?code=XXXX      Durable Object (1 por sala)
+  → Postgres               Neon (+ Hyperdrive opcional)
+```
 
-1. **Acesse a URL do seu jogo** (ex: `https://cunoku-game.up.railway.app`)
+LAN: continue usando `npm run dev` / `npm start` (Express + `ws`).
 
-2. **Crie uma sala** ou **entre em uma sala existente**
+## Cutover (sair do Railway)
 
-3. **Compartilhe o código da sala** com outra pessoa
+1. Deploy Cloudflare estável + Neon
+2. Atualize bookmarks / URL no app
+3. Desligue o serviço Railway quando não precisar mais
 
-4. **A outra pessoa acessa a mesma URL** e entra com o código
+## Troubleshooting
 
-5. **Ambos podem jogar juntos!**
+| Problema | Solução |
+|----------|---------|
+| `DATABASE_URL` missing / salas falham | `wrangler secret put DATABASE_URL` |
+| WS 400 Missing room code | Client deve enviar `?code=` (já no `wsUrl(roomCode)`) |
+| Tabela rooms | Criada automaticamente no primeiro request API |
+| Hyperdrive id inválido | Deixe o bloco comentado e use só `DATABASE_URL` |
 
----
+## Legado Railway / Render
 
-## 💡 Dicas
-
-- **Railway** oferece $5 grátis por mês (suficiente para testes)
-- **Render** oferece plano gratuito (pode ficar "dormindo" após inatividade)
-- Para produção, considere serviços pagos para melhor performance
-- Sempre use HTTPS em produção (Railway e Render fornecem automaticamente)
-
----
-
-## 📚 Recursos
-
-- [Railway Docs](https://docs.railway.app)
-- [Render Docs](https://render.com/docs)
-- [Neon Database](https://neon.tech/docs)
-
+Ainda é possível rodar o monólito Node (`npm run build` + `npm start`) nessas plataformas. O caminho **recomendado para cloud** passou a ser Cloudflare.

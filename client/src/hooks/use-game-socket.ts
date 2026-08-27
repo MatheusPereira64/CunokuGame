@@ -19,7 +19,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
     // Busca o nome do jogador do sessionStorage
     const playerName = sessionStorage.getItem(`playerName_${roomCode}`) || `Player ${playerId.substring(0, 4)}`;
 
-    const url = wsUrl();
+    const url = wsUrl(roomCode);
     
     const ws = new WebSocket(url);
     socketRef.current = ws;

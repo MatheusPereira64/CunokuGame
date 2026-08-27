@@ -9,3 +9,6 @@ vite.config.ts.*
 *.ipa
 *.xcarchive
 release-artifacts
+.dev.vars
+.wrangler
+.wrangler-bundle

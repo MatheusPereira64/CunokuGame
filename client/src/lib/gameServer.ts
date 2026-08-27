@@ -82,16 +82,26 @@ export function apiUrl(path: string): string {
   return `${base}${p}`;
 }
 
-export function wsUrl(): string {
+export function wsUrl(roomCode?: string): string {
   const base = getServerBase();
   try {
     const url = new URL(base || (typeof window !== "undefined" ? window.location.origin : "http://localhost"));
     const protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${url.host}/ws`;
+    const path = `${protocol}//${url.host}/ws`;
+    // Código na query para o Worker Cloudflare rotear ao Durable Object da sala.
+    // O servidor Node (LAN) ignora a query e usa a mensagem `join`.
+    if (roomCode) {
+      return `${path}?code=${encodeURIComponent(roomCode.toUpperCase())}`;
+    }
+    return path;
   } catch {
     const protocol = typeof window !== "undefined" && window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = typeof window !== "undefined" ? window.location.host : "localhost";
-    return `${protocol}//${host}/ws`;
+    const path = `${protocol}//${host}/ws`;
+    if (roomCode) {
+      return `${path}?code=${encodeURIComponent(roomCode.toUpperCase())}`;
+    }
+    return path;
   }
 }
 
