@@ -3,6 +3,8 @@ package com.cunoku.game;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
@@ -13,6 +15,19 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         enableImmersiveMode();
+        allowMediaAutoplay();
+    }
+
+    /** Libera autoplay de áudio/vídeo sem gesto do usuário no WebView. */
+    private void allowMediaAutoplay() {
+        try {
+            WebView webView = this.bridge != null ? this.bridge.getWebView() : null;
+            if (webView == null) return;
+            WebSettings settings = webView.getSettings();
+            settings.setMediaPlaybackRequiresUserGesture(false);
+        } catch (Exception ignored) {
+            // Capacitor já define isso no Bridge; fallback silencioso se ainda não estiver pronto
+        }
     }
 
     @Override

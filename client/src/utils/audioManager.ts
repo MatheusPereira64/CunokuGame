@@ -3,22 +3,27 @@
  * Controla músicas de fundo e efeitos sonoros
  */
 
+type MusicTrack = "menu" | "game";
+
 class AudioManager {
   private menuMusic: HTMLAudioElement | null = null;
   private gameMusic: HTMLAudioElement | null = null;
   private currentMusic: HTMLAudioElement | null = null;
+  /** Faixa que deveria estar tocando (sobrevive a mute/pause). */
+  private desiredTrack: MusicTrack | null = null;
   private musicVolume: number = 0.5;
   private sfxVolume: number = 0.7;
   private isMuted: boolean = false;
   private userInteracted: boolean = false;
   private audioCtx: AudioContext | null = null;
+  private readonly unlockEvents = ["pointerdown", "touchstart", "keydown", "click"] as const;
+  private unlockHandler: (() => void) | null = null;
 
   constructor() {
-    // Carrega volumes salvos do localStorage
-    const savedMusicVolume = localStorage.getItem('cunoku_music_volume');
-    const savedSfxVolume = localStorage.getItem('cunoku_sfx_volume');
-    const savedMuted = localStorage.getItem('cunoku_muted');
-    
+    const savedMusicVolume = localStorage.getItem("cunoku_music_volume");
+    const savedSfxVolume = localStorage.getItem("cunoku_sfx_volume");
+    const savedMuted = localStorage.getItem("cunoku_muted");
+
     if (savedMusicVolume !== null) {
       this.musicVolume = parseFloat(savedMusicVolume);
     }
@@ -26,130 +31,175 @@ class AudioManager {
       this.sfxVolume = parseFloat(savedSfxVolume);
     }
     if (savedMuted !== null) {
-      this.isMuted = savedMuted === 'true';
+      this.isMuted = savedMuted === "true";
     }
 
-    // Inicializa as músicas
-    this.menuMusic = new Audio('/audio/soundtrack/menu.mp3');
-    this.menuMusic.loop = true;
-    this.menuMusic.volume = this.musicVolume;
+    this.menuMusic = this.createLoopingTrack("/audio/soundtrack/menu.mp3");
+    this.gameMusic = this.createLoopingTrack("/audio/soundtrack/match-frenzy.mp3");
 
-    this.gameMusic = new Audio('/audio/soundtrack/match-frenzy.mp3');
-    this.gameMusic.loop = true;
-    this.gameMusic.volume = this.musicVolume;
-
-    // Detecta primeira interação do usuário
     this.setupUserInteraction();
+    this.setupAutoplayRetries();
+  }
+
+  private createLoopingTrack(src: string): HTMLAudioElement {
+    const audio = new Audio(src);
+    audio.loop = true;
+    audio.preload = "auto";
+    audio.volume = this.musicVolume;
+    // Ajuda em iOS / WebViews embutidos
+    audio.setAttribute("playsinline", "true");
+    (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
+    return audio;
+  }
+
+  private setupUserInteraction(): void {
+    this.unlockHandler = () => {
+      this.userInteracted = true;
+      void this.getAudioContext();
+      if (!this.isMuted) {
+        void this.resumeDesiredTrack();
+      }
+      this.teardownUnlockListeners();
+    };
+
+    // Vários eventos: em mobile o primeiro gesto pode ser pointer/touch, não click
+    const opts: AddEventListenerOptions = { capture: true, passive: true };
+    for (const event of this.unlockEvents) {
+      document.addEventListener(event, this.unlockHandler, opts);
+    }
+  }
+
+  private teardownUnlockListeners(): void {
+    if (!this.unlockHandler) return;
+    for (const event of this.unlockEvents) {
+      document.removeEventListener(event, this.unlockHandler, true);
+    }
+    this.unlockHandler = null;
   }
 
   /**
-   * Configura detecção de interação do usuário
+   * Retenta autoplay quando a página fica visível / o arquivo carrega.
+   * Browsers desktop ainda podem bloquear sem gesto; no WebView Android costuma liberar.
    */
-  private setupUserInteraction(): void {
-    const enableAudio = () => {
-      this.userInteracted = true;
-      // Tenta tocar a música do menu se já estiver configurada para tocar
-      if (this.currentMusic === this.menuMusic && this.menuMusic && this.menuMusic.paused) {
-        this.menuMusic.play().catch(err => {
-          console.warn('Failed to play menu music after interaction:', err);
-        });
+  private setupAutoplayRetries(): void {
+    const retry = () => {
+      if (this.isMuted || !this.desiredTrack) return;
+      const track = this.getTrackElement(this.desiredTrack);
+      if (track && track.paused) {
+        void this.tryPlay(track);
       }
-      // Remove listeners após primeira interação
-      document.removeEventListener('click', enableAudio);
-      document.removeEventListener('keydown', enableAudio);
-      document.removeEventListener('touchstart', enableAudio);
     };
 
-    document.addEventListener('click', enableAudio, { once: true });
-    document.addEventListener('keydown', enableAudio, { once: true });
-    document.addEventListener('touchstart', enableAudio, { once: true });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") retry();
+    });
+    window.addEventListener("pageshow", retry);
+    window.addEventListener("focus", retry);
+
+    for (const track of [this.menuMusic, this.gameMusic]) {
+      track?.addEventListener("canplaythrough", retry, { once: true });
+    }
+  }
+
+  private getTrackElement(track: MusicTrack): HTMLAudioElement | null {
+    return track === "menu" ? this.menuMusic : this.gameMusic;
+  }
+
+  private async tryPlay(audio: HTMLAudioElement | null): Promise<boolean> {
+    if (!audio || this.isMuted) return false;
+
+    audio.volume = this.musicVolume;
+    audio.muted = false;
+
+    try {
+      await audio.play();
+      this.userInteracted = true;
+      return true;
+    } catch {
+      // Alguns ambientes permitem autoplay só se começar mudo; depois desmutamos.
+      try {
+        audio.muted = true;
+        await audio.play();
+        audio.muted = false;
+        audio.volume = this.musicVolume;
+        this.userInteracted = true;
+        return true;
+      } catch (err) {
+        console.log("Menu/game music waiting for user gesture:", err);
+        return false;
+      }
+    }
+  }
+
+  private async resumeDesiredTrack(): Promise<void> {
+    if (!this.desiredTrack || this.isMuted) return;
+    const el = this.getTrackElement(this.desiredTrack);
+    this.currentMusic = el;
+    await this.tryPlay(el);
+  }
+
+  private pauseAllMusic(resetTime: boolean): void {
+    for (const track of [this.menuMusic, this.gameMusic]) {
+      if (!track) continue;
+      track.pause();
+      if (resetTime) track.currentTime = 0;
+    }
   }
 
   /**
    * Toca a música do menu
    */
   playMenuMusic(): void {
+    this.desiredTrack = "menu";
+    this.pauseAllMusic(true);
+    this.currentMusic = this.menuMusic;
     if (this.isMuted) return;
-    
-    this.stopAllMusic();
-    if (this.menuMusic) {
-      // Tenta tocar mesmo sem interação do usuário
-      // Se falhar, será tentado novamente após interação
-      this.menuMusic.play().catch(err => {
-        // Se falhar por falta de interação, marca para tentar novamente
-        if (!this.userInteracted) {
-          console.log('Menu music will play after user interaction');
-        } else {
-          console.warn('Failed to play menu music:', err);
-        }
-      });
-      this.currentMusic = this.menuMusic;
-    }
+    void this.tryPlay(this.menuMusic);
   }
 
   /**
    * Toca a música da partida
    */
   playGameMusic(): void {
-    if (this.isMuted || !this.userInteracted) return;
-    
-    this.stopAllMusic();
-    if (this.gameMusic) {
-      this.gameMusic.play().catch(err => {
-        console.warn('Failed to play game music:', err);
-      });
-      this.currentMusic = this.gameMusic;
-    }
+    this.desiredTrack = "game";
+    this.pauseAllMusic(true);
+    this.currentMusic = this.gameMusic;
+    if (this.isMuted) return;
+    void this.tryPlay(this.gameMusic);
   }
 
   /**
    * Para todas as músicas
    */
   stopAllMusic(): void {
-    if (this.menuMusic) {
-      this.menuMusic.pause();
-      this.menuMusic.currentTime = 0;
-    }
-    if (this.gameMusic) {
-      this.gameMusic.pause();
-      this.gameMusic.currentTime = 0;
-    }
+    this.desiredTrack = null;
+    this.pauseAllMusic(true);
     this.currentMusic = null;
   }
 
-  /**
-   * Toca efeito sonoro de vitória
-   */
   playGameWon(): void {
     if (this.isMuted || !this.userInteracted) return;
-    
-    const sound = new Audio('/audio/sfx/game-won.mp3');
+
+    const sound = new Audio("/audio/sfx/game-won.mp3");
     sound.volume = this.sfxVolume;
-    sound.play().catch(err => {
-      console.warn('Failed to play game won sound:', err);
+    sound.play().catch((err) => {
+      console.warn("Failed to play game won sound:", err);
     });
   }
 
-  /**
-   * Toca efeito sonoro de derrota
-   */
   playGameLost(): void {
     if (this.isMuted || !this.userInteracted) return;
-    
-    const sound = new Audio('/audio/sfx/game-lost.mp3');
+
+    const sound = new Audio("/audio/sfx/game-lost.mp3");
     sound.volume = this.sfxVolume;
-    sound.play().catch(err => {
-      console.warn('Failed to play game lost sound:', err);
+    sound.play().catch((err) => {
+      console.warn("Failed to play game lost sound:", err);
     });
   }
-
-  // ============================================
-  // SFX sintetizados via Web Audio (sem arquivos)
-  // ============================================
 
   private getAudioContext(): AudioContext | null {
     if (typeof window === "undefined") return null;
-    const Ctor = window.AudioContext || (window as any).webkitAudioContext;
+    const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     if (!this.audioCtx) {
       this.audioCtx = new Ctor();
@@ -164,7 +214,6 @@ class AudioManager {
     return !this.isMuted && this.userInteracted && this.sfxVolume > 0;
   }
 
-  /** Ruído filtrado curto: som de carta deslizando na mesa */
   playCardSlide(): void {
     if (!this.canPlaySfx()) return;
     const ctx = this.getAudioContext();
@@ -194,7 +243,6 @@ class AudioManager {
     source.start();
   }
 
-  /** Estalo curto: som de carta virando */
   playCardFlip(): void {
     if (!this.canPlaySfx()) return;
     const ctx = this.getAudioContext();
@@ -214,14 +262,12 @@ class AudioManager {
     osc.stop(ctx.currentTime + 0.1);
   }
 
-  /** Dois deslizes em sequência: troca de cartas */
   playSwap(): void {
     if (!this.canPlaySfx()) return;
     this.playCardSlide();
     setTimeout(() => this.playCardSlide(), 160);
   }
 
-  /** Zumbido grave: punição por descarte errado */
   playPenalty(): void {
     if (!this.canPlaySfx()) return;
     const ctx = this.getAudioContext();
@@ -241,7 +287,6 @@ class AudioManager {
     osc.stop(ctx.currentTime + 0.4);
   }
 
-  /** Dois toques suaves ascendentes: começou o seu turno */
   playYourTurn(): void {
     if (!this.canPlaySfx()) return;
     const ctx = this.getAudioContext();
@@ -262,83 +307,55 @@ class AudioManager {
       osc.stop(ctx.currentTime + startOffset + 0.3);
     };
 
-    playNote(659.25, 0); // Mi5
-    playNote(880, 0.14); // Lá5
+    playNote(659.25, 0);
+    playNote(880, 0.14);
   }
 
-  /**
-   * Define o volume da música
-   */
   setMusicVolume(volume: number): void {
     this.musicVolume = Math.max(0, Math.min(1, volume));
     if (this.menuMusic) this.menuMusic.volume = this.musicVolume;
     if (this.gameMusic) this.gameMusic.volume = this.musicVolume;
-    // Salva no localStorage
-    localStorage.setItem('cunoku_music_volume', this.musicVolume.toString());
+    localStorage.setItem("cunoku_music_volume", this.musicVolume.toString());
   }
 
-  /**
-   * Obtém o volume da música
-   */
   getMusicVolume(): number {
     return this.musicVolume;
   }
 
-  /**
-   * Define o volume dos efeitos sonoros
-   */
   setSfxVolume(volume: number): void {
     this.sfxVolume = Math.max(0, Math.min(1, volume));
-    // Salva no localStorage
-    localStorage.setItem('cunoku_sfx_volume', this.sfxVolume.toString());
+    localStorage.setItem("cunoku_sfx_volume", this.sfxVolume.toString());
   }
 
-  /**
-   * Obtém o volume dos efeitos sonoros
-   */
   getSfxVolume(): number {
     return this.sfxVolume;
   }
 
   /**
-   * Muta/desmuta o áudio
+   * Muta/desmuta o áudio.
+   * Mute apenas pausa (mantém a faixa desejada); desmute retoma essa faixa.
    */
   setMuted(muted: boolean): void {
     this.isMuted = muted;
-    localStorage.setItem('cunoku_muted', muted.toString());
+    localStorage.setItem("cunoku_muted", muted.toString());
+
     if (muted) {
-      this.stopAllMusic();
+      // Não zera desiredTrack / currentMusic — senão o desmute não sabe o que retomar
+      this.pauseAllMusic(false);
     } else {
-      // Retoma a música atual se houver
-      if (this.currentMusic) {
-        this.currentMusic.play().catch(err => {
-          console.warn('Failed to resume music:', err);
-        });
-      }
+      void this.resumeDesiredTrack();
     }
   }
 
-  /**
-   * Verifica se está mudo
-   */
   getMuted(): boolean {
     return this.isMuted;
   }
 
-  /**
-   * Limpa recursos
-   */
   cleanup(): void {
     this.stopAllMusic();
-    if (this.menuMusic) {
-      this.menuMusic = null;
-    }
-    if (this.gameMusic) {
-      this.gameMusic = null;
-    }
+    this.menuMusic = null;
+    this.gameMusic = null;
   }
 }
 
-// Instância singleton
 export const audioManager = new AudioManager();
-

@@ -32,13 +32,17 @@ import {
 } from "@/lib/gameServer";
 
 export default function Home() {
-  // Toca música do menu assim que o componente montar
+  // Toca música do menu assim que a página carregar (com retentativas no audioManager)
   useEffect(() => {
-    // Tenta tocar imediatamente
     audioManager.playMenuMusic();
-    
-    // Cleanup ao desmontar
+
+    // Segunda tentativa após o paint / preload do mp3
+    const t1 = window.setTimeout(() => audioManager.playMenuMusic(), 250);
+    const t2 = window.setTimeout(() => audioManager.playMenuMusic(), 1000);
+
     return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
       audioManager.stopAllMusic();
     };
   }, []);

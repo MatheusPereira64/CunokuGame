@@ -14,6 +14,56 @@ import { cn } from "@/lib/utils";
 import { Trophy } from "lucide-react";
 import { fetchLeaderboard, fetchRankMe, type LeaderboardEntry, type PublicRankProfile } from "@/lib/rankAuth";
 import { RankBadge } from "@/components/RankBadge";
+import { effectiveRank } from "@shared/rank";
+
+function buildDevMockLeaderboard(): { entries: LeaderboardEntry[]; me: PublicRankProfile } {
+  const raw = [
+    { nickname: "shadow_ace", displayName: "Shadow Ace", wins: 312, bestScore: -1, iconId: "crown", accent: "indigo" },
+    { nickname: "yuki_zero", displayName: "Yuki", wins: 287, bestScore: 0, iconId: "moon", accent: "slate" },
+    { nickname: "kunai_king", displayName: "Kunai King", wins: 251, bestScore: 1, iconId: "zap", accent: "amber" },
+    { nickname: "sakura_hand", displayName: "Sakura", wins: 198, bestScore: 2, iconId: "heart", accent: "red" },
+    { nickname: "void_deal", displayName: "Void Deal", wins: 176, bestScore: 0, iconId: "spade", accent: "slate" },
+    { nickname: "lotus_bluff", displayName: "Lotus", wins: 154, bestScore: 3, iconId: "star", accent: "emerald" },
+    { nickname: "voce_dev", displayName: "Você (dev)", wins: 141, bestScore: 1, iconId: "flame", accent: "indigo" },
+    { nickname: "ronin_card", displayName: "Ronin", wins: 128, bestScore: 4, iconId: "club", accent: "amber" },
+    { nickname: "fox_mask", displayName: "Fox Mask", wins: 119, bestScore: 2, iconId: "sun", accent: "red" },
+    { nickname: "ink_joker", displayName: "Ink Joker", wins: 105, bestScore: -1, iconId: "diamond", accent: "emerald" },
+    { nickname: "mid_table", displayName: "Mid Table", wins: 62, bestScore: 5, iconId: "spade", accent: "slate" },
+    { nickname: "silver_fan", displayName: "Silver Fan", wins: 28, bestScore: 6, iconId: "star", accent: "indigo" },
+    { nickname: "new_blade", displayName: "New Blade", wins: 9, bestScore: 8, iconId: "zap", accent: "amber" },
+    { nickname: "rookie_pt", displayName: "Rookie", wins: 2, bestScore: 12, iconId: "heart", accent: "red" },
+  ];
+
+  const entries: LeaderboardEntry[] = raw.map((r, i) => {
+    const position = i + 1;
+    return {
+      position,
+      nickname: r.nickname,
+      displayName: r.displayName,
+      wins: r.wins,
+      bestScore: r.bestScore,
+      rank: effectiveRank(r.wins, position),
+      iconId: r.iconId,
+      accent: r.accent,
+    };
+  });
+
+  const self = entries.find((e) => e.nickname === "voce_dev")!;
+  const me: PublicRankProfile = {
+    playerId: "dev-mock-player",
+    nickname: self.nickname,
+    displayName: self.displayName,
+    iconId: self.iconId,
+    accent: self.accent,
+    wins: self.wins,
+    gamesPlayed: self.wins + 20,
+    bestScore: self.bestScore,
+    rank: self.rank,
+    position: self.position,
+  };
+
+  return { entries, me };
+}
 
 interface LeaderboardDialogProps {
   compact?: boolean;
@@ -36,6 +86,21 @@ export function LeaderboardDialog({ compact = false }: LeaderboardDialogProps) {
     let cancelled = false;
     setLoading(true);
     setError(null);
+
+    // Em desenvolvimento: mock para visualizar o modal sem API/DB
+    if (import.meta.env.DEV) {
+      const mock = buildDevMockLeaderboard();
+      window.setTimeout(() => {
+        if (cancelled) return;
+        setEntries(mock.entries);
+        setMe(mock.me);
+        setLoading(false);
+      }, 250);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     Promise.all([fetchLeaderboard(50), fetchRankMe().catch(() => null)])
       .then(([board, profile]) => {
         if (cancelled) return;
