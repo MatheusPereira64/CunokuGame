@@ -9,14 +9,14 @@ import {
 import { Button } from "@/components/Button";
 import { useI18n } from "@/contexts/i18n-context";
 import { useUpdateCheck } from "@/hooks/use-update-check";
-import { APP_VERSION } from "@/lib/appVersion";
 import { Download, Sparkles } from "lucide-react";
 
 export function UpdateAvailableDialog() {
   const { t } = useI18n();
-  const { update, open, setOpen, dismiss, download } = useUpdateCheck();
+  const { update, open, setOpen, dismiss, download, currentVersion } = useUpdateCheck();
 
-  if (!update) return null;
+  // Sem update válido (versão igual ou mais nova local) → não renderiza
+  if (!update || !open) return null;
 
   return (
     <Dialog
@@ -36,7 +36,7 @@ export function UpdateAvailableDialog() {
             <p>
               {t("update.message")
                 .replace("{version}", update.tag)
-                .replace("{current}", APP_VERSION)}
+                .replace("{current}", currentVersion)}
             </p>
             {update.assetName && (
               <p className="text-xs text-gray-500 font-mono break-all">{update.assetName}</p>

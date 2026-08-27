@@ -2,7 +2,7 @@ import {
   APP_VERSION,
   GITHUB_RELEASES_API,
   GITHUB_RELEASES_PAGE,
-  isNewerVersion,
+  compareSemver,
   isUpdateDismissed,
   normalizeVersion,
 } from "./appVersion";
@@ -110,13 +110,20 @@ export async function checkForAppUpdate(signal?: AbortSignal): Promise<UpdateChe
     return { currentVersion: APP_VERSION, update: null };
   }
 
-  if (!isNewerVersion(latest.tag, APP_VERSION)) {
+  const remote = normalizeVersion(latest.tag);
+  const local = normalizeVersion(APP_VERSION);
+
+  // Mesma versão ou mais antiga no remoto → sem pop-up
+  if (compareSemver(remote, local) <= 0) {
     return { currentVersion: APP_VERSION, update: null };
   }
 
-  if (isUpdateDismissed(latest.tag)) {
+  if (isUpdateDismissed(remote)) {
     return { currentVersion: APP_VERSION, update: null };
   }
 
-  return { currentVersion: APP_VERSION, update: latest };
+  return {
+    currentVersion: APP_VERSION,
+    update: { ...latest, tag: remote },
+  };
 }

@@ -73,8 +73,8 @@ jobs:
           test -f "$IPA"
           if gh release view "v${VERSION}" >/dev/null 2>&1; then
             gh release upload "v${VERSION}" "$IPA" --clobber
-            if [[ -f "RELEASE_NOTES_${VERSION}.md" ]]; then
-              gh release edit "v${VERSION}" --notes-file "RELEASE_NOTES_${VERSION}.md"
+            if [[ -f "releases/RELEASE_NOTES_${VERSION}.md" ]]; then
+              gh release edit "v${VERSION}" --notes-file "releases/RELEASE_NOTES_${VERSION}.md"
             fi
           else
             echo "Release v${VERSION} ainda não existe; IPA ficou só como artifact."

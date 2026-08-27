@@ -19,6 +19,7 @@ import { useI18n, type Language } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
 import { loadProfile } from "@/lib/playerProfile";
+import { APP_VERSION } from "@/lib/appVersion";
 import {
   clearServerBase,
   isLikelyLocalHost,
@@ -762,6 +763,12 @@ export default function Home() {
           {t("menu.copyright")}
         </p>
       )}
+      <p
+        className="absolute bottom-1.5 left-2 text-[9px] leading-none text-stone-400/70 font-mono tracking-wide pointer-events-none select-none"
+        aria-label={`versão ${APP_VERSION}`}
+      >
+        v{APP_VERSION}
+      </p>
     </div>
   );
 }

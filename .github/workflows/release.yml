@@ -128,8 +128,8 @@ jobs:
           find release-artifacts -type f \( -name "*.apk" -o -name "*.ipa" -o -name "*.zip" \) -exec cp {} dist-release/ \;
           ls -lh dist-release
           test -f "dist-release/Cunoku-${VERSION}.apk"
-          NOTES="RELEASE_NOTES_${VERSION}.md"
-          if [[ ! -f "$NOTES" ]]; then NOTES="RELEASE_NOTES_1.0.4.md"; fi
+          NOTES="releases/RELEASE_NOTES_${VERSION}.md"
+          if [[ ! -f "$NOTES" ]]; then NOTES="releases/RELEASE_NOTES_1.0.5.md"; fi
           gh release create "${{ github.ref_name }}" dist-release/* \
             --title "Cunoku ${VERSION}" \
             --notes-file "$NOTES" \
