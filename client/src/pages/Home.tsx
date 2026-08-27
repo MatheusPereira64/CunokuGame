@@ -17,7 +17,7 @@ import { InstallAppButton } from "@/components/InstallAppButton";
 import { ProfileDialog } from "@/components/ProfileDialog";
 import { LeaderboardDialog } from "@/components/LeaderboardDialog";
 import { useI18n, type Language } from "@/contexts/i18n-context";
-import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
+import { useIsCompactGame, useIsPortrait, unlockOrientation } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
 import { loadProfile } from "@/lib/playerProfile";
 import { APP_VERSION } from "@/lib/appVersion";
@@ -34,9 +34,10 @@ import {
 } from "@/lib/gameServer";
 
 export default function Home() {
-  // Toca música do menu assim que a página carregar (com retentativas no audioManager)
+  // Menu livre em portrait/landscape; libera trava se veio da partida
   useEffect(() => {
     audioManager.playMenuMusic();
+    void unlockOrientation();
 
     // Segunda tentativa após o paint / preload do mp3
     const t1 = window.setTimeout(() => audioManager.playMenuMusic(), 250);

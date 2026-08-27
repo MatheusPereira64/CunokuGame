@@ -28,7 +28,7 @@ import { AbilityModal } from "@/components/game/AbilityModal";
 import { AbilityAction, hasSpecialAbility, getAbilityDescription } from "@/components/game/helpers";
 import { getSeatPositions } from "@/components/game/seatPositions";
 import { LandscapePrompt } from "@/components/game/LandscapePrompt";
-import { useIsPortrait, lockLandscape, useIsCompactGame } from "@/hooks/use-landscape";
+import { useIsPortrait, lockLandscape, unlockOrientation, useIsCompactGame } from "@/hooks/use-landscape";
 import { getLanJoinUrl, getNetworkMode } from "@/lib/gameServer";
 import { copyToClipboard } from "@/lib/clipboard";
 import {
@@ -431,14 +431,25 @@ export default function Game() {
     }
   }, [onlineRevealedCard, isOffline, setOnlineRevealedCard, revealOpponentCardInHand]);
 
-  // Trava orientação em paisagem quando possível (PWA / fullscreen)
+  // Trava landscape só com a partida em andamento (menu/espera ficam livres)
+  const isMatchInProgress =
+    !!gameState &&
+    !((gameState.players.length < 2 || gameState.turnPhase === "waiting") && !gameState.winnerId);
+
   useEffect(() => {
+    if (!isMatchInProgress) {
+      void unlockOrientation();
+      return;
+    }
     let unlock: (() => void) | undefined;
     lockLandscape().then((fn) => {
       unlock = fn;
     });
-    return () => unlock?.();
-  }, []);
+    return () => {
+      unlock?.();
+      void unlockOrientation();
+    };
+  }, [isMatchInProgress]);
 
   // Detecta declaração de Cunoku (offline)
   const prevFinalRound = useRef(false);
