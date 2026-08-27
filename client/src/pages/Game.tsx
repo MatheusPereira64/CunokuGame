@@ -126,9 +126,8 @@ export default function Game() {
     playerName: string;
     timer?: NodeJS.Timeout;
   } | null>(null);
-  // Cartas de oponentes reveladas temporariamente: chave = `${playerId}_${cardId}`
-  const [revealedOpponentCardsInHand, setRevealedOpponentCardsInHand] = useState<string[]>([]);
-  const revealedCardTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  // Cartas de oponentes reveladas só neste cliente (habilidade 5/6): chave → face real
+  const [revealedOpponentCardsInHand, setRevealedOpponentCardsInHand] = useState<Record<string, Card>>({});
   const [gameOverModalOpen, setGameOverModalOpen] = useState(false);
   const [opponentActionNotification, setOpponentActionNotification] = useState<{
     playerName: string;
@@ -373,32 +372,43 @@ export default function Game() {
     return () => {
       peekTimersRef.current.forEach((timer) => clearTimeout(timer));
       peekTimersRef.current.clear();
-      revealedCardTimersRef.current.forEach((timer) => clearTimeout(timer));
-      revealedCardTimersRef.current.clear();
     };
   }, []);
 
-  // Marca temporariamente uma carta de oponente como revelada (20 segundos)
+  // Marca carta de oponente como revelada só neste cliente (persiste até a carta sair da mão)
   const revealOpponentCardInHand = useCallback((targetPlayerId: string, targetCard: Card) => {
     const cardKey = `${targetPlayerId}_${targetCard.id}`;
-
-    const existingTimer = revealedCardTimersRef.current.get(cardKey);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
-      revealedCardTimersRef.current.delete(cardKey);
-    }
-
-    setRevealedOpponentCardsInHand((prev) => (prev.includes(cardKey) ? prev : [...prev, cardKey]));
-
-    const handTimer = setTimeout(() => {
-      setRevealedOpponentCardsInHand((current) => current.filter((key) => key !== cardKey));
-      revealedCardTimersRef.current.delete(cardKey);
-    }, 20000);
-
-    revealedCardTimersRef.current.set(cardKey, handTimer);
+    setRevealedOpponentCardsInHand((prev) =>
+      prev[cardKey] ? prev : { ...prev, [cardKey]: targetCard }
+    );
   }, []);
 
-  // Carta revelada pelo servidor (online): mostra por 20 segundos
+  // Remove revelações locais quando a carta não está mais na mão do oponente
+  useEffect(() => {
+    if (!gameState) return;
+    setRevealedOpponentCardsInHand((prev) => {
+      const keys = Object.keys(prev);
+      if (keys.length === 0) return prev;
+      let changed = false;
+      const next = { ...prev };
+      for (const key of keys) {
+        const player = gameState.players.find((p) => key.startsWith(`${p.id}_`));
+        if (!player) {
+          delete next[key];
+          changed = true;
+          continue;
+        }
+        const revealedCardId = key.slice(player.id.length + 1);
+        if (!player.hand.some((c) => c.id === revealedCardId)) {
+          delete next[key];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [gameState]);
+
+  // Carta revelada pelo servidor (online): popup 3s; mesa fica revelada só neste cliente
   useEffect(() => {
     if (!isOffline && onlineRevealedCard) {
       if (revealedOpponentCard?.timer) {
@@ -408,7 +418,7 @@ export default function Game() {
       const overlayTimer = setTimeout(() => {
         setOnlineRevealedCard(null);
         setRevealedOpponentCard(null);
-      }, 20000);
+      }, 3000);
 
       setRevealedOpponentCard({
         card: onlineRevealedCard.card,
@@ -417,14 +427,9 @@ export default function Game() {
       });
       audioManager.playCardFlip();
 
-      const targetPlayerId = (onlineRevealedCard as any).targetPlayerId;
-      const targetCardIndex = (onlineRevealedCard as any).targetCardIndex;
-
-      if (targetPlayerId !== undefined && targetCardIndex !== undefined) {
-        const targetPlayer = gameState?.players.find((p) => p.id === targetPlayerId);
-        if (targetPlayer && targetPlayer.hand[targetCardIndex]) {
-          revealOpponentCardInHand(targetPlayerId, targetPlayer.hand[targetCardIndex]);
-        }
+      const targetPlayerId = (onlineRevealedCard as any).targetPlayerId as string | undefined;
+      if (targetPlayerId && onlineRevealedCard.card) {
+        revealOpponentCardInHand(targetPlayerId, onlineRevealedCard.card);
       }
 
       return () => clearTimeout(overlayTimer);
@@ -620,17 +625,20 @@ export default function Game() {
     }
 
     if (action.kind === "peek_opponent") {
-      const targetPlayer = gameState.players.find((p) => p.id === action.targetPlayerId);
-      if (targetPlayer && targetPlayer.hand[action.targetCardIndex]) {
-        const peekedCard = targetPlayer.hand[action.targetCardIndex];
+      // Offline: feedback imediato. Online: private_info do servidor (só quem peekou recebe).
+      if (isOffline) {
+        const targetPlayer = gameState.players.find((p) => p.id === action.targetPlayerId);
+        if (targetPlayer && targetPlayer.hand[action.targetCardIndex]) {
+          const peekedCard = targetPlayer.hand[action.targetCardIndex];
 
-        if (revealedOpponentCard?.timer) {
-          clearTimeout(revealedOpponentCard.timer);
+          if (revealedOpponentCard?.timer) {
+            clearTimeout(revealedOpponentCard.timer);
+          }
+          const overlayTimer = setTimeout(() => setRevealedOpponentCard(null), 3000);
+          setRevealedOpponentCard({ card: peekedCard, playerName: targetPlayer.name, timer: overlayTimer });
+          revealOpponentCardInHand(action.targetPlayerId, peekedCard);
+          audioManager.playCardFlip();
         }
-        const overlayTimer = setTimeout(() => setRevealedOpponentCard(null), 20000);
-        setRevealedOpponentCard({ card: peekedCard, playerName: targetPlayer.name, timer: overlayTimer });
-        revealOpponentCardInHand(action.targetPlayerId, peekedCard);
-        audioManager.playCardFlip();
       }
 
       sendAction({
@@ -923,7 +931,8 @@ export default function Game() {
                   player={p}
                   isActive={currentTurnPlayerId === p.id}
                   showAllCards={!!gameState.winnerId}
-                  revealedCardKeys={revealedOpponentCardsInHand}
+                  revealedCardKeys={Object.keys(revealedOpponentCardsInHand)}
+                  revealedCardsByKey={revealedOpponentCardsInHand}
                   registerCardPosition={registerCardRef}
                   opponentCount={opponents.length}
                   side={pos.side}
@@ -950,7 +959,8 @@ export default function Game() {
                   player={p}
                   isActive={currentTurnPlayerId === p.id}
                   showAllCards={!!gameState.winnerId}
-                  revealedCardKeys={revealedOpponentCardsInHand}
+                  revealedCardKeys={Object.keys(revealedOpponentCardsInHand)}
+                  revealedCardsByKey={revealedOpponentCardsInHand}
                   registerCardPosition={registerCardRef}
                   opponentCount={opponents.length}
                   side="top"

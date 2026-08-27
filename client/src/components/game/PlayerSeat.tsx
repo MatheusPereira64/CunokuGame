@@ -13,8 +13,10 @@ interface PlayerSeatProps {
   isActive: boolean;
   /** Fim de jogo: revela todas as cartas */
   showAllCards: boolean;
-  /** Chaves `${playerId}_${cardId}` de cartas reveladas temporariamente (habilidades 5/6) */
+  /** Chaves `${playerId}_${cardId}` de cartas reveladas só para este cliente (habilidades 5/6) */
   revealedCardKeys: string[];
+  /** Faces reais das cartas peekadas (mãos de oponentes vêm filtradas no estado online) */
+  revealedCardsByKey?: Record<string, Card>;
   registerCardPosition: (key: string, el: HTMLElement | null, card?: Card) => void;
   /** Quantidade total de oponentes — define densidade do leque */
   opponentCount?: number;
@@ -31,6 +33,7 @@ export function PlayerSeat({
   isActive,
   showAllCards,
   revealedCardKeys,
+  revealedCardsByKey,
   registerCardPosition,
   opponentCount = 1,
   side = "top",
@@ -76,6 +79,7 @@ export function PlayerSeat({
         const cardKey = `${player.id}_${card.id}`;
         const isTemporarilyRevealed = revealedCardKeys.includes(cardKey);
         const shouldShowCard = showAllCards || isTemporarilyRevealed;
+        const displayCard = (isTemporarilyRevealed && revealedCardsByKey?.[cardKey]) || card;
 
         const wasPreviouslyHidden = previousRevealedState.current.get(cardKey) === false;
         const wasJustRevealed = wasPreviouslyHidden && shouldShowCard;
@@ -98,7 +102,7 @@ export function PlayerSeat({
                 style={{ transformStyle: "preserve-3d" }}
               >
                 <PlayingCard
-                  card={card}
+                  card={displayCard}
                   hidden={false}
                   className={cn(cardSize, isTemporarilyRevealed && "ring-2 ring-yellow-400 ring-offset-1")}
                   animate={false}
