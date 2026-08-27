@@ -36,6 +36,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Write Android signing config
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::Secret ANDROID_KEYSTORE_BASE64 ausente. Configure em Settings → Secrets."
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/cunoku-release.keystore
+          {
+            echo "storeFile=cunoku-release.keystore"
+            echo "storePassword=${ANDROID_KEYSTORE_PASSWORD}"
+            echo "keyAlias=${ANDROID_KEY_ALIAS:-cunoku}"
+            echo "keyPassword=${ANDROID_KEY_PASSWORD}"
+          } > android/keystore.properties
+
       - name: Web build
         run: npm run build
         env:
@@ -130,7 +149,12 @@ jobs:
           test -f "dist-release/Cunoku-${VERSION}.apk"
           NOTES="releases/RELEASE_NOTES_${VERSION}.md"
           if [[ ! -f "$NOTES" ]]; then NOTES="releases/RELEASE_NOTES_1.0.5.md"; fi
-          gh release create "${{ github.ref_name }}" dist-release/* \
-            --title "Cunoku ${VERSION}" \
-            --notes-file "$NOTES" \
-            --target "${{ github.sha }}"
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            gh release upload "${{ github.ref_name }}" dist-release/* --clobber
+            gh release edit "${{ github.ref_name }}" --notes-file "$NOTES" --title "Cunoku ${VERSION}"
+          else
+            gh release create "${{ github.ref_name }}" dist-release/* \
+              --title "Cunoku ${VERSION}" \
+              --notes-file "$NOTES" \
+              --target "${{ github.sha }}"
+          fi

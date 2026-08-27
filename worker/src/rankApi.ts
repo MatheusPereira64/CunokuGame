@@ -10,6 +10,7 @@ import {
 } from "../../shared/rankService";
 import { createDb, ensureSchema } from "./db";
 import type { Env } from "./env";
+import { corsHeaders } from "./cors";
 
 async function getRankDb(env: Env) {
   const db = createDb(env);
@@ -21,20 +22,17 @@ async function getRankDb(env: Env) {
 export async function handleRankApi(request: Request, env: Env, path: string, method: string): Promise<Response | null> {
   if (!path.startsWith("/api/rank")) return null;
 
+  const headers = {
+    "content-type": "application/json; charset=utf-8",
+    ...corsHeaders(request),
+  };
+  const json = (data: unknown, status = 200) =>
+    new Response(JSON.stringify(data), { status, headers });
+
   const db = await getRankDb(env);
   if (!db) {
-    return Response.json(
-      { message: "Database unavailable" },
-      {
-        status: 503,
-        headers: { "access-control-allow-origin": "*", "content-type": "application/json" },
-      },
-    );
+    return json({ message: "Database unavailable" }, 503);
   }
-
-  const cors = { "access-control-allow-origin": "*", "content-type": "application/json; charset=utf-8" };
-  const json = (data: unknown, status = 200) =>
-    new Response(JSON.stringify(data), { status, headers: cors });
 
   try {
     if (method === "POST" && path === api.rank.register.path) {

@@ -4,15 +4,16 @@ import { createStorage, pingDb } from "./storage";
 import type { Env } from "./env";
 import { RoomDurableObject } from "./room-do";
 import { handleRankApi } from "./rankApi";
+import { corsHeaders } from "./cors";
 
 export { RoomDurableObject };
 
-function json(data: unknown, status = 200): Response {
+function json(data: unknown, status = 200, request?: Request): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "access-control-allow-origin": "*",
+      ...(request ? corsHeaders(request) : {}),
     },
   });
 }
@@ -25,11 +26,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
   if (method === "OPTIONS") {
     return new Response(null, {
       status: 204,
-      headers: {
-        "access-control-allow-origin": "*",
-        "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
-        "access-control-allow-headers": "content-type, authorization",
-      },
+      headers: corsHeaders(request),
     });
   }
 
@@ -38,7 +35,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
 
   if (method === "GET" && path === "/api/health") {
     const dbOk = await pingDb(env).catch(() => false);
-    return json({ ok: true, db: dbOk, memory: !dbOk });
+    return json({ ok: true, db: dbOk, memory: !dbOk }, 200, request);
   }
 
   if (method === "GET" && path === api.lan.info.path) {
@@ -46,7 +43,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
       port: 443,
       addresses: [],
       joinBaseUrls: [url.origin],
-    });
+    }, 200, request);
   }
 
   if (method === "POST" && path === api.rooms.create.path) {
@@ -80,9 +77,9 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
         console.warn("Room DO init failed", e);
       }
 
-      return json({ code: roomCode, playerId }, 201);
+      return json({ code: roomCode, playerId }, 201, request);
     } catch (err: any) {
-      return json({ message: err?.message || "Invalid input" }, 400);
+      return json({ message: err?.message || "Invalid input" }, 400, request);
     }
   }
 
@@ -91,28 +88,28 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
       const body = await request.json();
       const { code } = api.rooms.join.input.parse(body);
       const room = await storage.getRoom(code.toUpperCase());
-      if (!room) return json({ message: "Room not found" }, 404);
+      if (!room) return json({ message: "Room not found" }, 404, request);
       const playerId = newPlayerId();
-      return json({ code: room.code, playerId, room });
+      return json({ code: room.code, playerId, room }, 200, request);
     } catch {
-      return json({ message: "Invalid input" }, 400);
+      return json({ message: "Invalid input" }, 400, request);
     }
   }
 
   if (method === "GET" && path === api.rooms.list.path) {
     const rooms = await storage.listRooms();
-    return json(rooms);
+    return json(rooms, 200, request);
   }
 
   const getMatch = path.match(/^\/api\/rooms\/([^/]+)$/);
   if (method === "GET" && getMatch) {
     const code = decodeURIComponent(getMatch[1]!).toUpperCase();
     const room = await storage.getRoom(code);
-    if (!room) return json({ message: "Room not found" }, 404);
-    return json(room);
+    if (!room) return json({ message: "Room not found" }, 404, request);
+    return json(room, 200, request);
   }
 
-  return json({ message: "Not found" }, 404);
+  return json({ message: "Not found" }, 404, request);
 }
 
 export default {

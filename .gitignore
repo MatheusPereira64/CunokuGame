@@ -12,3 +12,6 @@ release-artifacts
 .dev.vars
 .wrangler
 .wrangler-bundle
+android/keystore.properties
+android/*.keystore
+android/*.jks
