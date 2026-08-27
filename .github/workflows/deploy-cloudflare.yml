@@ -35,14 +35,11 @@ jobs:
       - name: Build frontend
         run: npm run build:cf
 
+      # DATABASE_URL já fica no Worker via: npx wrangler secret put DATABASE_URL
+      # (não sincronizar aqui — secret vazio no GitHub derrubava o deploy)
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
-          # Sincroniza DATABASE_URL do GitHub → secret do Worker (Neon)
-          secrets: |
-            DATABASE_URL
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}

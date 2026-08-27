@@ -35,9 +35,10 @@ Em **GitHub → Settings → Secrets and variables → Actions → New repositor
 |--------|------------|
 | `CLOUDFLARE_ACCOUNT_ID` | `98533e6d6fee8bc0cace27496f700c10` (já da sua conta) ou Dashboard → Overview → Account ID |
 | `CLOUDFLARE_API_TOKEN` | [Create Token](https://dash.cloudflare.com/profile/api-tokens) → template **Edit Cloudflare Workers** (ou Custom: Account → Workers Scripts Edit + Account Settings Read) |
-| `DATABASE_URL` | Mesma connection string do Neon |
 
-Sem esses três, o workflow falha no passo **Deploy to Cloudflare**.
+`DATABASE_URL` **não** precisa estar no GitHub: configure uma vez no Worker com `npx wrangler secret put DATABASE_URL`.
+
+Sem `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`, o workflow falha no passo **Deploy to Cloudflare**.
 
 Opcional (Deployments no GitHub): em **Settings → Environments**, crie `production` se ainda não existir (o workflow já usa `environment: production`).
 
