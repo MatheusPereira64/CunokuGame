@@ -18,6 +18,10 @@ jobs:
     name: Build and deploy Worker
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Marca o ambiente GitHub "production" como success quando o job passa
+    environment:
+      name: production
+      url: https://cunoku.cunokugame.workers.dev
     # Aceita CLOUDFLARE_API_TOKEN (correto) ou CLOUDFLARE_API_TOKE (typo legado)
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
