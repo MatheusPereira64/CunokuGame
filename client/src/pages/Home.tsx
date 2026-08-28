@@ -36,16 +36,30 @@ import {
 export default function Home() {
   // Menu livre em portrait/landscape; libera trava se veio da partida
   useEffect(() => {
-    audioManager.playMenuMusic();
-    void unlockOrientation();
+    let cancelled = false;
 
-    // Segunda tentativa após o paint / preload do mp3
-    const t1 = window.setTimeout(() => audioManager.playMenuMusic(), 250);
-    const t2 = window.setTimeout(() => audioManager.playMenuMusic(), 1000);
+    const startMenuMusic = () => {
+      if (!cancelled) audioManager.playMenuMusic();
+    };
+
+    void unlockOrientation();
+    startMenuMusic();
+
+    // Retries: WebView aplica autoplay um pouco depois; mp3 pode ainda estar carregando
+    const delays = [50, 200, 500, 1000, 2000, 4000];
+    const timers = delays.map((ms) => window.setTimeout(startMenuMusic, ms));
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") startMenuMusic();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", startMenuMusic);
 
     return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
+      cancelled = true;
+      timers.forEach((id) => window.clearTimeout(id));
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", startMenuMusic);
       audioManager.stopAllMusic();
     };
   }, []);

@@ -17,6 +17,8 @@ class AudioManager {
   private sfxVolume: number = 0.7;
   private isMuted: boolean = false;
   private userInteracted: boolean = false;
+  /** Autoplay iniciou mudo; aguarda gesto para ficar audível (política do browser). */
+  private awaitingAudibleUnlock = false;
   private audioCtx: AudioContext | null = null;
   private readonly unlockEvents = ["pointerdown", "touchstart", "keydown", "click"] as const;
   private unlockHandler: (() => void) | null = null;
@@ -59,7 +61,7 @@ class AudioManager {
       this.userInteracted = true;
       void this.getAudioContext();
       if (!this.isMuted) {
-        void this.resumeDesiredTrack();
+        void this.unlockAudiblePlayback();
       }
       this.teardownUnlockListeners();
     };
@@ -79,6 +81,23 @@ class AudioManager {
     this.unlockHandler = null;
   }
 
+  /** Após gesto: desmuta faixa já tocando ou retoma play audível. */
+  private async unlockAudiblePlayback(): Promise<void> {
+    if (!this.desiredTrack || this.isMuted) return;
+    const el = this.getTrackElement(this.desiredTrack);
+    if (!el) return;
+    this.currentMusic = el;
+
+    if (this.awaitingAudibleUnlock && !el.paused) {
+      el.muted = false;
+      el.volume = this.musicVolume;
+      this.awaitingAudibleUnlock = false;
+      return;
+    }
+
+    await this.tryPlay(el);
+  }
+
   /**
    * Retenta autoplay quando a página fica visível / o arquivo carrega.
    * Browsers desktop ainda podem bloquear sem gesto; no WebView Android costuma liberar.
@@ -87,8 +106,13 @@ class AudioManager {
     const retry = () => {
       if (this.isMuted || !this.desiredTrack) return;
       const track = this.getTrackElement(this.desiredTrack);
-      if (track && track.paused) {
+      if (!track) return;
+      if (track.paused) {
         void this.tryPlay(track);
+      } else if (track.muted && this.userInteracted && !this.isMuted) {
+        track.muted = false;
+        track.volume = this.musicVolume;
+        this.awaitingAudibleUnlock = false;
       }
     };
 
@@ -99,7 +123,8 @@ class AudioManager {
     window.addEventListener("focus", retry);
 
     for (const track of [this.menuMusic, this.gameMusic]) {
-      track?.addEventListener("canplaythrough", retry, { once: true });
+      track?.addEventListener("canplaythrough", retry);
+      track?.addEventListener("loadeddata", retry);
     }
   }
 
@@ -111,20 +136,20 @@ class AudioManager {
     if (!audio || this.isMuted) return false;
 
     audio.volume = this.musicVolume;
-    audio.muted = false;
 
+    // 1) Tenta audível (WebView Android com mediaPlaybackRequiresUserGesture=false)
     try {
+      audio.muted = false;
       await audio.play();
       this.userInteracted = true;
+      this.awaitingAudibleUnlock = false;
       return true;
     } catch {
-      // Alguns ambientes permitem autoplay só se começar mudo; depois desmutamos.
+      // 2) Autoplay mudo (permitido na maioria dos browsers); fica audível no 1º gesto
       try {
         audio.muted = true;
         await audio.play();
-        audio.muted = false;
-        audio.volume = this.musicVolume;
-        this.userInteracted = true;
+        this.awaitingAudibleUnlock = true;
         return true;
       } catch (err) {
         console.log("Menu/game music waiting for user gesture:", err);
@@ -146,6 +171,7 @@ class AudioManager {
       track.pause();
       if (resetTime) track.currentTime = 0;
     }
+    this.awaitingAudibleUnlock = false;
   }
 
   /**
@@ -153,6 +179,19 @@ class AudioManager {
    */
   playMenuMusic(): void {
     this.desiredTrack = "menu";
+    // Já tocando o menu: só reforça volume / desmute se possível
+    if (
+      this.menuMusic &&
+      this.currentMusic === this.menuMusic &&
+      !this.menuMusic.paused
+    ) {
+      if (!this.isMuted && this.userInteracted) {
+        this.menuMusic.muted = false;
+        this.menuMusic.volume = this.musicVolume;
+        this.awaitingAudibleUnlock = false;
+      }
+      return;
+    }
     this.pauseAllMusic(true);
     this.currentMusic = this.menuMusic;
     if (this.isMuted) return;
@@ -164,6 +203,18 @@ class AudioManager {
    */
   playGameMusic(): void {
     this.desiredTrack = "game";
+    if (
+      this.gameMusic &&
+      this.currentMusic === this.gameMusic &&
+      !this.gameMusic.paused
+    ) {
+      if (!this.isMuted && this.userInteracted) {
+        this.gameMusic.muted = false;
+        this.gameMusic.volume = this.musicVolume;
+        this.awaitingAudibleUnlock = false;
+      }
+      return;
+    }
     this.pauseAllMusic(true);
     this.currentMusic = this.gameMusic;
     if (this.isMuted) return;

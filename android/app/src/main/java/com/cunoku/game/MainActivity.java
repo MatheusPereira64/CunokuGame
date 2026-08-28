@@ -1,6 +1,8 @@
 package com.cunoku.game;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.WebSettings;
@@ -11,11 +13,55 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable allowAutoplayRunnable = this::allowMediaAutoplay;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         enableImmersiveMode();
+        scheduleAllowMediaAutoplay();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        scheduleAllowMediaAutoplay();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            enableImmersiveMode();
+            scheduleAllowMediaAutoplay();
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        enableImmersiveMode();
+        scheduleAllowMediaAutoplay();
+    }
+
+    @Override
+    public void onDestroy() {
+        mainHandler.removeCallbacks(allowAutoplayRunnable);
+        super.onDestroy();
+    }
+
+    /** Bridge/WebView às vezes ainda é null no onCreate — tenta várias vezes. */
+    private void scheduleAllowMediaAutoplay() {
         allowMediaAutoplay();
+        View decor = getWindow() != null ? getWindow().getDecorView() : null;
+        if (decor != null) {
+            decor.post(allowAutoplayRunnable);
+        }
+        mainHandler.removeCallbacks(allowAutoplayRunnable);
+        mainHandler.postDelayed(allowAutoplayRunnable, 100);
+        mainHandler.postDelayed(allowAutoplayRunnable, 400);
+        mainHandler.postDelayed(allowAutoplayRunnable, 1000);
     }
 
     /** Libera autoplay de áudio/vídeo sem gesto do usuário no WebView. */
@@ -28,20 +74,6 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception ignored) {
             // Capacitor já define isso no Bridge; fallback silencioso se ainda não estiver pronto
         }
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) {
-            enableImmersiveMode();
-        }
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        enableImmersiveMode();
     }
 
     private void enableImmersiveMode() {
