@@ -10,6 +10,39 @@ export interface IStorage {
   updateRoomStatus(code: string, status: string): Promise<Room>;
 }
 
+function throwCreateRoomError(err: any, insertRoom: InsertRoom): never {
+  console.error("DatabaseStorage.createRoom - Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+  console.error("DatabaseStorage.createRoom - Error name:", err.name);
+  console.error("DatabaseStorage.createRoom - Error message:", err.message);
+  console.error("DatabaseStorage.createRoom - Error code:", err.code);
+  console.error("DatabaseStorage.createRoom - Error detail:", err.detail);
+  console.error("DatabaseStorage.createRoom - Error constraint:", err.constraint);
+  console.error("DatabaseStorage.createRoom - Error stack:", err.stack);
+  console.error("DatabaseStorage.createRoom - Insert data:", JSON.stringify(insertRoom));
+
+  if (err.stack?.includes("@neondatabase/serverless") && !process.env.DATABASE_URL?.includes("neon.tech")) {
+    console.error("⚠️ ERROR: Using Neon driver but DATABASE_URL is not from Neon!");
+    console.error("DATABASE_URL set:", process.env.DATABASE_URL ? "yes" : "no");
+  }
+
+  let errorMessage = "Unknown error";
+  if (err.message) {
+    errorMessage = err.message;
+  } else if (err.code) {
+    errorMessage = `Database error code: ${err.code}`;
+  } else if (err.detail) {
+    errorMessage = err.detail;
+  } else if (err.name) {
+    errorMessage = `${err.name}: ${errorMessage}`;
+  }
+
+  if (err.constraint) {
+    errorMessage += ` (constraint: ${err.constraint})`;
+  }
+
+  throw new Error(`Failed to create room in database: ${errorMessage}`);
+}
+
 export class DatabaseStorage implements IStorage {
   async createRoom(insertRoom: InsertRoom): Promise<Room> {
     const database = await getDb();
@@ -31,39 +64,7 @@ export class DatabaseStorage implements IStorage {
       console.log("DatabaseStorage.createRoom - Room created:", room.id);
       return room;
     } catch (err: any) {
-      console.error("DatabaseStorage.createRoom - Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
-      console.error("DatabaseStorage.createRoom - Error name:", err.name);
-      console.error("DatabaseStorage.createRoom - Error message:", err.message);
-      console.error("DatabaseStorage.createRoom - Error code:", err.code);
-      console.error("DatabaseStorage.createRoom - Error detail:", err.detail);
-      console.error("DatabaseStorage.createRoom - Error constraint:", err.constraint);
-      console.error("DatabaseStorage.createRoom - Error stack:", err.stack);
-      console.error("DatabaseStorage.createRoom - Insert data:", JSON.stringify(insertRoom));
-      
-      // Check if error is from Neon when it shouldn't be
-      if (err.stack?.includes('@neondatabase/serverless') && !process.env.DATABASE_URL?.includes('neon.tech')) {
-        console.error("⚠️ ERROR: Using Neon driver but DATABASE_URL is not from Neon!");
-        console.error("DATABASE_URL set:", process.env.DATABASE_URL ? "yes" : "no");
-      }
-      
-      // Try to extract more information from the error
-      let errorMessage = "Unknown error";
-      if (err.message) {
-        errorMessage = err.message;
-      } else if (err.code) {
-        errorMessage = `Database error code: ${err.code}`;
-      } else if (err.detail) {
-        errorMessage = err.detail;
-      } else if (err.name) {
-        errorMessage = `${err.name}: ${errorMessage}`;
-      }
-      
-      // Add constraint information if available
-      if (err.constraint) {
-        errorMessage += ` (constraint: ${err.constraint})`;
-      }
-      
-      throw new Error(`Failed to create room in database: ${errorMessage}`);
+      throwCreateRoomError(err, insertRoom);
     }
   }
 

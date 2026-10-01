@@ -224,31 +224,43 @@ function applyMatchToProgress(
   const score = Number.isFinite(input.finalScore) ? Number(input.finalScore) : 0;
   next.bestScore = next.bestScore === null ? score : Math.min(next.bestScore, score);
 
-  if (input.won) {
+  applyMatchOutcome(next, input.won);
+  applyModeStats(next, input);
+  return next;
+}
+
+function applyMatchOutcome(next: AchievementProgress, won: boolean) {
+  if (won) {
     next.anyWins += 1;
     next.winStreak += 1;
     next.bestWinStreak = Math.max(next.bestWinStreak, next.winStreak);
-  } else {
-    next.winStreak = 0;
+    return;
   }
+  next.winStreak = 0;
+}
 
+function applyModeStats(
+  next: AchievementProgress,
+  input: { won: boolean; mode: MatchMode; botDifficulty?: BotDifficulty },
+) {
   if (input.mode === "pvp") {
     if (input.won) next.pvpWins += 1;
-  } else {
-    const diff = input.botDifficulty || "medium";
-    if (diff === "easy") {
-      next.botGamesEasy += 1;
-      if (input.won) next.botWinsEasy += 1;
-    } else if (diff === "hard") {
-      next.botGamesHard += 1;
-      if (input.won) next.botWinsHard += 1;
-    } else {
-      next.botGamesMedium += 1;
-      if (input.won) next.botWinsMedium += 1;
-    }
+    return;
   }
 
-  return next;
+  const diff = input.botDifficulty || "medium";
+  if (diff === "easy") {
+    next.botGamesEasy += 1;
+    if (input.won) next.botWinsEasy += 1;
+    return;
+  }
+  if (diff === "hard") {
+    next.botGamesHard += 1;
+    if (input.won) next.botWinsHard += 1;
+    return;
+  }
+  next.botGamesMedium += 1;
+  if (input.won) next.botWinsMedium += 1;
 }
 
 export async function recordRankMatch(

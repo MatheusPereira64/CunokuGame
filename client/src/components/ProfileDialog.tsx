@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
-import { cn } from "@/lib/utils";
+import { cn, fit } from "@/lib/utils";
 import {
   loadProfile,
   saveProfile,
@@ -58,6 +58,14 @@ interface ProfileDialogProps {
   compact?: boolean;
   highlight?: boolean;
   onSaved?: (profile: PlayerProfile) => void;
+}
+
+function authErrorKey(code: string) {
+  if (code === "nickname_taken") return "rank.error.nicknameTaken";
+  if (code === "invalid_credentials") return "rank.error.credentials";
+  if (code === "invalid_nickname") return "rank.error.nickname";
+  if (code === "invalid_pin") return "rank.error.pin";
+  return "rank.error.generic";
 }
 
 export function ProfileDialog({ compact = false, highlight = false, onSaved }: ProfileDialogProps) {
@@ -188,18 +196,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
       setPin("");
       setAccountTab("look");
     } catch (err: any) {
-      const code = String(err?.message || "");
-      const key =
-        code === "nickname_taken"
-          ? "rank.error.nicknameTaken"
-          : code === "invalid_credentials"
-            ? "rank.error.credentials"
-            : code === "invalid_nickname"
-              ? "rank.error.nickname"
-              : code === "invalid_pin"
-                ? "rank.error.pin"
-                : "rank.error.generic";
-      setAuthError(t(key));
+      setAuthError(t(authErrorKey(String(err?.message || ""))));
     } finally {
       setAuthBusy(false);
     }
@@ -211,7 +208,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
   };
 
   const rate = winRate(profile.stats);
-  const inputClass = isLandscapeMenu ? "h-9 text-sm" : "text-lg py-5";
+  const inputClass = fit(isLandscapeMenu, "h-9 text-sm", "text-lg py-5");
   const achievements = rankProfile?.achievements ?? [];
   const progress: AchievementProgress = rankProfile?.progress ?? DEFAULT_PROGRESS;
   const bannerClass =
@@ -230,15 +227,13 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
           )}
           aria-label={t("profile.title")}
         >
-          <UserRound className={cn(isLandscapeMenu ? "h-4 w-4" : "h-5 w-5")} />
+          <UserRound className={cn(fit(isLandscapeMenu, "h-4 w-4", "h-5 w-5"))} />
         </Button>
       </DialogTrigger>
       <DialogContent
         className={cn(
           "sm:max-w-md overflow-hidden flex flex-col",
-          isLandscapeMenu
-            ? "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2"
-            : "max-h-[min(92dvh,40rem)] gap-3",
+          fit(isLandscapeMenu, "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2", "max-h-[min(92dvh,40rem)] gap-3"),
         )}
       >
         <DialogHeader className={cn(isLandscapeMenu && "pr-6 space-y-0.5")}>
@@ -256,18 +251,18 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                 {t("rank.backToProfile")}
               </button>
               <DialogTitle
-                className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-lg" : "text-2xl")}
+                className={cn("font-display text-indigo-900", fit(isLandscapeMenu, "text-lg", "text-2xl"))}
               >
                 {t("rank.accountTitle")}
               </DialogTitle>
-              <DialogDescription className={cn(isLandscapeMenu ? "text-xs" : "text-sm")}>
+              <DialogDescription className={cn(fit(isLandscapeMenu, "text-xs", "text-sm"))}>
                 {t("rank.accountHint")}
               </DialogDescription>
             </>
           ) : (
             <>
               <DialogTitle
-                className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-lg" : "text-2xl")}
+                className={cn("font-display text-indigo-900", fit(isLandscapeMenu, "text-lg", "text-2xl"))}
               >
                 {t("profile.title")}
               </DialogTitle>
@@ -283,10 +278,10 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
             <div
               className={cn(
                 "min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1",
-                isLandscapeMenu ? "space-y-2.5 py-0.5" : "space-y-4 py-1",
+                fit(isLandscapeMenu, "space-y-2.5 py-0.5", "space-y-4 py-1"),
               )}
             >
-              <div className={cn(isLandscapeMenu ? "grid grid-cols-2 gap-2" : "space-y-4")}>
+              <div className={cn(fit(isLandscapeMenu, "grid grid-cols-2 gap-2", "space-y-4"))}>
                 <div className="space-y-1.5">
                   <Label htmlFor="profileName">{t("profile.displayName")}</Label>
                   <Input
@@ -321,7 +316,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
 
               <div className="space-y-1.5">
                 <Label>{t("profile.icon")}</Label>
-                <div className={cn("grid gap-1.5", isLandscapeMenu ? "grid-cols-10" : "grid-cols-5 gap-2")}>
+                <div className={cn("grid gap-1.5", fit(isLandscapeMenu, "grid-cols-10", "grid-cols-5 gap-2"))}>
                   {PROFILE_ICONS.map(({ id, Icon }) => (
                     <button
                       key={id}
@@ -335,7 +330,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                       )}
                       aria-label={id}
                     >
-                      <Icon className={cn(isLandscapeMenu ? "w-4 h-4" : "w-5 h-5")} />
+                      <Icon className={cn(fit(isLandscapeMenu, "w-4 h-4", "w-5 h-5"))} />
                     </button>
                   ))}
                 </div>
@@ -346,7 +341,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                   <div className="text-[10px] uppercase tracking-wide text-indigo-500 font-semibold">
                     {t("profile.gamesPlayed")}
                   </div>
-                  <div className={cn("font-bold text-indigo-900", isLandscapeMenu ? "text-base" : "text-lg")}>
+                  <div className={cn("font-bold text-indigo-900", fit(isLandscapeMenu, "text-base", "text-lg"))}>
                     {profile.stats.gamesPlayed}
                   </div>
                 </div>
@@ -354,7 +349,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                   <div className="text-[10px] uppercase tracking-wide text-emerald-600 font-semibold">
                     {t("profile.wins")}
                   </div>
-                  <div className={cn("font-bold text-emerald-900", isLandscapeMenu ? "text-base" : "text-lg")}>
+                  <div className={cn("font-bold text-emerald-900", fit(isLandscapeMenu, "text-base", "text-lg"))}>
                     {profile.stats.wins}
                   </div>
                 </div>
@@ -362,7 +357,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                   <div className="text-[10px] uppercase tracking-wide text-amber-600 font-semibold">
                     {t("profile.bestScore")}
                   </div>
-                  <div className={cn("font-bold text-amber-900", isLandscapeMenu ? "text-base" : "text-lg")}>
+                  <div className={cn("font-bold text-amber-900", fit(isLandscapeMenu, "text-base", "text-lg"))}>
                     {profile.stats.bestScore === null ? "—" : profile.stats.bestScore}
                   </div>
                 </div>
@@ -370,7 +365,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                   <div className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">
                     {t("profile.winRate")}
                   </div>
-                  <div className={cn("font-bold text-slate-800", isLandscapeMenu ? "text-base" : "text-lg")}>
+                  <div className={cn("font-bold text-slate-800", fit(isLandscapeMenu, "text-base", "text-lg"))}>
                     {rate}%
                   </div>
                 </div>
@@ -636,7 +631,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                       {t("rank.login")}
                     </Button>
                   </div>
-                  <div className={cn(isLandscapeMenu ? "grid grid-cols-2 gap-2" : "space-y-3")}>
+                  <div className={cn(fit(isLandscapeMenu, "grid grid-cols-2 gap-2", "space-y-3"))}>
                     <div className="space-y-1.5">
                       <Label htmlFor="rankNick">{t("rank.nickname")}</Label>
                       <Input

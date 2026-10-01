@@ -19,6 +19,28 @@ function json(data: unknown, status = 200, request?: Request): Response {
   });
 }
 
+async function handleReadApi(request: Request, env: Env, url: URL, path: string, method: string): Promise<Response | null> {
+  const storage = createStorage(env);
+  if (method === "GET" && path === "/api/health") {
+    const dbOk = await pingDb(env).catch(() => false);
+    return json({ ok: true, db: dbOk, memory: !dbOk }, 200, request);
+  }
+  if (method === "GET" && path === api.lan.info.path) {
+    return json({ port: 443, addresses: [], joinBaseUrls: [url.origin] }, 200, request);
+  }
+  if (method === "GET" && path === api.rooms.list.path) {
+    return json(await storage.listRooms(), 200, request);
+  }
+  const getMatch = path.match(/^\/api\/rooms\/([^/]+)$/);
+  if (method === "GET" && getMatch) {
+    const code = decodeURIComponent(getMatch[1]!).toUpperCase();
+    const room = await storage.getRoom(code);
+    if (!room) return json({ message: "Room not found" }, 404, request);
+    return json(room, 200, request);
+  }
+  return null;
+}
+
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
   const storage = createStorage(env);
   const path = url.pathname;
@@ -34,18 +56,8 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
   const rankRes = await handleRankApi(request, env, path, method);
   if (rankRes) return rankRes;
 
-  if (method === "GET" && path === "/api/health") {
-    const dbOk = await pingDb(env).catch(() => false);
-    return json({ ok: true, db: dbOk, memory: !dbOk }, 200, request);
-  }
-
-  if (method === "GET" && path === api.lan.info.path) {
-    return json({
-      port: 443,
-      addresses: [],
-      joinBaseUrls: [url.origin],
-    }, 200, request);
-  }
+  const readRes = await handleReadApi(request, env, url, path, method);
+  if (readRes) return readRes;
 
   if (method === "POST" && path === api.rooms.create.path) {
     try {
@@ -106,19 +118,6 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     } catch {
       return json({ message: "Invalid input" }, 400, request);
     }
-  }
-
-  if (method === "GET" && path === api.rooms.list.path) {
-    const rooms = await storage.listRooms();
-    return json(rooms, 200, request);
-  }
-
-  const getMatch = path.match(/^\/api\/rooms\/([^/]+)$/);
-  if (method === "GET" && getMatch) {
-    const code = decodeURIComponent(getMatch[1]!).toUpperCase();
-    const room = await storage.getRoom(code);
-    if (!room) return json({ message: "Room not found" }, 404, request);
-    return json(room, 200, request);
   }
 
   return json({ message: "Not found" }, 404, request);

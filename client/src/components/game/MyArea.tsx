@@ -4,7 +4,7 @@ import { GameState, Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
-import { cn } from "@/lib/utils";
+import { cn, fit } from "@/lib/utils";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import { useI18n } from "@/contexts/i18n-context";
 import { ArrowUpDown } from "lucide-react";
@@ -94,7 +94,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
     <div
       className={cn(
         "absolute left-0 right-0 flex flex-col items-center z-30 player-hand-zone",
-        isCompact ? "bottom-0.5" : "bottom-3"
+        fit(isCompact, "bottom-0.5", "bottom-3")
       )}
     >
       {/* Minha mão — faixa inferior reservada, sem invadir o centro */}
@@ -140,11 +140,11 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                     transition={{ duration: 0.15 }}
                     className={cn(
                       "absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center",
-                      isCompact ? "-top-6" : "-top-9"
+                      fit(isCompact, "-top-6", "-top-9")
                     )}
                   >
                     <div className="rounded-full bg-green-500 text-white shadow-lg shadow-green-500/40 p-1 ring-2 ring-green-300/80">
-                      <ArrowUpDown className={cn(isCompact ? "w-3 h-3" : "w-5 h-5")} strokeWidth={2.5} />
+                      <ArrowUpDown className={cn(fit(isCompact, "w-3 h-3", "w-5 h-5"))} strokeWidth={2.5} />
                     </div>
                     {!isCompact && (
                       <span className="mt-1 text-[10px] font-bold uppercase tracking-wide text-green-300 drop-shadow-md whitespace-nowrap">
@@ -190,7 +190,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                 <div
                   className={cn(
                     "text-center mt-0.5 font-bold text-orange-400 uppercase tracking-wider animate-pulse",
-                    isCompact ? "text-[8px]" : "text-[10px]"
+                    fit(isCompact, "text-[8px]", "text-[10px]")
                   )}
                 >
                   {t("game.match")}
@@ -229,10 +229,10 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
           animate={{ opacity: 1, y: 0 }}
           className={cn(
             "absolute left-1/2 -translate-x-1/2 bg-orange-500/90 backdrop-blur rounded-full border-2 border-orange-400",
-            isCompact ? "-top-8 px-2 py-0.5" : "-top-12 px-4 py-2"
+            fit(isCompact, "-top-8 px-2 py-0.5", "-top-12 px-4 py-2")
           )}
         >
-          <span className={cn("text-white font-bold", isCompact ? "text-[9px]" : "text-sm")}>
+          <span className={cn("text-white font-bold", fit(isCompact, "text-[9px]", "text-sm"))}>
             {isCompact ? t("game.canDiscardMatchShort") : t("game.canDiscardMatch")}
           </span>
         </motion.div>
@@ -242,7 +242,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
       <div
         className={cn(
           "absolute origin-bottom-right",
-          isCompact ? "right-1 bottom-0 scale-[0.72]" : "-bottom-1 right-4 hidden md:block scale-90"
+          fit(isCompact, "right-1 bottom-0 scale-[0.72]", "-bottom-1 right-4 hidden md:block scale-90")
         )}
       >
         <Avatar name={me.name} score={me.score} isActive={isMyTurn} position="left" compact={isCompact} iconId={profile.iconId} accent={profile.accent} />
@@ -250,12 +250,12 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
 
       {/* Botão Cunoku */}
       {isMyTurn && phase === "draw" && gameState.round >= 5 && (
-        <div className={cn("absolute", isCompact ? "right-1 bottom-14" : "right-4 bottom-28")}>
+        <div className={cn("absolute", fit(isCompact, "right-1 bottom-14", "right-4 bottom-28"))}>
           <Button
             variant="destructive"
             className={cn(
               "rounded-full shadow-xl shadow-red-900/50 font-black border-4 border-red-400",
-              isCompact ? "w-11 h-11 text-[10px] border-2" : "w-20 h-20 text-lg"
+              fit(isCompact, "w-11 h-11 text-[10px] border-2", "w-20 h-20 text-lg")
             )}
             onClick={() => sendAction({ type: "declare_finish" })}
           >

@@ -3,6 +3,17 @@ import { useEffect, useState } from "react";
 import { PlayingCard } from "../PlayingCard";
 import { ReplaceAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
 
+function motionForPhase<T>(phase: string, poses: { highlight: T; lift: T; swap: T; done: T }): T {
+  if (phase === "highlight") return poses.highlight;
+  if (phase === "lift") return poses.lift;
+  if (phase === "swap") return poses.swap;
+  return poses.done;
+}
+
+function shown(phase: string, on: number, off: number) {
+  return phase === "highlight" ? off : on;
+}
+
 interface CardReplaceAnimationProps extends BaseAnimationProps {
   data: ReplaceAnimationData;
   isOwnPlayer?: boolean;
@@ -85,31 +96,12 @@ export function CardReplaceAnimation({
               rotate: 0,
               opacity: 1,
             }}
-            animate={phase === 'highlight' ? {
-              x: handCardPosition.x - 48,
-              y: handCardPosition.y - 68,
-              scale: 1.1,
-              rotate: 0,
-              opacity: 1,
-            } : phase === 'lift' ? {
-              x: handCardPosition.x - 48,
-              y: handCardPosition.y - 88,
-              scale: 1.15,
-              rotate: -5,
-              opacity: 1,
-            } : phase === 'swap' ? {
-              x: centerX - 48,
-              y: centerY - 68,
-              scale: 1.2,
-              rotate: -25,
-              opacity: 1,
-            } : {
-              x: discardPosition.x - 48,
-              y: discardPosition.y - 68,
-              scale: 0.9,
-              rotate: -5,
-              opacity: 0.95,
-            }}
+            animate={motionForPhase(phase, {
+              highlight: { x: handCardPosition.x - 48, y: handCardPosition.y - 68, scale: 1.1, rotate: 0, opacity: 1 },
+              lift: { x: handCardPosition.x - 48, y: handCardPosition.y - 88, scale: 1.15, rotate: -5, opacity: 1 },
+              swap: { x: centerX - 48, y: centerY - 68, scale: 1.2, rotate: -25, opacity: 1 },
+              done: { x: discardPosition.x - 48, y: discardPosition.y - 68, scale: 0.9, rotate: -5, opacity: 0.95 },
+            })}
             transition={{
               type: "spring",
               stiffness: 200,
@@ -144,31 +136,12 @@ export function CardReplaceAnimation({
               rotate: 0,
               opacity: 1,
             }}
-            animate={phase === 'highlight' ? {
-              x: drawnCardPosition.x - 48,
-              y: drawnCardPosition.y - 68,
-              scale: 1.1,
-              rotate: 0,
-              opacity: 1,
-            } : phase === 'lift' ? {
-              x: drawnCardPosition.x - 48,
-              y: drawnCardPosition.y - 88,
-              scale: 1.15,
-              rotate: 5,
-              opacity: 1,
-            } : phase === 'swap' ? {
-              x: centerX - 48,
-              y: centerY - 38,
-              scale: 1.3,
-              rotate: 25,
-              opacity: 1,
-            } : {
-              x: handCardPosition.x - 48,
-              y: handCardPosition.y - 68,
-              scale: 1,
-              rotate: 0,
-              opacity: 1,
-            }}
+            animate={motionForPhase(phase, {
+              highlight: { x: drawnCardPosition.x - 48, y: drawnCardPosition.y - 68, scale: 1.1, rotate: 0, opacity: 1 },
+              lift: { x: drawnCardPosition.x - 48, y: drawnCardPosition.y - 88, scale: 1.15, rotate: 5, opacity: 1 },
+              swap: { x: centerX - 48, y: centerY - 38, scale: 1.3, rotate: 25, opacity: 1 },
+              done: { x: handCardPosition.x - 48, y: handCardPosition.y - 68, scale: 1, rotate: 0, opacity: 1 },
+            })}
             transition={{
               type: "spring",
               stiffness: 200,
@@ -204,7 +177,7 @@ export function CardReplaceAnimation({
               strokeWidth="5"
               strokeDasharray="12,6"
               initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: phase !== 'highlight' ? 1 : 0, opacity: phase !== 'highlight' ? 1 : 0 }}
+              animate={{ pathLength: shown(phase, 1, 0), opacity: shown(phase, 1, 0) }}
               transition={{ duration: 0.6, ease: "easeOut" }}
             />
             
@@ -216,7 +189,7 @@ export function CardReplaceAnimation({
               strokeWidth="5"
               strokeDasharray="12,6"
               initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: phase !== 'highlight' ? 1 : 0, opacity: phase !== 'highlight' ? 1 : 0 }}
+              animate={{ pathLength: shown(phase, 1, 0), opacity: shown(phase, 1, 0) }}
               transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
             />
           </svg>

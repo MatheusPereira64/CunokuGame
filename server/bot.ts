@@ -149,74 +149,50 @@ export class BotPlayer {
       })
       .filter(score => score > 0);
 
-    if (this.difficulty === "easy") {
-      // Easy: declara apenas com pontuação muito boa e probabilidade baixa
-      // Score < 10: 30% chance
-      // Score < 8: 50% chance
-      // Score < 6: 80% chance
-      if (totalScore >= 10) return false;
-      
-      let probability = 0.3;
-      if (totalScore < 8) probability = 0.5;
-      if (totalScore < 6) probability = 0.8;
-      
-      return randomChance(probability);
-    }
-
-    if (this.difficulty === "medium") {
-      // Medium: declara com pontuação boa e probabilidade média
-      // Score < 8: 40% chance
-      // Score < 6: 60% chance
-      // Score < 4: 85% chance
-      if (totalScore >= 8) return false;
-      
-      let probability = 0.4;
-      if (totalScore < 6) probability = 0.6;
-      if (totalScore < 4) probability = 0.85;
-      
-      // Se outros jogadores parecem ter pontuação pior, aumenta probabilidade
-      if (knownScores.length > 0) {
-        const avgOtherScore = knownScores.reduce((sum, s) => sum + s, 0) / knownScores.length;
-        if (totalScore < avgOtherScore - 2) {
-          probability += 0.15; // Bônus se está claramente na frente
-        }
-      }
-      
-      return randomChance(Math.min(probability, 0.95));
-    }
-
-    // Hard: declara com pontuação excelente e probabilidade alta
-    // Score < 6: 50% chance
-    // Score < 4: 75% chance
-    // Score < 2: 95% chance
-    // Score <= 0: 100% chance (sempre declara)
-    if (totalScore <= 0) return true; // Sempre declara com pontuação perfeita ou negativa
-    
-    if (totalScore >= 6) return false;
-    
-    let probability = 0.5;
-    if (totalScore < 4) probability = 0.75;
-    if (totalScore < 2) probability = 0.95;
-    
-    // Hard bots são mais agressivos: se outros parecem ter pior pontuação, aumenta significativamente
-    if (knownScores.length > 0) {
-      const avgOtherScore = knownScores.reduce((sum, s) => sum + s, 0) / knownScores.length;
-      if (totalScore < avgOtherScore - 1) {
-        probability += 0.2; // Bônus maior para bots hard
-      }
-      // Se está claramente na frente, aumenta ainda mais
-      if (totalScore < avgOtherScore - 3) {
-        probability += 0.15;
-      }
-    }
-    
-    // Considera também o round: quanto mais rounds passaram, mais propenso a declarar
-    if (state.round >= 7) {
-      probability += 0.1; // Bônus após muitos rounds
-    }
-    
-    return randomChance(Math.min(probability, 0.98));
+    if (this.difficulty === "easy") return shouldEasyBotFinish(totalScore);
+    if (this.difficulty === "medium") return shouldMediumBotFinish(totalScore, knownScores);
+    return shouldHardBotFinish(totalScore, knownScores, state.round);
   }
+}
+
+function shouldEasyBotFinish(totalScore: number): boolean {
+  if (totalScore >= 10) return false;
+  let probability = 0.3;
+  if (totalScore < 8) probability = 0.5;
+  if (totalScore < 6) probability = 0.8;
+  return randomChance(probability);
+}
+
+function shouldMediumBotFinish(totalScore: number, knownScores: number[]): boolean {
+  if (totalScore >= 8) return false;
+  let probability = 0.4;
+  if (totalScore < 6) probability = 0.6;
+  if (totalScore < 4) probability = 0.85;
+  if (knownScores.length > 0) {
+    const avgOtherScore = knownScores.reduce((sum, s) => sum + s, 0) / knownScores.length;
+    if (totalScore < avgOtherScore - 2) probability += 0.15;
+  }
+  return randomChance(Math.min(probability, 0.95));
+}
+
+function shouldHardBotFinish(totalScore: number, knownScores: number[], round: number): boolean {
+  if (totalScore <= 0) return true;
+  if (totalScore >= 6) return false;
+  let probability = 0.5;
+  if (totalScore < 4) probability = 0.75;
+  if (totalScore < 2) probability = 0.95;
+  probability += hardBotLeadBonus(totalScore, knownScores);
+  if (round >= 7) probability += 0.1;
+  return randomChance(Math.min(probability, 0.98));
+}
+
+function hardBotLeadBonus(totalScore: number, knownScores: number[]): number {
+  if (knownScores.length === 0) return 0;
+  const avgOtherScore = knownScores.reduce((sum, s) => sum + s, 0) / knownScores.length;
+  let bonus = 0;
+  if (totalScore < avgOtherScore - 1) bonus += 0.2;
+  if (totalScore < avgOtherScore - 3) bonus += 0.15;
+  return bonus;
 }
 
 export function createBots(count: number, difficulty: BotDifficulty): BotPlayer[] {

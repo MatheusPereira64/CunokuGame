@@ -33,7 +33,7 @@ async function initDatabase() {
   if (initPromise) return initPromise;
   
   if (!process.env.DATABASE_URL) {
-    return Promise.resolve();
+    return;
   }
   
   initPromise = (async () => {

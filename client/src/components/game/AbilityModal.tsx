@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Card, Player } from "@shared/schema";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
-import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { cn, fit } from "@/lib/utils";
+import { useIsCompactGame } from "@/hooks/use-landscape";
 import { useI18n } from "@/contexts/i18n-context";
 import {
   Dialog,
@@ -24,6 +24,48 @@ interface AbilityModalProps {
   onConfirm: (action: AbilityAction) => void;
 }
 
+function abilityClasses(isCompact: boolean) {
+  return {
+    labelClass: cn("font-bold text-gray-700", fit(isCompact, "text-xs", "text-sm")),
+    cardBtnClass: cn(fit(isCompact, "h-11 min-w-0 text-xs", "h-16")),
+    myCardBtnClass: cn(fit(isCompact, "h-11 w-11 text-xs shrink-0", "h-20 w-16")),
+    playerBtnClass: cn("h-auto", fit(isCompact, "py-1.5", "py-3")),
+    avatarClass: cn(fit(isCompact, "scale-50", "scale-75")),
+    playerNameClass: cn(fit(isCompact, "text-[10px] leading-tight text-center", "text-xs")),
+  };
+}
+
+function abilityConfirmDisabled(input: {
+  isPeekOpponent: boolean;
+  isPeekOwn: boolean;
+  isSwap: boolean;
+  swapMode: "me_and_other" | "two_others";
+  targetPlayer: string | null;
+  targetCard: number | null;
+  myCardIndex: number | null;
+  firstPlayerSelection: { playerId: string; cardIndex: number } | null;
+  targetPlayer2: string | null;
+  targetCard2: number | null;
+}) {
+  if (input.isPeekOpponent && opponentPeekMissing(input.targetPlayer, input.targetCard)) return true;
+  if (input.isPeekOwn && input.myCardIndex === null) return true;
+  if (input.isSwap && input.swapMode === "me_and_other" && meSwapMissing(input)) return true;
+  if (input.isSwap && input.swapMode === "two_others" && othersSwapMissing(input)) return true;
+  return false;
+}
+
+function opponentPeekMissing(targetPlayer: string | null, targetCard: number | null) {
+  return !targetPlayer || targetCard === null;
+}
+
+function meSwapMissing(input: { targetPlayer: string | null; myCardIndex: number | null; targetCard: number | null }) {
+  return !input.targetPlayer || input.myCardIndex === null || input.targetCard === null;
+}
+
+function othersSwapMissing(input: { firstPlayerSelection: unknown; targetPlayer2: string | null; targetCard2: number | null }) {
+  return !input.firstPlayerSelection || !input.targetPlayer2 || input.targetCard2 === null;
+}
+
 export function AbilityModal({
   open,
   onOpenChange,
@@ -33,8 +75,10 @@ export function AbilityModal({
   myHand,
   onConfirm,
 }: AbilityModalProps) {
-  const isMobile = useIsMobile();
+  const isCompact = useIsCompactGame();
   const { t } = useI18n();
+
+  const { labelClass, cardBtnClass, myCardBtnClass, playerBtnClass, avatarClass, playerNameClass } = abilityClasses(isCompact);
 
   const [myCardIndex, setMyCardIndex] = useState<number | null>(null);
   const [targetPlayer, setTargetPlayer] = useState<string | null>(null);
@@ -68,11 +112,18 @@ export function AbilityModal({
   const isPeekOwn = rank === "7" || rank === "8";
   const isSwap = rank === "9" || rank === "10";
 
-  const confirmDisabled =
-    (isPeekOpponent && (!targetPlayer || targetCard === null)) ||
-    (isPeekOwn && myCardIndex === null) ||
-    (isSwap && swapMode === "me_and_other" && (!targetPlayer || myCardIndex === null || targetCard === null)) ||
-    (isSwap && swapMode === "two_others" && (!firstPlayerSelection || !targetPlayer2 || targetCard2 === null));
+  const confirmDisabled = abilityConfirmDisabled({
+    isPeekOpponent,
+    isPeekOwn,
+    isSwap,
+    swapMode,
+    targetPlayer,
+    targetCard,
+    myCardIndex,
+    firstPlayerSelection,
+    targetPlayer2,
+    targetCard2,
+  });
 
   const handleConfirm = () => {
     let action: AbilityAction | null = null;
@@ -102,26 +153,33 @@ export function AbilityModal({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className={cn("bg-white", isMobile ? "max-w-[95vw] max-h-[90vh] overflow-y-auto" : "sm:max-w-md")}
+        className={cn(
+          "bg-white sm:max-w-md",
+          isCompact &&
+            "flex w-[min(96vw,28rem)] max-h-[min(94dvh,100%)] flex-col gap-2 overflow-hidden p-3 !top-[max(2dvh,env(safe-area-inset-top,0px))] !translate-y-0",
+        )}
       >
-        <DialogHeader>
-          <DialogTitle className={cn("font-display text-indigo-900", isMobile ? "text-lg" : "text-2xl")}>
+        <DialogHeader className={cn(isCompact && "shrink-0 space-y-1 pr-8")}>
+          <DialogTitle className={cn("font-display text-indigo-900", fit(isCompact, "text-base leading-tight", "text-2xl"))}>
             {t("game.abilityTitle")}
           </DialogTitle>
-          <DialogDescription className={isMobile ? "text-sm" : ""}>
+          <DialogDescription className={cn(isCompact && "text-xs leading-snug")}>
             {getAbilityDescription(rank, t)}
           </DialogDescription>
         </DialogHeader>
 
-        <div className={cn("space-y-4", isMobile ? "py-2" : "py-4")}>
+        <div
+          className={cn(
+            "space-y-3",
+            fit(isCompact, "min-h-0 flex-1 overflow-y-auto overscroll-contain py-1 pr-0.5", "space-y-4 py-4"),
+          )}
+        >
           {/* Cartas 5 e 6: ver carta de oponente */}
           {isPeekOpponent && (
             <>
               <div className="space-y-2">
-                <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
-                  {t("game.selectPlayer")}
-                </label>
-                <div className={cn("grid gap-2", isMobile ? "grid-cols-1" : "grid-cols-2")}>
+                <label className={labelClass}>{t("game.selectPlayer")}</label>
+                <div className={cn("grid gap-2", fit(isCompact, "grid-cols-2 sm:grid-cols-3", "grid-cols-2"))}>
                   {players
                     .filter((p) => p.id !== playerId)
                     .map((p) => (
@@ -132,11 +190,11 @@ export function AbilityModal({
                           setTargetPlayer(p.id);
                           setTargetCard(null);
                         }}
-                        className={cn("h-auto", isMobile ? "py-2" : "py-3")}
+                        className={playerBtnClass}
                       >
-                        <div className="flex flex-col items-center gap-1">
-                          <Avatar name={p.name} className={isMobile ? "scale-50" : "scale-75"} />
-                          <span className={cn(isMobile ? "text-[10px]" : "text-xs")}>{p.name}</span>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <Avatar name={p.name} className={avatarClass} />
+                          <span className={playerNameClass}>{p.name}</span>
                         </div>
                       </Button>
                     ))}
@@ -145,16 +203,14 @@ export function AbilityModal({
 
               {targetPlayer && (
                 <div className="space-y-2">
-                  <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
-                    {t("game.selectCardNumber")}
-                  </label>
+                  <label className={labelClass}>{t("game.selectCardNumber")}</label>
                   <div className="grid grid-cols-4 gap-2">
                     {[0, 1, 2, 3].map((idx) => (
                       <Button
                         key={idx}
                         variant={targetCard === idx ? "primary" : "outline"}
                         onClick={() => setTargetCard(idx)}
-                        className={cn(isMobile ? "h-12 text-xs" : "h-16")}
+                        className={cardBtnClass}
                       >
                         {idx + 1}
                       </Button>
@@ -168,16 +224,14 @@ export function AbilityModal({
           {/* Cartas 7 e 8: ver a própria carta */}
           {isPeekOwn && (
             <div className="space-y-2">
-              <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
-                {t("game.selectYourCard")}
-              </label>
-              <div className={cn("flex gap-2 justify-center", isMobile ? "flex-wrap" : "")}>
+              <label className={labelClass}>{t("game.selectYourCard")}</label>
+              <div className="flex flex-wrap justify-center gap-2">
                 {myHand.map((_, idx) => (
                   <Button
                     key={idx}
                     variant={myCardIndex === idx ? "primary" : "outline"}
                     onClick={() => setMyCardIndex(idx)}
-                    className={cn(isMobile ? "h-12 w-12 text-xs" : "h-20 w-16")}
+                    className={myCardBtnClass}
                   >
                     {idx + 1}
                   </Button>
@@ -190,19 +244,17 @@ export function AbilityModal({
           {isSwap && (
             <>
               <div className="space-y-2">
-                <label className={cn("font-bold text-gray-700", isMobile ? "text-xs" : "text-sm")}>
-                  {t("game.swapMode")}
-                </label>
-                <div className={cn("flex gap-2", isMobile ? "flex-col" : "")}>
+                <label className={labelClass}>{t("game.swapMode")}</label>
+                <div className={cn("flex gap-2", fit(isCompact, "flex-col sm:flex-row", ""))}>
                   <Button
                     variant={swapMode === "me_and_other" ? "primary" : "outline"}
                     onClick={() => {
                       resetSelections();
                       setSwapMode("me_and_other");
                     }}
-                    className={cn("flex-1", isMobile && "text-xs py-2")}
+                    className={cn("flex-1", isCompact && "text-xs py-2 h-auto min-h-9 whitespace-normal leading-tight")}
                   >
-                    {isMobile ? t("game.swapMeAndOtherShort") : t("game.swapMeAndOther")}
+                    {isCompact ? t("game.swapMeAndOtherShort") : t("game.swapMeAndOther")}
                   </Button>
                   <Button
                     variant={swapMode === "two_others" ? "primary" : "outline"}
@@ -210,9 +262,9 @@ export function AbilityModal({
                       resetSelections();
                       setSwapMode("two_others");
                     }}
-                    className={cn("flex-1", isMobile && "text-xs py-2")}
+                    className={cn("flex-1", isCompact && "text-xs py-2 h-auto min-h-9 whitespace-normal leading-tight")}
                   >
-                    {isMobile ? t("game.swapTwoOthersShort") : t("game.swapTwoOthers")}
+                    {isCompact ? t("game.swapTwoOthersShort") : t("game.swapTwoOthers")}
                   </Button>
                 </div>
               </div>
@@ -220,14 +272,14 @@ export function AbilityModal({
               {swapMode === "me_and_other" && (
                 <>
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">{t("game.yourCard")}</label>
-                    <div className="flex gap-2 justify-center">
+                    <label className={labelClass}>{t("game.yourCard")}</label>
+                    <div className="flex flex-wrap justify-center gap-2">
                       {myHand.map((_, idx) => (
                         <Button
                           key={idx}
                           variant={myCardIndex === idx ? "primary" : "outline"}
                           onClick={() => setMyCardIndex(idx)}
-                          className="h-20 w-16"
+                          className={myCardBtnClass}
                         >
                           {idx + 1}
                         </Button>
@@ -236,8 +288,8 @@ export function AbilityModal({
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">{t("game.otherPlayer")}</label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <label className={labelClass}>{t("game.otherPlayer")}</label>
+                    <div className={cn("grid gap-2", fit(isCompact, "grid-cols-2 sm:grid-cols-3", "grid-cols-2"))}>
                       {players
                         .filter((p) => p.id !== playerId)
                         .map((p) => (
@@ -248,11 +300,11 @@ export function AbilityModal({
                               setTargetPlayer(p.id);
                               setTargetCard(null);
                             }}
-                            className="h-auto py-3"
+                            className={playerBtnClass}
                           >
-                            <div className="flex flex-col items-center gap-1">
-                              <Avatar name={p.name} className="scale-75" />
-                              <span className="text-xs">{p.name}</span>
+                            <div className="flex flex-col items-center gap-0.5">
+                              <Avatar name={p.name} className={avatarClass} />
+                              <span className={playerNameClass}>{p.name}</span>
                             </div>
                           </Button>
                         ))}
@@ -261,14 +313,14 @@ export function AbilityModal({
 
                   {targetPlayer && targetPlayer !== playerId && (
                     <div className="space-y-2">
-                      <label className="text-sm font-bold text-gray-700">{t("game.otherPlayerCard")}</label>
+                      <label className={labelClass}>{t("game.otherPlayerCard")}</label>
                       <div className="grid grid-cols-4 gap-2">
                         {[0, 1, 2, 3].map((idx) => (
                           <Button
                             key={idx}
                             variant={targetCard === idx ? "primary" : "outline"}
                             onClick={() => setTargetCard(idx)}
-                            className="h-16"
+                            className={cardBtnClass}
                           >
                             {idx + 1}
                           </Button>
@@ -284,8 +336,14 @@ export function AbilityModal({
                   {swapStep === 1 ? (
                     <>
                       <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700">{t("game.firstPlayer")}</label>
-                        <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                        <label className={labelClass}>{t("game.firstPlayer")}</label>
+                        <div
+                          className={cn(
+                            "grid gap-2",
+                            fit(isCompact, "grid-cols-2 sm:grid-cols-3 max-h-32", "grid-cols-2 max-h-48"),
+                            "overflow-y-auto overscroll-contain",
+                          )}
+                        >
                           {players.map((p) => (
                             <Button
                               key={p.id}
@@ -294,11 +352,11 @@ export function AbilityModal({
                                 setTargetPlayer(p.id);
                                 setTargetCard(null);
                               }}
-                              className="h-auto py-2"
+                              className={playerBtnClass}
                             >
-                              <div className="flex flex-col items-center gap-1">
-                                <Avatar name={p.name} className="scale-75" />
-                                <span className="text-xs">{p.name}</span>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <Avatar name={p.name} className={avatarClass} />
+                                <span className={playerNameClass}>{p.name}</span>
                               </div>
                             </Button>
                           ))}
@@ -307,14 +365,14 @@ export function AbilityModal({
 
                       {targetPlayer && (
                         <div className="space-y-2">
-                          <label className="text-sm font-bold text-gray-700">{t("game.firstPlayerCard")}</label>
+                          <label className={labelClass}>{t("game.firstPlayerCard")}</label>
                           <div className="grid grid-cols-4 gap-2">
                             {[0, 1, 2, 3].map((idx) => (
                               <Button
                                 key={idx}
                                 variant={targetCard === idx ? "primary" : "outline"}
                                 onClick={() => setTargetCard(idx)}
-                                className="h-12"
+                                className={cardBtnClass}
                               >
                                 {idx + 1}
                               </Button>
@@ -353,8 +411,14 @@ export function AbilityModal({
                       )}
 
                       <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-700">{t("game.secondPlayer")}</label>
-                        <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                        <label className={labelClass}>{t("game.secondPlayer")}</label>
+                        <div
+                          className={cn(
+                            "grid gap-2",
+                            fit(isCompact, "grid-cols-2 sm:grid-cols-3 max-h-32", "grid-cols-2 max-h-48"),
+                            "overflow-y-auto overscroll-contain",
+                          )}
+                        >
                           {players
                             .filter((p) => p.id !== firstPlayerSelection?.playerId)
                             .map((p) => (
@@ -365,11 +429,11 @@ export function AbilityModal({
                                   setTargetPlayer2(p.id);
                                   setTargetCard2(null);
                                 }}
-                                className="h-auto py-2"
+                                className={playerBtnClass}
                               >
-                                <div className="flex flex-col items-center gap-1">
-                                  <Avatar name={p.name} className="scale-75" />
-                                  <span className="text-xs">{p.name}</span>
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <Avatar name={p.name} className={avatarClass} />
+                                  <span className={playerNameClass}>{p.name}</span>
                                 </div>
                               </Button>
                             ))}
@@ -378,14 +442,14 @@ export function AbilityModal({
 
                       {targetPlayer2 && (
                         <div className="space-y-2">
-                          <label className="text-sm font-bold text-gray-700">{t("game.secondPlayerCard")}</label>
+                          <label className={labelClass}>{t("game.secondPlayerCard")}</label>
                           <div className="grid grid-cols-4 gap-2">
                             {[0, 1, 2, 3].map((idx) => (
                               <Button
                                 key={idx}
                                 variant={targetCard2 === idx ? "primary" : "outline"}
                                 onClick={() => setTargetCard2(idx)}
-                                className="h-12"
+                                className={cardBtnClass}
                               >
                                 {idx + 1}
                               </Button>
@@ -415,23 +479,29 @@ export function AbilityModal({
             </>
           )}
 
-          <div className={cn("flex gap-2", isMobile ? "pt-2" : "pt-4")}>
-            <Button
-              variant="destructive"
-              onClick={() => handleOpenChange(false)}
-              className={cn("flex-1", isMobile && "text-xs py-2")}
-            >
-              {t("game.cancel")}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleConfirm}
-              className={cn("flex-1", isMobile && "text-xs py-2")}
-              disabled={confirmDisabled}
-            >
-              {t("game.confirm")}
-            </Button>
-          </div>
+        </div>
+
+        <div
+          className={cn(
+            "flex shrink-0 gap-2",
+            fit(isCompact, "border-t border-gray-100 bg-white pt-2", "pt-4"),
+          )}
+        >
+          <Button
+            variant="destructive"
+            onClick={() => handleOpenChange(false)}
+            className={cn("flex-1", isCompact && "text-xs py-2 h-9")}
+          >
+            {t("game.cancel")}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleConfirm}
+            className={cn("flex-1", isCompact && "text-xs py-2 h-9")}
+            disabled={confirmDisabled}
+          >
+            {t("game.confirm")}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

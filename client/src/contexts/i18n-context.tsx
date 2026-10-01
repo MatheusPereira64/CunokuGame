@@ -87,44 +87,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         .replace("{player}", peekOpponentMatch[1]);
     }
     
-    // Declaração de Cunoku: "declarou CUNOKU! Rodada final iniciada."
-    if (message.includes("declarou CUNOKU") || message.includes("declared CUNOKU") || (message.includes("CUNOKU") && (message.includes("Rodada final") || message.includes("Final round")))) {
-      return translations["bot.declaredCunoku"];
-    }
-    
-    // Compra do baralho
-    if (message.includes("comprou uma carta do baralho")) {
-      return translations["bot.drewFromDeck"];
-    }
-    
-    // Compra da pilha de descarte: "comprou a carta X de Y da pilha de descarte"
-    const drawDiscardMatch = message.match(/comprou a carta (.+?) de (.+?) da pilha de descarte/);
-    if (drawDiscardMatch) {
-      return translations["bot.drewFromDiscard"]
-        .replace("{rank}", drawDiscardMatch[1])
-        .replace("{suit}", drawDiscardMatch[2]);
-    }
-    
-    // Descarte correspondente: "descartou a carta X de Y (corresponde ao descarte)"
-    const matchingDiscardMatch = message.match(/descartou a carta (.+?) de (.+?) \(corresponde ao descarte\)/);
-    if (matchingDiscardMatch) {
-      return translations["bot.discardedMatching"]
-        .replace("{rank}", matchingDiscardMatch[1])
-        .replace("{suit}", matchingDiscardMatch[2]);
-    }
-    
-    // Punição: "tentou descartar carta errada! Compra 2 cartas como punição."
-    if (message.includes("tentou descartar carta errada") && message.includes("Compra 2 cartas")) {
-      return translations["bot.punishmentWrongCard"];
-    }
-    
-    // Punição perde vez: "tentou descartar carta errada! Perde a vez (tem 6 cartas)."
-    if (message.includes("tentou descartar carta errada") && message.includes("Perde a vez")) {
-      return translations["bot.punishmentLoseTurn"];
-    }
-    
-    // Se não encontrou padrão, retorna a mensagem original
-    return message;
+    return translateLaterBotMessage(message, translations);
   };
 
   return (
@@ -140,6 +103,40 @@ export function useI18n() {
     throw new Error("useI18n must be used within I18nProvider");
   }
   return context;
+}
+
+function translateLaterBotMessage(message: string, translations: Record<string, string>): string {
+  if (message.includes("declarou CUNOKU") || message.includes("declared CUNOKU") || (message.includes("CUNOKU") && (message.includes("Rodada final") || message.includes("Final round")))) {
+    return translations["bot.declaredCunoku"];
+  }
+
+  if (message.includes("comprou uma carta do baralho")) {
+    return translations["bot.drewFromDeck"];
+  }
+
+  const drawDiscardMatch = message.match(/comprou a carta (.+?) de (.+?) da pilha de descarte/);
+  if (drawDiscardMatch) {
+    return translations["bot.drewFromDiscard"]
+      .replace("{rank}", drawDiscardMatch[1])
+      .replace("{suit}", drawDiscardMatch[2]);
+  }
+
+  const matchingDiscardMatch = message.match(/descartou a carta (.+?) de (.+?) \(corresponde ao descarte\)/);
+  if (matchingDiscardMatch) {
+    return translations["bot.discardedMatching"]
+      .replace("{rank}", matchingDiscardMatch[1])
+      .replace("{suit}", matchingDiscardMatch[2]);
+  }
+
+  if (message.includes("tentou descartar carta errada") && message.includes("Compra 2 cartas")) {
+    return translations["bot.punishmentWrongCard"];
+  }
+
+  if (message.includes("tentou descartar carta errada") && message.includes("Perde a vez")) {
+    return translations["bot.punishmentLoseTurn"];
+  }
+
+  return message;
 }
 
 function getTranslations(lang: Language): Record<string, string> {

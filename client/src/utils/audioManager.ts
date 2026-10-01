@@ -59,9 +59,9 @@ class AudioManager {
   private setupUserInteraction(): void {
     this.unlockHandler = () => {
       this.userInteracted = true;
-      void this.getAudioContext();
+      this.getAudioContext();
       if (!this.isMuted) {
-        void this.unlockAudiblePlayback();
+        this.unlockAudiblePlayback().catch(() => undefined);
       }
       this.teardownUnlockListeners();
     };

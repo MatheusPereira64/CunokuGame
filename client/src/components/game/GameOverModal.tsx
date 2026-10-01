@@ -3,7 +3,7 @@ import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { cn } from "@/lib/utils";
 import { Trophy } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsCompactGame } from "@/hooks/use-landscape";
 import { useI18n } from "@/contexts/i18n-context";
 import {
   Dialog,
@@ -31,7 +31,7 @@ export function GameOverModal({
   localPlayerId,
   onBackHome,
 }: GameOverModalProps) {
-  const isMobile = useIsMobile();
+  const isCompact = useIsCompactGame();
   const { t } = useI18n();
   const winnerName = players.find((p) => p.id === winnerId)?.name || "";
   const profile = loadProfile();
@@ -39,19 +39,23 @@ export function GameOverModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={cn("bg-white text-center", isMobile ? "max-w-[95vw] max-h-[90vh] overflow-y-auto" : "sm:max-w-md")}
+        className={cn(
+          "bg-white text-center sm:max-w-md",
+          isCompact &&
+            "w-[min(96vw,28rem)] max-h-[min(94dvh,100%)] overflow-y-auto p-3 !top-[max(2dvh,env(safe-area-inset-top,0px))] !translate-y-0",
+        )}
       >
         <DialogHeader>
           <DialogTitle
             className={cn(
               "font-display text-indigo-900 flex items-center justify-center gap-3",
-              isMobile ? "text-2xl mb-2" : "text-4xl mb-4"
+              isCompact ? "text-xl mb-2" : "text-4xl mb-4"
             )}
           >
-            <Trophy className={cn("text-yellow-500", isMobile ? "w-6 h-6" : "w-10 h-10")} />
+            <Trophy className={cn("text-yellow-500", isCompact ? "w-6 h-6" : "w-10 h-10")} />
             {t("game.gameOver")}
           </DialogTitle>
-          <DialogDescription className={cn(isMobile ? "text-sm" : "text-lg")}>
+          <DialogDescription className={cn(isCompact ? "text-sm" : "text-lg")}>
             {t("game.winnerIs").replace("{player}", winnerName)}
           </DialogDescription>
         </DialogHeader>
