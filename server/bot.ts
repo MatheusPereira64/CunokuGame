@@ -79,7 +79,7 @@ export class BotPlayer {
           const worstVal = player.hand[worst]?.value ?? 0;
           const currentVal = player.hand[idx]?.value ?? 0;
           return currentVal > worstVal ? idx : worst;
-        });
+        }, knownIndices[0]);
 
         if (player.hand[worstKnownIdx]?.value > drawnCard.value) {
           return { type: "replace_card", handIndex: worstKnownIdx };
@@ -96,9 +96,9 @@ export class BotPlayer {
 
     if (knownCards.length > 0) {
       // Find the worst known card
-      const worstIdx = knownCards.reduce((worst, current) => 
+      const worstIdx = knownCards.reduce((worst, current) =>
         current.card.value > worst.card.value ? current : worst
-      ).idx;
+      , knownCards[0]).idx;
 
       // If drawn card is significantly better, swap
       if (player.hand[worstIdx].value - drawnCard.value > 1) {

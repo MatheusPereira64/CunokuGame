@@ -93,5 +93,3 @@ export async function getPool() {
   return pool;
 }
 
-// For backward compatibility, export sync versions (will be null until initialized)
-export { pool, db };

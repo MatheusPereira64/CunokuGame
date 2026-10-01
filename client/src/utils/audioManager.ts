@@ -29,10 +29,10 @@ class AudioManager {
     const savedMuted = localStorage.getItem("cunoku_muted");
 
     if (savedMusicVolume !== null) {
-      this.musicVolume = parseFloat(savedMusicVolume);
+      this.musicVolume = Number.parseFloat(savedMusicVolume);
     }
     if (savedSfxVolume !== null) {
-      this.sfxVolume = parseFloat(savedSfxVolume);
+      this.sfxVolume = Number.parseFloat(savedSfxVolume);
     }
     if (savedMuted !== null) {
       this.isMuted = savedMuted === "true";

@@ -1,8 +1,10 @@
-import { db, pool } from "../server/db";
+import { getDb, getPool } from "../server/db";
 import { sql } from "drizzle-orm";
 import * as schema from "../shared/schema";
 
 async function initDatabase() {
+  const db = await getDb();
+  const pool = await getPool();
   if (!db || !pool) {
     console.log("DATABASE_URL not set, skipping database initialization");
     return;
