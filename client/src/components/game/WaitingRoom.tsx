@@ -240,7 +240,9 @@ export function WaitingRoom({
               )}
             >
               <div className="text-amber-700 font-semibold">{t("waiting.needPlayers")}</div>
-              <div className="text-sm text-amber-600 mt-1">{t("waiting.needPlayersDesc")}</div>
+              <div className="text-sm text-amber-600 mt-1">
+                {quickMatch ? t("queue.waitingPlayersDesc") : t("waiting.needPlayersDesc")}
+              </div>
             </div>
           )}
         </div>

@@ -7,6 +7,7 @@
 
 ### Novidades
 - **Aviso antes de atualizar:** aparece "Nova versão disponível" com o número da versão nova e da atual; o download dentro do app só começa ao tocar em **Baixar agora** (ou é adiado em **Agora não**)
+- **Partida rápida:** os jogadores da fila caíam em salas separadas quando a busca terminava ao mesmo tempo; agora todos entram na mesma mesa e a partida começa sozinha
 - Correções de confiabilidade apontadas pelo SonarCloud (bots, banco de dados e áudio)
 
 ## Notas

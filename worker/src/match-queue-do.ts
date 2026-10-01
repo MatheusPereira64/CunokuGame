@@ -71,7 +71,19 @@ export class MatchQueueDurableObject extends DurableObject<Env> {
     return commitMatch(stepped.state, stepped.ready, code, hostId, Date.now());
   }
 
-  async fetch(request: Request): Promise<Response> {
+  private tail: Promise<unknown> = Promise.resolve();
+
+  /** O fetch para o RoomDO abre o input gate; sem a fila, duas consultas criariam salas diferentes. */
+  fetch(request: Request): Promise<Response> {
+    const job = this.tail.then(
+      () => this.handle(request),
+      () => this.handle(request),
+    );
+    this.tail = job.catch(() => undefined);
+    return job;
+  }
+
+  private async handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
     const ticketMatch = url.pathname.match(/\/api\/matchmaking\/([^/]+)$/);
