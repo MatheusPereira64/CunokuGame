@@ -139,7 +139,7 @@ export function HomeFeatures({ name, menuBtnClass, menuIconClass, onNeedName }: 
     }
   };
 
-  const cancelQueue = async () => {
+  const cancelQueue = () => {
     cancelRef.current = true;
     const ticketId = ticketRef.current;
     ticketRef.current = "";

@@ -48,7 +48,7 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
+void (async () => {
   // Initialize database tables if in production and DATABASE_URL is set
   if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL) {
     try {
@@ -127,7 +127,7 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
+  const port = Number.parseInt(process.env.PORT || "5000", 10);
   // Aceita conexões na LAN (necessário para partida Wi‑Fi local). Override: HOST=127.0.0.1
   const host = process.env.HOST || "0.0.0.0";
   httpServer.listen(

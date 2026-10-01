@@ -70,7 +70,7 @@ export class GameLogic {
     if (rank === "A") return 1;
     if (rank === "J") return 11;
     if (rank === "Q") return 12;
-    return parseInt(rank) || 0;
+    return Number.parseInt(rank) || 0;
   }
 
   static handleAbility(
@@ -425,7 +425,7 @@ export class GameLogic {
               // Reindexa knownCards
               const newKnownCards: Record<string, boolean> = {};
               Object.keys(player.knownCards).forEach(key => {
-                const idx = parseInt(key);
+                const idx = Number.parseInt(key);
                 if (idx < action.cardIndex!) {
                   newKnownCards[key] = true;
                 } else if (idx > action.cardIndex!) {
@@ -473,7 +473,7 @@ export class GameLogic {
             delete player.knownCards[action.cardIndex.toString()];
             const newKnownCards: Record<string, boolean> = {};
             Object.keys(player.knownCards).forEach(key => {
-              const idx = parseInt(key);
+              const idx = Number.parseInt(key);
               if (idx < action.cardIndex!) {
                 newKnownCards[key] = true;
               } else if (idx > action.cardIndex!) {

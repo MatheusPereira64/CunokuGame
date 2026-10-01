@@ -46,8 +46,9 @@ class Matchmaker {
   }
 
   leave(ticketId: string): Promise<void> {
-    return this.locked(async () => {
+    return this.locked(() => {
       this.state = leaveTicket(this.state, ticketId, Date.now());
+      return Promise.resolve();
     });
   }
 

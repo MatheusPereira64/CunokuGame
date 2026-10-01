@@ -71,7 +71,7 @@ export class BotPlayer {
       // Medium: compare values
       const knownIndices = Object.entries(player.knownCards)
         .filter(([_, known]) => known)
-        .map(([idx]) => parseInt(idx));
+        .map(([idx]) => Number.parseInt(idx));
 
       if (knownIndices.length > 0) {
         // Check if any known card is worse than drawn
@@ -92,7 +92,7 @@ export class BotPlayer {
     // Hard: intelligent strategy
     const knownCards = Object.entries(player.knownCards)
       .filter(([_, known]) => known)
-      .map(([idx]) => ({ idx: parseInt(idx), card: player.hand[parseInt(idx)] }));
+      .map(([idx]) => ({ idx: Number.parseInt(idx), card: player.hand[Number.parseInt(idx)] }));
 
     if (knownCards.length > 0) {
       // Find the worst known card
@@ -110,7 +110,7 @@ export class BotPlayer {
     if (drawnCard.rank === "7" || drawnCard.rank === "8") {
       const unknownIndices = Object.entries(player.knownCards)
         .filter(([_, known]) => !known)
-        .map(([idx]) => parseInt(idx));
+        .map(([idx]) => Number.parseInt(idx));
 
       if (unknownIndices.length > 0) {
         const peekIdx = unknownIndices[0];
@@ -141,7 +141,7 @@ export class BotPlayer {
         // Tenta estimar pontuação baseada em cartas conhecidas
         const knownCards = Object.entries(p.knownCards)
           .filter(([_, known]) => known)
-          .map(([idx]) => p.hand[parseInt(idx)]?.value || 0);
+          .map(([idx]) => p.hand[Number.parseInt(idx)]?.value || 0);
         const knownSum = knownCards.reduce((sum, val) => sum + val, 0);
         const unknownCount = 4 - knownCards.length;
         // Estima média de 5 pontos por carta desconhecida (valor médio aproximado)

@@ -180,7 +180,7 @@ export function processOfflineAction(
             // Reindexa knownCards
             const newKnownCards: Record<string, boolean> = {};
             Object.keys(player.knownCards).forEach(key => {
-              const idx = parseInt(key);
+              const idx = Number.parseInt(key);
               if (idx < action.cardIndex!) {
                 newKnownCards[key] = true;
               } else if (idx > action.cardIndex!) {
@@ -226,7 +226,7 @@ export function processOfflineAction(
           delete player.knownCards[action.cardIndex.toString()];
           const newKnownCards: Record<string, boolean> = {};
           Object.keys(player.knownCards).forEach(key => {
-            const idx = parseInt(key);
+            const idx = Number.parseInt(key);
             if (idx < action.cardIndex!) {
               newKnownCards[key] = true;
             } else if (idx > action.cardIndex!) {

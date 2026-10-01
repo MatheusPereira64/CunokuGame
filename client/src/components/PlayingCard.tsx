@@ -32,7 +32,7 @@ function getAbilityIcon(rank?: string) {
 }
 
 function CardBack({ variant }: { variant: CardBackId }) {
-  const rawId = useId().replace(/:/g, "");
+  const rawId = useId().replaceAll(":", "");
   const patternId = `back-${variant}-${rawId}`;
 
   if (variant === "asanoha") {

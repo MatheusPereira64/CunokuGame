@@ -334,8 +334,9 @@ export async function getLeaderboard(db: any, limit = 50): Promise<LeaderboardEn
 
 export function bearerToken(authHeader: string | null | undefined): string | null {
   if (!authHeader) return null;
-  const m = /^Bearer\s+(.+)$/i.exec(authHeader.trim());
-  return m?.[1]?.trim() || null;
+  const header = authHeader.trim();
+  if (!/^bearer\s/i.test(header)) return null;
+  return header.slice("bearer".length).trim() || null;
 }
 
 /** Exposto para testes unitários. */

@@ -40,7 +40,7 @@ export async function registerRoutes(
   app: Express,
 ): Promise<Server> {
   app.get(api.lan.info.path, (_req, res) => {
-    const port = parseInt(process.env.PORT || "5000", 10);
+    const port = Number.parseInt(process.env.PORT || "5000", 10);
     const info = buildLanInfo(port);
     res.json(api.lan.info.responses[200].parse(info));
   });

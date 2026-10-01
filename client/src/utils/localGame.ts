@@ -59,7 +59,7 @@ function getCardValue(rank: string): number {
   if (rank === "A") return 1;
   if (rank === "J") return 11;
   if (rank === "Q") return 12;
-  return parseInt(rank) || 0;
+  return Number.parseInt(rank) || 0;
 }
 
 /**

@@ -515,7 +515,7 @@ export default function Home() {
                     <Select 
                       value={maxPlayers.toString()} 
                       onValueChange={(value) => {
-                        const newMax = parseInt(value);
+                        const newMax = Number.parseInt(value);
                         setMaxPlayers(newMax);
                         // Ajusta botCount se necessário
                         if (botCount > newMax - 1) {
@@ -574,7 +574,7 @@ export default function Home() {
                       <Select 
                         value={Math.min(botCount, maxPlayers - 1).toString()} 
                         onValueChange={(value) => {
-                          const newCount = parseInt(value);
+                          const newCount = Number.parseInt(value);
                           setBotCount(Math.min(newCount, maxPlayers - 1));
                           setBotCountOpen(false);
                         }}
@@ -698,7 +698,7 @@ export default function Home() {
                     <Select 
                       value={botCount.toString()} 
                       onValueChange={(value) => {
-                        setBotCount(parseInt(value));
+                        setBotCount(Number.parseInt(value));
                         setBotCountOpen(false);
                       }}
                       open={botCountOpen}
