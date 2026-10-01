@@ -45,6 +45,9 @@ export interface GameState {
   logs: string[];
   finalRoundDeclarerId?: string | null; // ID do jogador que declarou fim de jogo
   isFinalRound?: boolean; // Se está na rodada final
+  /** Epoch ms: jogador offline tem até esse instante para voltar no turno dele */
+  reconnectDeadline?: number | null;
+  reconnectPlayerId?: string | null;
 }
 
 // === TABLE DEFINITIONS ===

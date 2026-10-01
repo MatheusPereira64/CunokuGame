@@ -13,10 +13,13 @@ import {
   executeBotTurn,
   handleJoinMessage,
   handlePlayerAction,
+  handlePlayerDisconnect,
   handleStartGame,
+  resolveDisconnectedTurn,
   type RoomSessionData,
 } from "./roomHandlers";
 import { ensureRankSchema } from "./rankEnsure";
+import { getMatchmaker } from "./matchmaking";
 import {
   bearerToken,
   getLeaderboard,
@@ -86,6 +89,27 @@ export async function registerRoutes(
     } catch {
       res.status(400).json({ message: "Invalid input" });
     }
+  });
+
+  app.post(api.matchmaking.enqueue.path, async (req, res) => {
+    try {
+      const { playerName } = api.matchmaking.enqueue.input.parse(req.body);
+      const result = await getMatchmaker().enqueue(playerName);
+      res.json(result);
+    } catch {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  app.get("/api/matchmaking/:ticketId", async (req, res) => {
+    const result = await getMatchmaker().status(req.params.ticketId);
+    if (!result) return res.status(404).json({ message: "Ticket not found" });
+    res.json(result);
+  });
+
+  app.delete("/api/matchmaking/:ticketId", async (req, res) => {
+    await getMatchmaker().leave(req.params.ticketId);
+    res.status(204).end();
   });
 
   app.get(api.rooms.list.path, async (_req, res) => {
@@ -208,24 +232,56 @@ export async function registerRoutes(
     );
   }
 
+  const disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  function clearDisconnectTimer(roomCode: string) {
+    const timer = disconnectTimers.get(roomCode);
+    if (!timer) return;
+    clearTimeout(timer);
+    disconnectTimers.delete(roomCode);
+  }
+
   function scheduleNextBotTurn(roomCode: string, state: GameState) {
     const currentPlayer = state.players[state.currentPlayerIndex];
-    if (!currentPlayer?.isBot) return;
+    const playing = !state.winnerId && state.turnPhase !== "finished" && state.turnPhase !== "waiting";
 
-    const messenger = makeMessenger(roomCode);
-    messenger.broadcast({ type: "bot_thinking", botName: currentPlayer.name });
+    if (playing && currentPlayer?.isBot) {
+      clearDisconnectTimer(roomCode);
+      const messenger = makeMessenger(roomCode);
+      messenger.broadcast({ type: "bot_thinking", botName: currentPlayer.name });
+      setTimeout(() => {
+        const live = roomsLive.get(roomCode);
+        if (!live) return;
+        void executeBotTurn(
+          storage,
+          live.session,
+          makeMessenger(roomCode),
+          roomCode,
+          scheduleNextBotTurn,
+        );
+      }, 3000);
+      return;
+    }
 
-    setTimeout(() => {
-      const live = roomsLive.get(roomCode);
-      if (!live) return;
-      void executeBotTurn(
-        storage,
-        live.session,
-        makeMessenger(roomCode),
-        roomCode,
-        scheduleNextBotTurn,
-      );
-    }, 3000);
+    clearDisconnectTimer(roomCode);
+    if (!state.reconnectDeadline || !state.reconnectPlayerId) return;
+    const playerId = state.reconnectPlayerId;
+    const delay = Math.max(0, state.reconnectDeadline - Date.now());
+    const timer = setTimeout(() => {
+      disconnectTimers.delete(roomCode);
+      void (async () => {
+        const live = roomsLive.get(roomCode);
+        if (!live) return;
+        const next = await resolveDisconnectedTurn(
+          storage,
+          makeMessenger(roomCode),
+          roomCode,
+          playerId,
+        );
+        if (next) scheduleNextBotTurn(roomCode, next);
+      })();
+    }, delay);
+    disconnectTimers.set(roomCode, timer);
   }
 
   wss.on("connection", (ws) => {
@@ -254,6 +310,7 @@ export async function registerRoutes(
             (m) => {
               if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m));
             },
+            scheduleNextBotTurn,
           );
         }
 
@@ -299,9 +356,17 @@ export async function registerRoutes(
     });
 
     ws.on("close", () => {
-      if (currentRoom && currentPlayer) {
-        roomsLive.get(currentRoom)?.sockets.delete(currentPlayer);
-      }
+      if (!currentRoom || !currentPlayer) return;
+      const live = roomsLive.get(currentRoom);
+      if (!live || live.sockets.get(currentPlayer) !== ws) return;
+      live.sockets.delete(currentPlayer);
+      void handlePlayerDisconnect(
+        storage,
+        makeMessenger(currentRoom),
+        currentRoom,
+        currentPlayer,
+        scheduleNextBotTurn,
+      );
     });
   });
 

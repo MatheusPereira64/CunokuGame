@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useSyncExternalStore } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useGameSocket } from "@/hooks/use-game-socket";
 import { useOfflineGame } from "@/hooks/use-offline-game";
@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { audioManager } from "@/utils/audioManager";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { VolumeControl } from "@/components/VolumeControl";
+import { TableThemeButton } from "@/components/TableThemePicker";
 import { useI18n } from "@/contexts/i18n-context";
 import { PlayerSeat } from "@/components/game/PlayerSeat";
 import { CenterPile } from "@/components/game/CenterPile";
@@ -30,6 +31,10 @@ import { getSeatPositions } from "@/components/game/seatPositions";
 import { LandscapePrompt } from "@/components/game/LandscapePrompt";
 import { useIsPortrait, lockLandscape, unlockOrientation, useIsCompactGame } from "@/hooks/use-landscape";
 import { getLanJoinUrl, getNetworkMode } from "@/lib/gameServer";
+import { clearActiveSession, saveActiveSession } from "@/lib/activeSession";
+import { buildInviteUrl } from "@/lib/inviteLink";
+import { loadTableTheme, subscribeTableTheme } from "@/lib/tableTheme";
+import { GameTutorial } from "@/components/game/GameTutorial";
 import { copyToClipboard } from "@/lib/clipboard";
 import {
   hasRecordedMatchStats,
@@ -51,6 +56,9 @@ export default function Game() {
   const searchParams = new URLSearchParams(window.location.search);
   const playerId = searchParams.get("player") || "";
   const isOffline = searchParams.get("mode") === "offline" || roomCode === "offline";
+  const fromQueue = searchParams.get("queue") === "1";
+  const tableTheme = useSyncExternalStore(subscribeTableTheme, loadTableTheme, loadTableTheme);
+  const queueStartedRef = useRef(false);
 
   // Modo offline: carrega estado do sessionStorage
   const [offlineGameState, setOfflineGameState] = useState<GameState | null>(null);
@@ -98,6 +106,12 @@ export default function Game() {
     }
   }, [isOffline, playerId, toast]);
 
+  useEffect(() => {
+    if (isOffline || !roomCode || !playerId) return;
+    const name = sessionStorage.getItem(`playerName_${roomCode}`) || "";
+    saveActiveSession({ code: roomCode, playerId, name, savedAt: Date.now() });
+  }, [isOffline, roomCode, playerId]);
+
   const { gameState: offlineGameStateFromHook, sendAction: sendOfflineAction } = useOfflineGame(
     offlineGameState,
     playerId,
@@ -106,6 +120,7 @@ export default function Game() {
 
   const {
     gameState: onlineGameState,
+    connected,
     sendAction: sendOnlineAction,
     socketRef,
     revealedCard: onlineRevealedCard,
@@ -121,6 +136,7 @@ export default function Game() {
 
   const [abilityModalOpen, setAbilityModalOpen] = useState(false);
   const peekTimersRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
+  const opponentRevealTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [revealedOpponentCard, setRevealedOpponentCard] = useState<{
     card: Card;
     playerName: string;
@@ -135,6 +151,24 @@ export default function Game() {
   } | null>(null);
 
   const gameState = isOffline ? offlineGameStateFromHook : onlineGameState;
+  const [, setReconnectTick] = useState(0);
+
+  useEffect(() => {
+    if (!gameState?.reconnectDeadline) return;
+    setReconnectTick((n) => n + 1);
+    const id = window.setInterval(() => setReconnectTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [gameState?.reconnectDeadline]);
+
+  useEffect(() => {
+    if (!fromQueue || isOffline || queueStartedRef.current) return;
+    if (!gameState || gameState.turnPhase !== "waiting" || gameState.players.length < 2) return;
+    const hostId = sessionStorage.getItem(`hostId_${roomCode}`);
+    if (hostId !== playerId) return;
+    if (socketRef.current?.readyState !== WebSocket.OPEN) return;
+    queueStartedRef.current = true;
+    socketRef.current.send(JSON.stringify({ type: "start_game" }));
+  }, [fromQueue, isOffline, gameState, roomCode, playerId, socketRef]);
   const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
 
   const {
@@ -369,18 +403,32 @@ export default function Game() {
 
   // Cleanup de timers ao desmontar
   useEffect(() => {
+    const ownTimers = peekTimersRef.current;
+    const opponentTimers = opponentRevealTimers.current;
     return () => {
-      peekTimersRef.current.forEach((timer) => clearTimeout(timer));
-      peekTimersRef.current.clear();
+      ownTimers.forEach((timer) => clearTimeout(timer));
+      ownTimers.clear();
+      opponentTimers.forEach((timer) => clearTimeout(timer));
+      opponentTimers.clear();
     };
   }, []);
 
-  // Marca carta de oponente como revelada só neste cliente (persiste até a carta sair da mão)
+  /** Carta do oponente fica virada só para quem espiou, e volta ao verso em 20s. */
   const revealOpponentCardInHand = useCallback((targetPlayerId: string, targetCard: Card) => {
     const cardKey = `${targetPlayerId}_${targetCard.id}`;
-    setRevealedOpponentCardsInHand((prev) =>
-      prev[cardKey] ? prev : { ...prev, [cardKey]: targetCard }
-    );
+    setRevealedOpponentCardsInHand((prev) => ({ ...prev, [cardKey]: targetCard }));
+    const previous = opponentRevealTimers.current.get(cardKey);
+    if (previous) clearTimeout(previous);
+    const timer = setTimeout(() => {
+      opponentRevealTimers.current.delete(cardKey);
+      setRevealedOpponentCardsInHand((prev) => {
+        if (!prev[cardKey]) return prev;
+        const next = { ...prev };
+        delete next[cardKey];
+        return next;
+      });
+    }, 20000);
+    opponentRevealTimers.current.set(cardKey, timer);
   }, []);
 
   // Remove revelações locais quando a carta não está mais na mão do oponente
@@ -588,6 +636,23 @@ export default function Game() {
     });
   };
 
+  const handleShareInvite = async () => {
+    const url = buildInviteUrl(roomCode);
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "Cunoku", text: roomCode, url });
+        return;
+      } catch {
+        // usuário cancelou ou o WebView não completou — cai no clipboard
+      }
+    }
+    const ok = await copyToClipboard(url);
+    toast({
+      title: ok ? t("invite.copied") : t("error.generic"),
+      description: ok ? t("invite.copiedDesc") : url,
+    });
+  };
+
   const handleCopyLanUrl = async () => {
     const url = getLanJoinUrl() || window.location.origin;
     const ok = await copyToClipboard(url);
@@ -696,6 +761,7 @@ export default function Game() {
         playerId={playerId}
         isHost={isHost}
         onCopyCode={handleCopyCode}
+        onShareInvite={handleShareInvite}
         onCopyLanUrl={handleCopyLanUrl}
         networkMode={getNetworkMode()}
         lanJoinUrl={getLanJoinUrl()}
@@ -715,6 +781,11 @@ export default function Game() {
   }
 
   const opponents = gameState.players.filter((p) => p.id !== playerId);
+  const graceSeconds =
+    gameState.reconnectDeadline != null
+      ? Math.max(0, Math.ceil((gameState.reconnectDeadline - Date.now()) / 1000))
+      : null;
+  const graceName = gameState.players.find((p) => p.id === gameState.reconnectPlayerId)?.name ?? "";
   const seatPositions = getSeatPositions(opponents.length);
   const currentTurnPlayerId = gameState.players[gameState.currentPlayerIndex]?.id;
   // Em paisagem (incl. celular deitado) usa assentos em arco; em retrato o overlay impede jogar
@@ -763,12 +834,18 @@ export default function Game() {
           </Button>
           <div
             className={cn(
-              "[&_button]:bg-black/20 [&_button]:text-white [&_button]:border-white/20 [&_button]:backdrop-blur-sm [&_button]:hover:bg-black/30",
-              isCompact && "[&_button]:h-7 [&_button]:w-7 [&_button]:p-0 scale-90 origin-left"
+              "flex items-center [&_button]:bg-black/20 [&_button]:text-white [&_button]:border-white/20 [&_button]:backdrop-blur-sm [&_button]:hover:bg-black/30",
+              isCompact ? "gap-1.5 [&_button]:h-7 [&_button]:w-7 [&_button]:p-0" : "gap-2"
             )}
           >
             <VolumeControl />
+            <TableThemeButton />
           </div>
+          {!isOffline && !connected && (
+            <div className="pointer-events-none rounded-full bg-amber-500/90 text-amber-950 text-xs font-semibold px-3 py-1">
+              {t("reconnect.banner")}
+            </div>
+          )}
         </div>
 
         <div
@@ -792,8 +869,21 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Banner "Sua vez" */}
-      {isMyTurn && (
+      {/* Banner "Sua vez" ou janela de reconexão */}
+      {graceSeconds != null && graceName ? (
+        <div
+          className={cn(
+            "absolute z-40 pointer-events-none left-1/2 -translate-x-1/2",
+            isCompact ? "top-8 max-w-[min(92vw,22rem)]" : "top-20 max-w-xl"
+          )}
+        >
+          <div className="rounded-full border-2 border-amber-300 bg-amber-500/95 px-4 py-2 text-center text-amber-950 shadow-xl">
+            <span className={cn("font-bold", isCompact ? "text-[10px]" : "text-sm")}>
+              {t("reconnect.turn", { name: graceName, seconds: String(graceSeconds) })}
+            </span>
+          </div>
+        </div>
+      ) : isMyTurn ? (
         <div
           className={cn(
             "absolute z-40 pointer-events-none left-1/2 -translate-x-1/2",
@@ -824,7 +914,7 @@ export default function Game() {
             )}
           </motion.div>
         </div>
-      )}
+      ) : null}
 
       {/* Info da rodada */}
       <div
@@ -916,6 +1006,7 @@ export default function Game() {
         <div
           className={cn(
             "w-full relative felt-table shadow-2xl",
+            `felt-${tableTheme.mat}`,
             isCompact
               ? "max-w-none max-h-[calc(100dvh-0.5rem)] h-[calc(100dvh-0.5rem)] aspect-auto rounded-xl"
               : "max-w-6xl max-h-[min(100%,calc(100dvh-1rem))] aspect-[16/9] rounded-[100px]"
@@ -1070,6 +1161,8 @@ export default function Game() {
         )}
       </AnimatePresence>
 
+      {!gameState.winnerId && gameState.turnPhase !== "waiting" && <GameTutorial />}
+
       {/* Modal de fim de jogo */}
       {gameState.winnerId && (
         <GameOverModal
@@ -1078,7 +1171,10 @@ export default function Game() {
           players={gameState.players}
           winnerId={gameState.winnerId}
           localPlayerId={playerId}
-          onBackHome={() => setLocation("/")}
+          onBackHome={() => {
+            clearActiveSession();
+            setLocation("/");
+          }}
         />
       )}
     </div>

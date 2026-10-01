@@ -12,12 +12,15 @@ import {
 } from "@/components/ui/dialog";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
+import { TableThemePicker } from "@/components/TableThemePicker";
+import { useI18n } from "@/contexts/i18n-context";
 
 export function VolumeControl() {
   const [musicVolume, setMusicVolume] = useState(audioManager.getMusicVolume());
   const [sfxVolume, setSfxVolume] = useState(audioManager.getSfxVolume());
   const [isMuted, setIsMuted] = useState(audioManager.getMuted());
   const [isOpen, setIsOpen] = useState(false);
+  const { t } = useI18n();
   const isPortrait = useIsPortrait();
   const isCompactGame = useIsCompactGame();
   const isLandscapeMenu = isCompactGame && !isPortrait;
@@ -72,7 +75,7 @@ export function VolumeControl() {
         )}
       >
         <DialogHeader className={cn(isLandscapeMenu && "pr-6")}>
-          <DialogTitle className={cn(isLandscapeMenu && "text-base")}>Configurações de Áudio</DialogTitle>
+          <DialogTitle className={cn(isLandscapeMenu && "text-base")}>{t("settings.title")}</DialogTitle>
         </DialogHeader>
         <div className={cn(isLandscapeMenu ? "space-y-3 py-1" : "space-y-6 py-4")}>
           {/* Controle de Mute */}
@@ -134,6 +137,11 @@ export function VolumeControl() {
               disabled={isMuted}
               className="w-full"
             />
+          </div>
+
+          <div className="border-t border-gray-200 pt-4">
+            <p className="text-sm font-medium mb-3">{t("theme.title")}</p>
+            <TableThemePicker />
           </div>
         </div>
       </DialogContent>

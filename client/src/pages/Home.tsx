@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/Button";
 import { useCreateRoom, useJoinRoom, fetchLanInfo } from "@/hooks/use-rooms";
 import { useToast } from "@/hooks/use-toast";
-import { Spade, Heart, Club, Diamond, ArrowRight, Gamepad2, Users, Bot, Languages, Wifi, Cloud, ArrowLeft } from "lucide-react";
+import { Spade, Heart, Club, Diamond, ArrowRight, Gamepad2, Users, Bot, Languages, Wifi, Cloud, ArrowLeft, ArrowUp } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createOfflineGame } from "@/utils/localGame";
 import { audioManager } from "@/utils/audioManager";
 import { VolumeControl } from "@/components/VolumeControl";
+import { TableThemeButton } from "@/components/TableThemePicker";
+import { HomeFeatures } from "@/components/HomeFeatures";
 import { RulesDialog } from "@/components/RulesDialog";
 import { InstallAppButton } from "@/components/InstallAppButton";
 import { ProfileDialog } from "@/components/ProfileDialog";
@@ -112,6 +114,7 @@ export default function Home() {
   const [networkChoice, setNetworkChoice] = useState<NetworkMode | null>(null);
   const [hostAddress, setHostAddress] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [showNameHint, setShowNameHint] = useState(false);
 
   const createRoom = useCreateRoom();
   const joinRoom = useJoinRoom();
@@ -290,23 +293,45 @@ export default function Home() {
       </div>
 
       {/* Volume + ranking + perfil + instalar app - Top Right */}
-      <div className={cn("absolute z-20 flex items-center gap-2", isLandscapeMenu ? "top-2 right-2" : "top-4 right-4")}>
+      <div
+        className={cn(
+          "absolute z-20 flex items-center justify-end",
+          isLandscapeMenu
+            ? "top-2 right-2 left-36 gap-1.5"
+            : "top-4 right-4 left-[9.75rem] gap-2 max-[400px]:gap-1.5"
+        )}
+      >
         <InstallAppButton compact={isLandscapeMenu} />
         <LeaderboardDialog compact={isLandscapeMenu} />
-        <ProfileDialog
-          compact={isLandscapeMenu}
-          onSaved={(p) => {
-            if (!name.trim() && p.displayName) setName(p.displayName);
-            else if (p.displayName) setName(p.displayName);
-          }}
-        />
+        <div className="relative shrink-0">
+          {showNameHint && (
+            <div className="absolute left-1/2 top-full z-30 mt-2 -translate-x-1/2 flex flex-col items-center pointer-events-none w-36">
+              <ArrowUp className="h-7 w-7 text-amber-500 animate-bounce drop-shadow" />
+              <span className="mt-1 rounded-lg bg-amber-500 px-2 py-1 text-center text-xs font-semibold text-amber-950 shadow-md">
+                {t("queue.nameHint")}
+              </span>
+            </div>
+          )}
+          <ProfileDialog
+            compact={isLandscapeMenu}
+            highlight={showNameHint}
+            onSaved={(p) => {
+              if (!name.trim() && p.displayName) setName(p.displayName);
+              else if (p.displayName) setName(p.displayName);
+              if (p.displayName.trim()) setShowNameHint(false);
+            }}
+          />
+        </div>
         <div
           className={cn(
-            "[&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md",
-            isLandscapeMenu && "[&_button]:h-8 [&_button]:w-8 [&_button]:p-0 scale-90 origin-top-right"
+            "flex shrink-0 items-center [&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md",
+            isLandscapeMenu
+              ? "gap-1.5 [&_button]:h-8 [&_button]:w-8 [&_button]:p-0"
+              : "gap-2 max-[400px]:gap-1.5"
           )}
         >
           <VolumeControl />
+          <TableThemeButton />
         </div>
       </div>
 
@@ -616,6 +641,13 @@ export default function Home() {
               )}
             </DialogContent>
           </Dialog>
+
+          <HomeFeatures
+            name={name}
+            menuBtnClass={menuBtnClass}
+            menuIconClass={menuIconClass}
+            onNeedName={() => setShowNameHint(true)}
+          />
 
           <Dialog>
             <DialogTrigger asChild>

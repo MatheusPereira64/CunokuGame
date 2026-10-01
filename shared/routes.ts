@@ -59,6 +59,27 @@ export const api = {
       },
     },
   },
+  matchmaking: {
+    enqueue: {
+      method: 'POST' as const,
+      path: '/api/matchmaking',
+      input: z.object({
+        playerName: z.string().min(1).max(24),
+      }),
+      responses: {
+        200: z.object({
+          status: z.enum(["waiting", "filling", "countdown", "matched"]),
+          ticketId: z.string(),
+          playerId: z.string(),
+          code: z.string().optional(),
+          hostId: z.string().optional(),
+          position: z.number().optional(),
+          players: z.number().optional(),
+          secondsLeft: z.number().optional(),
+        }),
+      },
+    },
+  },
   lan: {
     info: {
       method: 'GET' as const,

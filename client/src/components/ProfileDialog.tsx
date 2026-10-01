@@ -56,10 +56,11 @@ type AccountTab = "look" | "achievements";
 
 interface ProfileDialogProps {
   compact?: boolean;
+  highlight?: boolean;
   onSaved?: (profile: PlayerProfile) => void;
 }
 
-export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) {
+export function ProfileDialog({ compact = false, highlight = false, onSaved }: ProfileDialogProps) {
   const { t } = useI18n();
   const isPortrait = useIsPortrait();
   const isCompactGame = useIsCompactGame();
@@ -211,6 +212,7 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
           className={cn(
             "bg-white/90 text-indigo-900 border border-indigo-200 hover:bg-white shadow-md",
             isLandscapeMenu && "h-8 w-8",
+            highlight && "ring-4 ring-amber-400 ring-offset-2 animate-pulse",
           )}
           aria-label={t("profile.title")}
         >

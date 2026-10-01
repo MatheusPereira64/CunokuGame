@@ -3,10 +3,11 @@ import { api } from "../../shared/routes";
 import { createStorage, pingDb } from "./storage";
 import type { Env } from "./env";
 import { RoomDurableObject } from "./room-do";
+import { MatchQueueDurableObject } from "./match-queue-do";
 import { handleRankApi } from "./rankApi";
 import { corsHeaders } from "./cors";
 
-export { RoomDurableObject };
+export { RoomDurableObject, MatchQueueDurableObject };
 
 function json(data: unknown, status = 200, request?: Request): Response {
   return new Response(JSON.stringify(data), {
@@ -81,6 +82,17 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     } catch (err: any) {
       return json({ message: err?.message || "Invalid input" }, 400, request);
     }
+  }
+
+  if (path === api.matchmaking.enqueue.path || path.startsWith("/api/matchmaking/")) {
+    const id = env.MATCH_QUEUE.idFromName("public");
+    const stub = env.MATCH_QUEUE.get(id);
+    const upstream = await stub.fetch(request);
+    const headers = new Headers(upstream.headers);
+    for (const [key, value] of Object.entries(corsHeaders(request))) {
+      headers.set(key, value);
+    }
+    return new Response(upstream.body, { status: upstream.status, headers });
   }
 
   if (method === "POST" && path === api.rooms.join.path) {

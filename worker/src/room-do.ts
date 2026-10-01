@@ -8,7 +8,9 @@ import {
   executeBotTurn,
   handleJoinMessage,
   handlePlayerAction,
+  handlePlayerDisconnect,
   handleStartGame,
+  resolveDisconnectedTurn,
   serializeBots,
   type RoomSessionData,
 } from "../../server/roomHandlers";
@@ -112,9 +114,10 @@ export class RoomDurableObject extends DurableObject<Env> {
     ws.serializeAttachment({ ...prev, ...patch });
   }
 
-  private connectedIds(): string[] {
+  private connectedIds(except?: WebSocket): string[] {
     const ids: string[] = [];
     for (const ws of this.ctx.getWebSockets()) {
+      if (except && ws === except) continue;
       const id = this.playerIdFor(ws);
       if (id) ids.push(id);
     }
@@ -145,10 +148,25 @@ export class RoomDurableObject extends DurableObject<Env> {
   }
 
   private scheduleBot(_roomCode: string, state: GameState): void {
+    void this.armAlarm(state);
+  }
+
+  private async armAlarm(state: GameState): Promise<void> {
     const current = state.players[state.currentPlayerIndex];
-    if (!current?.isBot) return;
-    this.makeMessenger().broadcast({ type: "bot_thinking", botName: current.name });
-    void this.ctx.storage.setAlarm(Date.now() + 3000);
+    const playing = !state.winnerId && state.turnPhase !== "finished" && state.turnPhase !== "waiting";
+    if (playing && current?.isBot) {
+      this.makeMessenger().broadcast({ type: "bot_thinking", botName: current.name });
+      await this.ctx.storage.put("alarmKind", "bot");
+      await this.ctx.storage.setAlarm(Date.now() + 3000);
+      return;
+    }
+    if (state.reconnectDeadline && state.reconnectPlayerId) {
+      await this.ctx.storage.put("alarmKind", "disconnect");
+      await this.ctx.storage.setAlarm(Math.max(Date.now() + 50, state.reconnectDeadline));
+      return;
+    }
+    await this.ctx.storage.delete("alarmKind");
+    await this.ctx.storage.deleteAlarm();
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -211,13 +229,14 @@ export class RoomDurableObject extends DurableObject<Env> {
           (id) => {
             this.setAttachment(ws, { playerId: id, roomCode: this.roomCode });
           },
-          (m) => {
+            (m) => {
             try {
               ws.send(JSON.stringify(m));
             } catch {
               /* ignore */
             }
           },
+          (c, s) => this.scheduleBot(c, s),
         );
         await this.saveSession();
         return;
@@ -267,12 +286,62 @@ export class RoomDurableObject extends DurableObject<Env> {
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
-    void ws;
+    await this.loadSession();
+    const playerId = this.playerIdFor(ws);
+    if (!playerId || !this.roomCode) return;
+    if (this.connectedIds(ws).includes(playerId)) return;
+    const messenger = createFilteringMessenger(
+      (id) => {
+        for (const sock of this.ctx.getWebSockets()) {
+          if (sock === ws) continue;
+          if (this.playerIdFor(sock) === id) {
+            return {
+              open: true,
+              send: (data: string) => {
+                try {
+                  sock.send(data);
+                } catch {
+                  /* ignore */
+                }
+              },
+            };
+          }
+        }
+        return undefined;
+      },
+      () => this.connectedIds(ws),
+    );
+    await handlePlayerDisconnect(
+      this.storage(),
+      messenger,
+      this.roomCode,
+      playerId,
+      (c, s) => this.scheduleBot(c, s),
+    );
+    await this.saveSession();
   }
 
   async alarm(): Promise<void> {
     await this.loadSession();
     if (!this.roomCode) return;
+    const kind = await this.ctx.storage.get<string>("alarmKind");
+    await this.ctx.storage.delete("alarmKind");
+    if (kind === "disconnect") {
+      const room = await this.storage().getRoom(this.roomCode);
+      const playerId = room?.gameState?.reconnectPlayerId;
+      if (playerId) {
+        const next = await resolveDisconnectedTurn(
+          this.storage(),
+          this.makeMessenger(),
+          this.roomCode,
+          playerId,
+        );
+        if (next) this.scheduleBot(this.roomCode, next);
+      }
+      await this.saveSession();
+      return;
+    }
+    if (kind != null && kind !== "bot") return;
     await executeBotTurn(
       this.storage(),
       this.session,

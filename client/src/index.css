@@ -57,11 +57,8 @@
   }
 }
 
-/* Mesa com tema japonês: feltro verde-pinho profundo com padrão
-   seigaiha (ondas) sutil e borda de madeira laqueada com filete dourado */
+/* Mesa com tema japonês: borda de madeira laqueada + tapete escolhido */
 .felt-table {
-  background-color: #2f4a38;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24' viewBox='0 0 48 24'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.045' stroke-width='1.5'%3E%3Ccircle cx='24' cy='24' r='22'/%3E%3Ccircle cx='24' cy='24' r='15'/%3E%3Ccircle cx='24' cy='24' r='8'/%3E%3Ccircle cx='0' cy='36' r='22'/%3E%3Ccircle cx='48' cy='36' r='22'/%3E%3C/g%3E%3C/svg%3E");
   box-shadow:
     inset 0 0 120px rgba(0, 0, 0, 0.55),
     inset 0 0 0 2px rgba(212, 175, 55, 0.35),
@@ -70,6 +67,26 @@
   border: 16px solid #3b2420;
   border-radius: 120px;
   /* Reserva visual implícita: centro ~30–55% / mão ~0–28% inferior */
+}
+
+/* Tatame: pinho com seigaiha */
+.felt-tatami {
+  background-color: #2f4a38;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24' viewBox='0 0 48 24'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='0.045' stroke-width='1.5'%3E%3Ccircle cx='24' cy='24' r='22'/%3E%3Ccircle cx='24' cy='24' r='15'/%3E%3Ccircle cx='24' cy='24' r='8'/%3E%3Ccircle cx='0' cy='36' r='22'/%3E%3Ccircle cx='48' cy='36' r='22'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Urushi: laca vermelha com asanoha */
+.felt-urushi {
+  background-color: #6b1d1d;
+  border-color: #2a140c;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M20 2 L38 20 L20 38 L2 20 Z' fill='none' stroke='%23e8c9a0' stroke-opacity='0.12' stroke-width='1'/%3E%3C/svg%3E");
+}
+
+/* Noite: índigo com shippo dourado */
+.felt-night {
+  background-color: #16162a;
+  border-color: #2c2416;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36'%3E%3Ccircle cx='18' cy='18' r='10' fill='none' stroke='%23d4af37' stroke-opacity='0.14' stroke-width='1'/%3E%3C/svg%3E");
 }
 
 @media (max-width: 768px), (max-height: 500px) {

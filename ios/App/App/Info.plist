@@ -75,5 +75,16 @@
 	<false/>
 	<key>UIStatusBarHidden</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.cunoku.game</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>cunoku</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

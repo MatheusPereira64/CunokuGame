@@ -2,8 +2,9 @@ import { Player } from "@shared/schema";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { VolumeControl } from "@/components/VolumeControl";
+import { TableThemeButton } from "@/components/TableThemePicker";
 import { cn } from "@/lib/utils";
-import { Copy, Wifi } from "lucide-react";
+import { Copy, Link2, Wifi } from "lucide-react";
 import { useI18n } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { loadProfile } from "@/lib/playerProfile";
@@ -14,6 +15,7 @@ interface WaitingRoomProps {
   playerId: string;
   isHost: boolean;
   onCopyCode: () => void;
+  onShareInvite?: () => void;
   onCopyLanUrl?: () => void;
   onStart: () => void;
   networkMode?: "lan" | "server";
@@ -26,6 +28,7 @@ export function WaitingRoom({
   playerId,
   isHost,
   onCopyCode,
+  onShareInvite,
   onCopyLanUrl,
   onStart,
   networkMode = "server",
@@ -49,11 +52,12 @@ export function WaitingRoom({
       <div className={cn("absolute z-20", isLandscape ? "top-2 right-2" : "top-4 right-4")}>
         <div
           className={cn(
-            "[&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md",
-            isLandscape && "[&_button]:h-8 [&_button]:w-8 [&_button]:p-0"
+            "flex items-center [&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md",
+            isLandscape ? "gap-1.5 [&_button]:h-8 [&_button]:w-8 [&_button]:p-0" : "gap-2"
           )}
         >
           <VolumeControl />
+          <TableThemeButton />
         </div>
       </div>
 
@@ -97,6 +101,12 @@ export function WaitingRoom({
             </div>
             <Copy className="w-5 h-5 text-gray-500" />
           </div>
+
+          {onShareInvite && (
+            <Button variant="outline" className={cn("w-full", isLandscape ? "mb-0 h-9 text-sm" : "mb-4")} onClick={onShareInvite}>
+              <Link2 className="w-4 h-4 mr-2" /> {t("invite.share")}
+            </Button>
+          )}
 
           {isLan && lanJoinUrl && (
             <div

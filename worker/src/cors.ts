@@ -18,7 +18,7 @@ export function resolveCorsOrigin(requestOrigin: string | null): string | null {
 export function corsHeaders(request: Request): Record<string, string> {
   const origin = resolveCorsOrigin(request.headers.get("Origin"));
   const headers: Record<string, string> = {
-    "access-control-allow-methods": "GET,POST,PATCH,OPTIONS",
+    "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
     "access-control-allow-headers": "content-type, authorization",
   };
   if (origin) {

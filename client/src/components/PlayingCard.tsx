@@ -1,7 +1,9 @@
+import { useId, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { type Card } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { Club, Diamond, Heart, Spade, Eye, Glasses, ArrowLeftRight } from "lucide-react";
+import { loadTableTheme, subscribeTableTheme, type CardBackId } from "@/lib/tableTheme";
 
 interface PlayingCardProps {
   card?: Card; // Se ausente, é um verso de carta ou slot vazio
@@ -29,7 +31,71 @@ function getAbilityIcon(rank?: string) {
   }
 }
 
+function CardBack({ variant }: { variant: CardBackId }) {
+  const rawId = useId().replace(/:/g, "");
+  const patternId = `back-${variant}-${rawId}`;
+
+  if (variant === "asanoha") {
+    return (
+      <svg viewBox="0 0 96 144" className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <pattern id={patternId} x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M10 0 L20 10 L10 20 L0 10 Z" fill="none" stroke="#c45c26" strokeWidth="0.8" />
+            <path d="M10 4 L16 10 L10 16 L4 10 Z" fill="none" stroke="#e8c9a0" strokeWidth="0.5" />
+          </pattern>
+        </defs>
+        <rect width="96" height="144" fill="#6b1d1d" />
+        <rect width="96" height="144" fill={`url(#${patternId})`} />
+        <circle cx="48" cy="72" r="22" fill="#4a1010" stroke="#e8c9a0" strokeWidth="1.5" />
+        <text x="48" y="73" textAnchor="middle" dominantBaseline="central" fontSize="22" fill="#e8c9a0" fontFamily="'Noto Serif JP', serif">麻</text>
+      </svg>
+    );
+  }
+
+  if (variant === "shippo") {
+    return (
+      <svg viewBox="0 0 96 144" className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <pattern id={patternId} x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+            <circle cx="12" cy="12" r="8" fill="none" stroke="#d4af37" strokeWidth="1" opacity="0.55" />
+            <circle cx="0" cy="0" r="8" fill="none" stroke="#d4af37" strokeWidth="1" opacity="0.55" />
+            <circle cx="24" cy="0" r="8" fill="none" stroke="#d4af37" strokeWidth="1" opacity="0.55" />
+            <circle cx="0" cy="24" r="8" fill="none" stroke="#d4af37" strokeWidth="1" opacity="0.55" />
+            <circle cx="24" cy="24" r="8" fill="none" stroke="#d4af37" strokeWidth="1" opacity="0.55" />
+          </pattern>
+        </defs>
+        <rect width="96" height="144" fill="#141428" />
+        <rect width="96" height="144" fill={`url(#${patternId})`} />
+        <circle cx="48" cy="72" r="22" fill="#0d0d1c" stroke="#d4af37" strokeWidth="1.5" />
+        <text x="48" y="73" textAnchor="middle" dominantBaseline="central" fontSize="22" fill="#d4af37" fontFamily="'Noto Serif JP', serif">七</text>
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 96 144" className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <pattern id={patternId} x="0" y="0" width="24" height="12" patternUnits="userSpaceOnUse">
+          <g fill="none" stroke="#3d4d7a" strokeWidth="1">
+            <circle cx="12" cy="12" r="11" />
+            <circle cx="12" cy="12" r="7.5" />
+            <circle cx="12" cy="12" r="4" />
+            <circle cx="0" cy="18" r="11" />
+            <circle cx="24" cy="18" r="11" />
+          </g>
+        </pattern>
+      </defs>
+      <rect width="96" height="144" fill="#1c2340" />
+      <rect width="96" height="144" fill={`url(#${patternId})`} opacity="0.55" />
+      <circle cx="48" cy="72" r="27" fill="#141a30" stroke="#d4af37" strokeWidth="1.5" opacity="0.95" />
+      <circle cx="48" cy="72" r="22.5" fill="none" stroke="#d4af37" strokeWidth="0.5" opacity="0.5" />
+      <text x="48" y="73" textAnchor="middle" dominantBaseline="central" fontSize="28" fill="#d4af37" fontFamily="'Noto Serif JP', serif" fontWeight="600">九</text>
+    </svg>
+  );
+}
+
 export function PlayingCard({ card, hidden, onClick, className, selected, animate = true }: PlayingCardProps) {
+  const theme = useSyncExternalStore(subscribeTableTheme, loadTableTheme, loadTableTheme);
   const isRed = card?.suit === "hearts" || card?.suit === "diamonds";
 
   const getIcon = (suit?: string) => {
@@ -54,8 +120,8 @@ export function PlayingCard({ card, hidden, onClick, className, selected, animat
     <motion.div
       whileHover={onClick ? { scale: 1.05, y: -5 } : {}}
       whileTap={onClick ? { scale: 0.95 } : {}}
-      initial={animate ? { scale: 0.8, opacity: 0 } : false}
-      animate={animate ? { scale: 1, opacity: 1 } : false}
+      initial={animate ? { scale: 0.8, opacity: 0 } : { scale: 1, opacity: 1 }}
+      animate={{ scale: 1, opacity: 1 }}
       onClick={onClick}
       className={cn(
         "relative w-24 h-36 rounded-xl border-2 cursor-pointer transition-all duration-300 select-none card-shadow overflow-hidden",
@@ -65,42 +131,7 @@ export function PlayingCard({ card, hidden, onClick, className, selected, animat
       )}
     >
       {/* Verso da carta: padrão seigaiha + selo dourado */}
-      {isBack && (
-        <svg
-          viewBox="0 0 96 144"
-          className="absolute inset-0 w-full h-full"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-        >
-          <defs>
-            <pattern id="seigaiha-back" x="0" y="0" width="24" height="12" patternUnits="userSpaceOnUse">
-              <g fill="none" stroke="#3d4d7a" strokeWidth="1">
-                <circle cx="12" cy="12" r="11" />
-                <circle cx="12" cy="12" r="7.5" />
-                <circle cx="12" cy="12" r="4" />
-                <circle cx="0" cy="18" r="11" />
-                <circle cx="24" cy="18" r="11" />
-              </g>
-            </pattern>
-          </defs>
-          <rect width="96" height="144" fill="#1c2340" />
-          <rect width="96" height="144" fill="url(#seigaiha-back)" opacity="0.55" />
-          <circle cx="48" cy="72" r="27" fill="#141a30" stroke="#d4af37" strokeWidth="1.5" opacity="0.95" />
-          <circle cx="48" cy="72" r="22.5" fill="none" stroke="#d4af37" strokeWidth="0.5" opacity="0.5" />
-          <text
-            x="48"
-            y="73"
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontSize="28"
-            fill="#d4af37"
-            fontFamily="'Noto Serif JP', serif"
-            fontWeight="600"
-          >
-            九
-          </text>
-        </svg>
-      )}
+      {isBack && <CardBack variant={theme.back} />}
 
       {/* Frente da carta */}
       {!isBack && card && (

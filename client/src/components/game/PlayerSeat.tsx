@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
@@ -7,6 +7,21 @@ import { cn } from "@/lib/utils";
 import { Eye } from "lucide-react";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import type { SeatSide } from "./seatPositions";
+
+/** initial sempre é um objeto: trocar para `false` muda a quantidade de hooks do Framer Motion. */
+function FlippableCard({ flip, children }: { flip: boolean; children: ReactNode }) {
+  const [spin] = useState(flip);
+  return (
+    <motion.div
+      initial={{ rotateY: spin ? 180 : 0 }}
+      animate={{ rotateY: 0 }}
+      transition={{ duration: spin ? 0.6 : 0, ease: "easeInOut" }}
+      style={{ transformStyle: "preserve-3d" }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 interface PlayerSeatProps {
   player: Player;
@@ -95,19 +110,14 @@ export function PlayerSeat({
             ref={(el) => registerCardPosition(positionKey, el, card)}
           >
             {shouldShowCard ? (
-              <motion.div
-                initial={wasJustRevealed ? { rotateY: 180 } : false}
-                animate={{ rotateY: 0 }}
-                transition={{ duration: 0.6, ease: "easeInOut" }}
-                style={{ transformStyle: "preserve-3d" }}
-              >
+              <FlippableCard flip={wasJustRevealed}>
                 <PlayingCard
                   card={displayCard}
                   hidden={false}
                   className={cn(cardSize, isTemporarilyRevealed && "ring-2 ring-yellow-400 ring-offset-1")}
                   animate={false}
                 />
-              </motion.div>
+              </FlippableCard>
             ) : (
               <PlayingCard card={card} hidden className={cardSize} animate={false} />
             )}
@@ -152,6 +162,7 @@ export function PlayerSeat({
       style={style}
       className={cn(
         "flex rounded-xl transition-all pointer-events-none",
+        !player.isConnected && !player.isBot && "opacity-50",
         layoutClass,
         isCompact ? "p-0" : "p-1",
         className

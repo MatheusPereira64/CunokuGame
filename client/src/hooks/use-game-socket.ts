@@ -12,30 +12,36 @@ export function useGameSocket(roomCode: string, playerId: string) {
   const { translateBotMessage } = useI18n();
   const [revealedCard, setRevealedCard] = useState<{ card: Card; playerName: string; targetPlayerId?: string; targetCardIndex?: number } | null>(null);
   const [swapInfo, setSwapInfo] = useState<{ player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number } | null>(null);
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+  const translateRef = useRef(translateBotMessage);
+  translateRef.current = translateBotMessage;
 
   useEffect(() => {
     if (!roomCode || !playerId) return;
 
-    // Busca o nome do jogador do sessionStorage
-    const playerName = sessionStorage.getItem(`playerName_${roomCode}`) || `Player ${playerId.substring(0, 4)}`;
+    let stopped = false;
+    let attempt = 0;
+    let retryTimer = 0;
+    let ws: WebSocket | null = null;
 
-    const url = wsUrl(roomCode);
-    
-    const ws = new WebSocket(url);
-    socketRef.current = ws;
+    const connect = () => {
+      if (stopped) return;
+      const playerName = sessionStorage.getItem(`playerName_${roomCode}`) || `Player ${playerId.substring(0, 4)}`;
+      ws = new WebSocket(wsUrl(roomCode));
+      socketRef.current = ws;
 
-    ws.onopen = () => {
-      setConnected(true);
-      console.log("Connected to game room:", roomCode);
-      
-      // Envia mensagem de join assim que conectar
-      ws.send(JSON.stringify({
-        type: "join",
-        code: roomCode,
-        playerId: playerId,
-        name: playerName
-      }));
-    };
+      ws.onopen = () => {
+        if (stopped) return;
+        attempt = 0;
+        setConnected(true);
+        ws?.send(JSON.stringify({
+          type: "join",
+          code: roomCode,
+          playerId,
+          name: playerName,
+        }));
+      };
 
     ws.onmessage = (event) => {
       try {
@@ -77,7 +83,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
             break;
           case "player_joined":
             console.log("Player joined notification:", (message as any).name);
-            toast({
+            toastRef.current({
               title: "Player Joined",
               description: `${(message as any).name} joined the room`,
             });
@@ -85,7 +91,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
             // Não precisamos fazer nada aqui, apenas aguardar o lobby_state
             break;
           case "error":
-            toast({
+            toastRef.current({
               variant: "destructive",
               title: "Error",
               description: message.message
@@ -96,7 +102,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
             break;
           case "cunoku_declared":
             // Notificação quando alguém declara Cunoku
-            toast({
+            toastRef.current({
               title: "🔥 CUNOKU Declarado!",
               description: `${message.playerName} declarou fim de jogo! Rodada final iniciada.`,
               duration: 5000,
@@ -104,7 +110,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
             break;
           case "bot_thinking":
             // Notificação quando um bot está pensando
-            toast({
+            toastRef.current({
               title: `${(message as any).botName} está pensando...`,
               description: "O bot está analisando sua jogada",
               duration: 3000,
@@ -113,8 +119,8 @@ export function useGameSocket(roomCode: string, playerId: string) {
           case "bot_action":
             // Notificação quando um bot executa uma ação
             const botMessage = (message as any).message;
-            const translatedMessage = translateBotMessage(botMessage);
-            toast({
+            const translatedMessage = translateRef.current(botMessage);
+            toastRef.current({
               title: `${(message as any).botName}`,
               description: translatedMessage,
               duration: 4000,
@@ -143,15 +149,23 @@ export function useGameSocket(roomCode: string, playerId: string) {
       }
     };
 
-    ws.onclose = () => {
-      setConnected(false);
-      console.log("Disconnected from game room");
+      ws.onclose = () => {
+        setConnected(false);
+        if (stopped) return;
+        const delay = Math.min(8000, 600 * 2 ** attempt);
+        attempt += 1;
+        retryTimer = window.setTimeout(connect, delay);
+      };
     };
 
+    connect();
+
     return () => {
-      ws.close();
+      stopped = true;
+      window.clearTimeout(retryTimer);
+      ws?.close();
     };
-  }, [roomCode, playerId, toast]);
+  }, [roomCode, playerId]);
 
   const sendAction = useCallback((action: GameAction) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
