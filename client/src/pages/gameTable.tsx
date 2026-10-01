@@ -495,19 +495,26 @@ function FeltTable({
 
 function RevealOverlay({
   revealed,
-  isMobile,
+  isCompact,
   isOffline,
   t,
   onClose,
 }: {
   revealed: NonNullable<RevealedCard>;
-  isMobile: boolean;
+  isCompact: boolean;
   isOffline: boolean;
   t: Translate;
   onClose: () => void;
 }) {
+  // Landscape phones often have width > 768 (isMobile=false) but short height —
+  // always size the overlay for the viewport when compact.
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-[max(0.5rem,env(safe-area-inset-top,0px))] pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]"
+    >
       <button type="button" className="absolute inset-0 cursor-pointer border-0 bg-black/80 p-0 backdrop-blur-sm" onClick={onClose}>
         <span className="sr-only">{t("game.cardRevealed")}</span>
       </button>
@@ -516,21 +523,34 @@ function RevealOverlay({
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.8, y: 20 }}
         className={cn(
-          "relative z-10 bg-gradient-to-br from-indigo-900 to-purple-900 rounded-3xl border-4 border-yellow-400 shadow-2xl p-8 flex flex-col items-center gap-6",
-          cx(isMobile, "mx-4 max-w-[90vw]", "max-w-md"),
+          "relative z-10 bg-gradient-to-br from-indigo-900 to-purple-900 border-yellow-400 shadow-2xl flex flex-col items-center overflow-y-auto overscroll-contain",
+          cx(
+            isCompact,
+            "mx-2 max-h-[min(92dvh,100%)] w-[min(92vw,22rem)] gap-2 rounded-2xl border-2 px-3 py-2.5",
+            "max-w-md gap-6 rounded-3xl border-4 p-8",
+          ),
         )}
       >
-        <div className="text-center">
-          <h3 className={cn("font-bold text-yellow-400 mb-2", cx(isMobile, "text-lg", "text-2xl"))}>{t("game.cardRevealed")}</h3>
-          <p className={cn("text-white/80", cx(isMobile, "text-sm", "text-base"))}>
+        <div className="text-center shrink-0">
+          <h3 className={cn("font-bold text-yellow-400", cx(isCompact, "text-base mb-0.5", "text-2xl mb-2"))}>
+            {t("game.cardRevealed")}
+          </h3>
+          <p className={cn("text-white/80", cx(isCompact, "text-xs", "text-base"))}>
             {t("game.playerHas").replace("{player}", revealed.playerName)}
           </p>
         </div>
-        <div className={cn("transform transition-transform", cx(isMobile, "scale-90", "scale-110"))}>
-          <PlayingCard card={revealed.card} hidden={false} animate={true} className={cx(isMobile, "w-32 h-48", "w-40 h-60")} />
+        <div className="shrink-0">
+          <PlayingCard
+            card={revealed.card}
+            hidden={false}
+            animate={true}
+            className={cx(isCompact, "w-20 h-[7.5rem]", "w-40 h-60")}
+          />
         </div>
-        <div className="text-center">
-          <p className={cn("text-white/60 font-mono", cx(isMobile, "text-xs", "text-sm"))}>{t("game.visibleFor20s")}</p>
+        <div className="text-center shrink-0">
+          <p className={cn("text-white/60 font-mono", cx(isCompact, "text-[10px] leading-tight", "text-sm"))}>
+            {t("game.visibleFor20s")}
+          </p>
         </div>
       </motion.div>
     </motion.div>
@@ -615,7 +635,7 @@ export function ActiveTable(props: {
       />
       <AnimatePresence>
         {props.revealedOpponentCard ? (
-          <RevealOverlay revealed={props.revealedOpponentCard} isMobile={props.isMobile} isOffline={props.isOffline} t={t} onClose={props.onCloseReveal} />
+          <RevealOverlay revealed={props.revealedOpponentCard} isCompact={props.isCompact} isOffline={props.isOffline} t={t} onClose={props.onCloseReveal} />
         ) : null}
       </AnimatePresence>
       {showTutorial(gameState) ? <GameTutorial /> : null}

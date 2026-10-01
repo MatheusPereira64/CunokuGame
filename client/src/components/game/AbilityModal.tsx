@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AbilityAction, getAbilityDescription } from "./helpers";
+import { AbilityAction, getAbilityDescription, abilityConfirmDisabled } from "./helpers";
 
 interface AbilityModalProps {
   open: boolean;
@@ -27,43 +27,39 @@ interface AbilityModalProps {
 function abilityClasses(isCompact: boolean) {
   return {
     labelClass: cn("font-bold text-gray-700", fit(isCompact, "text-xs", "text-sm")),
-    cardBtnClass: cn(fit(isCompact, "h-11 min-w-0 text-xs", "h-16")),
-    myCardBtnClass: cn(fit(isCompact, "h-11 w-11 text-xs shrink-0", "h-20 w-16")),
-    playerBtnClass: cn("h-auto", fit(isCompact, "py-1.5", "py-3")),
-    avatarClass: cn(fit(isCompact, "scale-50", "scale-75")),
-    playerNameClass: cn(fit(isCompact, "text-[10px] leading-tight text-center", "text-xs")),
+    cardBtnClass: cn(fit(isCompact, "h-9 min-w-0 text-xs", "h-16")),
+    myCardBtnClass: cn(fit(isCompact, "h-9 w-9 text-xs shrink-0", "h-20 w-16")),
+    playerBtnClass: cn(
+      "h-auto min-w-0 overflow-hidden",
+      fit(isCompact, "py-1 px-1.5", "py-3"),
+    ),
   };
 }
 
-function abilityConfirmDisabled(input: {
-  isPeekOpponent: boolean;
-  isPeekOwn: boolean;
-  isSwap: boolean;
-  swapMode: "me_and_other" | "two_others";
-  targetPlayer: string | null;
-  targetCard: number | null;
-  myCardIndex: number | null;
-  firstPlayerSelection: { playerId: string; cardIndex: number } | null;
-  targetPlayer2: string | null;
-  targetCard2: number | null;
+function PlayerPickButton({
+  player,
+  selected,
+  onSelect,
+  playerBtnClass,
+  isCompact,
+}: {
+  player: Player;
+  selected: boolean;
+  onSelect: () => void;
+  playerBtnClass: string;
+  isCompact: boolean;
 }) {
-  if (input.isPeekOpponent && opponentPeekMissing(input.targetPlayer, input.targetCard)) return true;
-  if (input.isPeekOwn && input.myCardIndex === null) return true;
-  if (input.isSwap && input.swapMode === "me_and_other" && meSwapMissing(input)) return true;
-  if (input.isSwap && input.swapMode === "two_others" && othersSwapMissing(input)) return true;
-  return false;
-}
-
-function opponentPeekMissing(targetPlayer: string | null, targetCard: number | null) {
-  return !targetPlayer || targetCard === null;
-}
-
-function meSwapMissing(input: { targetPlayer: string | null; myCardIndex: number | null; targetCard: number | null }) {
-  return !input.targetPlayer || input.myCardIndex === null || input.targetCard === null;
-}
-
-function othersSwapMissing(input: { firstPlayerSelection: unknown; targetPlayer2: string | null; targetCard2: number | null }) {
-  return !input.firstPlayerSelection || !input.targetPlayer2 || input.targetCard2 === null;
+  return (
+    <Button
+      variant={selected ? "primary" : "outline"}
+      onClick={onSelect}
+      className={playerBtnClass}
+    >
+      <div className={cn("flex flex-col items-center w-full min-w-0", fit(isCompact, "gap-0", "gap-1"))}>
+        <Avatar name={player.name} isBot={player.isBot} compact score={player.score} className="!gap-0.5" />
+      </div>
+    </Button>
+  );
 }
 
 export function AbilityModal({
@@ -78,7 +74,7 @@ export function AbilityModal({
   const isCompact = useIsCompactGame();
   const { t } = useI18n();
 
-  const { labelClass, cardBtnClass, myCardBtnClass, playerBtnClass, avatarClass, playerNameClass } = abilityClasses(isCompact);
+  const { labelClass, cardBtnClass, myCardBtnClass, playerBtnClass } = abilityClasses(isCompact);
 
   const [myCardIndex, setMyCardIndex] = useState<number | null>(null);
   const [targetPlayer, setTargetPlayer] = useState<string | null>(null);
@@ -89,13 +85,13 @@ export function AbilityModal({
   const [swapStep, setSwapStep] = useState<1 | 2>(1);
   const [firstPlayerSelection, setFirstPlayerSelection] = useState<{ playerId: string; cardIndex: number } | null>(null);
 
-  const resetSelections = () => {
+  const resetSelections = (nextMode: "me_and_other" | "two_others" = "me_and_other") => {
     setMyCardIndex(null);
     setTargetPlayer(null);
     setTargetCard(null);
     setTargetPlayer2(null);
     setTargetCard2(null);
-    setSwapMode("me_and_other");
+    setSwapMode(nextMode);
     setSwapStep(1);
     setFirstPlayerSelection(null);
   };
@@ -112,11 +108,14 @@ export function AbilityModal({
   const isPeekOwn = rank === "7" || rank === "8";
   const isSwap = rank === "9" || rank === "10";
 
+  const otherPlayers = players.filter((p) => p.id !== playerId);
+
   const confirmDisabled = abilityConfirmDisabled({
     isPeekOpponent,
     isPeekOwn,
     isSwap,
     swapMode,
+    swapStep,
     targetPlayer,
     targetCard,
     myCardIndex,
@@ -125,7 +124,22 @@ export function AbilityModal({
     targetCard2,
   });
 
+  const advanceTwoOthersStep = () => {
+    if (!targetPlayer || targetCard === null) return;
+    setFirstPlayerSelection({ playerId: targetPlayer, cardIndex: targetCard });
+    setSwapStep(2);
+    setTargetPlayer(null);
+    setTargetCard(null);
+    setTargetPlayer2(null);
+    setTargetCard2(null);
+  };
+
   const handleConfirm = () => {
+    if (isSwap && swapMode === "two_others" && swapStep === 1) {
+      advanceTwoOthersStep();
+      return;
+    }
+
     let action: AbilityAction | null = null;
 
     if (isPeekOwn && myCardIndex !== null) {
@@ -150,13 +164,23 @@ export function AbilityModal({
     onConfirm(action);
   };
 
+  const confirmLabel =
+    isSwap && swapMode === "two_others" && swapStep === 1
+      ? t("game.confirmFirstPlayer")
+      : t("game.confirm");
+
+  const playerGridClass = cn(
+    "grid gap-2",
+    fit(isCompact, "grid-cols-3", "grid-cols-2"),
+  );
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         className={cn(
           "bg-white sm:max-w-md",
           isCompact &&
-            "flex w-[min(96vw,28rem)] max-h-[min(94dvh,100%)] flex-col gap-2 overflow-hidden p-3 !top-[max(2dvh,env(safe-area-inset-top,0px))] !translate-y-0",
+            "flex w-[min(96vw,28rem)] max-h-[min(92dvh,100%)] flex-col gap-2 overflow-hidden p-3 !top-[max(2dvh,env(safe-area-inset-top,0px))] !translate-y-0",
         )}
       >
         <DialogHeader className={cn(isCompact && "shrink-0 space-y-1 pr-8")}>
@@ -179,25 +203,20 @@ export function AbilityModal({
             <>
               <div className="space-y-2">
                 <label className={labelClass}>{t("game.selectPlayer")}</label>
-                <div className={cn("grid gap-2", fit(isCompact, "grid-cols-2 sm:grid-cols-3", "grid-cols-2"))}>
-                  {players
-                    .filter((p) => p.id !== playerId)
-                    .map((p) => (
-                      <Button
-                        key={p.id}
-                        variant={targetPlayer === p.id ? "primary" : "outline"}
-                        onClick={() => {
-                          setTargetPlayer(p.id);
-                          setTargetCard(null);
-                        }}
-                        className={playerBtnClass}
-                      >
-                        <div className="flex flex-col items-center gap-0.5">
-                          <Avatar name={p.name} className={avatarClass} />
-                          <span className={playerNameClass}>{p.name}</span>
-                        </div>
-                      </Button>
-                    ))}
+                <div className={playerGridClass}>
+                  {otherPlayers.map((p) => (
+                    <PlayerPickButton
+                      key={p.id}
+                      player={p}
+                      selected={targetPlayer === p.id}
+                      onSelect={() => {
+                        setTargetPlayer(p.id);
+                        setTargetCard(null);
+                      }}
+                      playerBtnClass={playerBtnClass}
+                      isCompact={isCompact}
+                    />
+                  ))}
                 </div>
               </div>
 
@@ -248,20 +267,14 @@ export function AbilityModal({
                 <div className={cn("flex gap-2", fit(isCompact, "flex-col sm:flex-row", ""))}>
                   <Button
                     variant={swapMode === "me_and_other" ? "primary" : "outline"}
-                    onClick={() => {
-                      resetSelections();
-                      setSwapMode("me_and_other");
-                    }}
+                    onClick={() => resetSelections("me_and_other")}
                     className={cn("flex-1", isCompact && "text-xs py-2 h-auto min-h-9 whitespace-normal leading-tight")}
                   >
                     {isCompact ? t("game.swapMeAndOtherShort") : t("game.swapMeAndOther")}
                   </Button>
                   <Button
                     variant={swapMode === "two_others" ? "primary" : "outline"}
-                    onClick={() => {
-                      resetSelections();
-                      setSwapMode("two_others");
-                    }}
+                    onClick={() => resetSelections("two_others")}
                     className={cn("flex-1", isCompact && "text-xs py-2 h-auto min-h-9 whitespace-normal leading-tight")}
                   >
                     {isCompact ? t("game.swapTwoOthersShort") : t("game.swapTwoOthers")}
@@ -289,25 +302,20 @@ export function AbilityModal({
 
                   <div className="space-y-2">
                     <label className={labelClass}>{t("game.otherPlayer")}</label>
-                    <div className={cn("grid gap-2", fit(isCompact, "grid-cols-2 sm:grid-cols-3", "grid-cols-2"))}>
-                      {players
-                        .filter((p) => p.id !== playerId)
-                        .map((p) => (
-                          <Button
-                            key={p.id}
-                            variant={targetPlayer === p.id ? "primary" : "outline"}
-                            onClick={() => {
-                              setTargetPlayer(p.id);
-                              setTargetCard(null);
-                            }}
-                            className={playerBtnClass}
-                          >
-                            <div className="flex flex-col items-center gap-0.5">
-                              <Avatar name={p.name} className={avatarClass} />
-                              <span className={playerNameClass}>{p.name}</span>
-                            </div>
-                          </Button>
-                        ))}
+                    <div className={playerGridClass}>
+                      {otherPlayers.map((p) => (
+                        <PlayerPickButton
+                          key={p.id}
+                          player={p}
+                          selected={targetPlayer === p.id}
+                          onSelect={() => {
+                            setTargetPlayer(p.id);
+                            setTargetCard(null);
+                          }}
+                          playerBtnClass={playerBtnClass}
+                          isCompact={isCompact}
+                        />
+                      ))}
                     </div>
                   </div>
 
@@ -337,28 +345,19 @@ export function AbilityModal({
                     <>
                       <div className="space-y-2">
                         <label className={labelClass}>{t("game.firstPlayer")}</label>
-                        <div
-                          className={cn(
-                            "grid gap-2",
-                            fit(isCompact, "grid-cols-2 sm:grid-cols-3 max-h-32", "grid-cols-2 max-h-48"),
-                            "overflow-y-auto overscroll-contain",
-                          )}
-                        >
-                          {players.map((p) => (
-                            <Button
+                        <div className={playerGridClass}>
+                          {otherPlayers.map((p) => (
+                            <PlayerPickButton
                               key={p.id}
-                              variant={targetPlayer === p.id ? "primary" : "outline"}
-                              onClick={() => {
+                              player={p}
+                              selected={targetPlayer === p.id}
+                              onSelect={() => {
                                 setTargetPlayer(p.id);
                                 setTargetCard(null);
                               }}
-                              className={playerBtnClass}
-                            >
-                              <div className="flex flex-col items-center gap-0.5">
-                                <Avatar name={p.name} className={avatarClass} />
-                                <span className={playerNameClass}>{p.name}</span>
-                              </div>
-                            </Button>
+                              playerBtnClass={playerBtnClass}
+                              isCompact={isCompact}
+                            />
                           ))}
                         </div>
                       </div>
@@ -380,28 +379,11 @@ export function AbilityModal({
                           </div>
                         </div>
                       )}
-
-                      {targetPlayer && targetCard !== null && (
-                        <Button
-                          variant="primary"
-                          onClick={() => {
-                            setFirstPlayerSelection({ playerId: targetPlayer, cardIndex: targetCard });
-                            setSwapStep(2);
-                            setTargetPlayer(null);
-                            setTargetCard(null);
-                            setTargetPlayer2(null);
-                            setTargetCard2(null);
-                          }}
-                          className="w-full"
-                        >
-                          {t("game.confirmFirstPlayer")}
-                        </Button>
-                      )}
                     </>
                   ) : (
                     <>
                       {firstPlayerSelection && (
-                        <div className="bg-gray-100 p-2 rounded mb-2">
+                        <div className="bg-gray-100 p-2 rounded mb-1">
                           <div className="text-xs text-gray-600">
                             {t("game.firstPlayerSelected")
                               .replace("{name}", players.find((p) => p.id === firstPlayerSelection.playerId)?.name || "")
@@ -412,30 +394,21 @@ export function AbilityModal({
 
                       <div className="space-y-2">
                         <label className={labelClass}>{t("game.secondPlayer")}</label>
-                        <div
-                          className={cn(
-                            "grid gap-2",
-                            fit(isCompact, "grid-cols-2 sm:grid-cols-3 max-h-32", "grid-cols-2 max-h-48"),
-                            "overflow-y-auto overscroll-contain",
-                          )}
-                        >
-                          {players
+                        <div className={playerGridClass}>
+                          {otherPlayers
                             .filter((p) => p.id !== firstPlayerSelection?.playerId)
                             .map((p) => (
-                              <Button
+                              <PlayerPickButton
                                 key={p.id}
-                                variant={targetPlayer2 === p.id ? "primary" : "outline"}
-                                onClick={() => {
+                                player={p}
+                                selected={targetPlayer2 === p.id}
+                                onSelect={() => {
                                   setTargetPlayer2(p.id);
                                   setTargetCard2(null);
                                 }}
-                                className={playerBtnClass}
-                              >
-                                <div className="flex flex-col items-center gap-0.5">
-                                  <Avatar name={p.name} className={avatarClass} />
-                                  <span className={playerNameClass}>{p.name}</span>
-                                </div>
-                              </Button>
+                                playerBtnClass={playerBtnClass}
+                                isCompact={isCompact}
+                              />
                             ))}
                         </div>
                       </div>
@@ -458,20 +431,20 @@ export function AbilityModal({
                         </div>
                       )}
 
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setSwapStep(1);
-                            setFirstPlayerSelection(null);
-                            setTargetPlayer2(null);
-                            setTargetCard2(null);
-                          }}
-                          className="flex-1"
-                        >
-                          {t("game.back")}
-                        </Button>
-                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSwapStep(1);
+                          setFirstPlayerSelection(null);
+                          setTargetPlayer(null);
+                          setTargetCard(null);
+                          setTargetPlayer2(null);
+                          setTargetCard2(null);
+                        }}
+                        className={cn("w-full", isCompact && "text-xs py-2 h-9")}
+                      >
+                        {t("game.back")}
+                      </Button>
                     </>
                   )}
                 </>
@@ -497,10 +470,10 @@ export function AbilityModal({
           <Button
             variant="primary"
             onClick={handleConfirm}
-            className={cn("flex-1", isCompact && "text-xs py-2 h-9")}
+            className={cn("flex-1", isCompact && "text-xs py-2 h-9 whitespace-normal leading-tight")}
             disabled={confirmDisabled}
           >
-            {t("game.confirm")}
+            {confirmLabel}
           </Button>
         </div>
       </DialogContent>
