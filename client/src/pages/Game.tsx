@@ -5,6 +5,7 @@ import { useOfflineGame } from "@/hooks/use-offline-game";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Button } from "@/components/Button";
 import { GameState, Card } from "@shared/schema";
+import { START_COUNTDOWN_MS } from "@shared/matchQueue";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   useGameAnimations,
@@ -59,6 +60,8 @@ export default function Game() {
   const fromQueue = searchParams.get("queue") === "1";
   const tableTheme = useSyncExternalStore(subscribeTableTheme, loadTableTheme, loadTableTheme);
   const queueStartedRef = useRef(false);
+  const queueStartAtRef = useRef<number | null>(null);
+  const [queueCountdown, setQueueCountdown] = useState<number | null>(null);
 
   // Modo offline: carrega estado do sessionStorage
   const [offlineGameState, setOfflineGameState] = useState<GameState | null>(null);
@@ -161,13 +164,32 @@ export default function Game() {
   }, [gameState?.reconnectDeadline]);
 
   useEffect(() => {
-    if (!fromQueue || isOffline || queueStartedRef.current) return;
-    if (!gameState || gameState.turnPhase !== "waiting" || gameState.players.length < 2) return;
-    const hostId = sessionStorage.getItem(`hostId_${roomCode}`);
-    if (hostId !== playerId) return;
-    if (socketRef.current?.readyState !== WebSocket.OPEN) return;
-    queueStartedRef.current = true;
-    socketRef.current.send(JSON.stringify({ type: "start_game" }));
+    if (!fromQueue || isOffline) return;
+    if (!gameState || gameState.turnPhase !== "waiting" || gameState.players.length < 2) {
+      if (gameState?.turnPhase === "waiting") {
+        queueStartAtRef.current = null;
+        setQueueCountdown(null);
+      }
+      return;
+    }
+    if (queueStartAtRef.current == null) {
+      queueStartAtRef.current = Date.now() + START_COUNTDOWN_MS;
+    }
+    const tick = () => {
+      const startAt = queueStartAtRef.current;
+      if (startAt == null) return;
+      const left = Math.max(0, Math.ceil((startAt - Date.now()) / 1000));
+      setQueueCountdown(left);
+      if (left > 0 || queueStartedRef.current) return;
+      const hostId = sessionStorage.getItem(`hostId_${roomCode}`);
+      if (hostId !== playerId) return;
+      if (socketRef.current?.readyState !== WebSocket.OPEN) return;
+      queueStartedRef.current = true;
+      socketRef.current.send(JSON.stringify({ type: "start_game" }));
+    };
+    tick();
+    const id = window.setInterval(tick, 200);
+    return () => window.clearInterval(id);
   }, [fromQueue, isOffline, gameState, roomCode, playerId, socketRef]);
   const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
 
@@ -765,6 +787,7 @@ export default function Game() {
         onCopyLanUrl={handleCopyLanUrl}
         networkMode={getNetworkMode()}
         lanJoinUrl={getLanJoinUrl()}
+        startCountdown={fromQueue ? queueCountdown : null}
         onStart={() => {
           if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ type: "start_game" }));

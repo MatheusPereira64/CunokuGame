@@ -66,11 +66,10 @@ function copyState(state: QueueState): QueueState {
 }
 
 function openLobby(players: QueueTicket[], now: number): Lobby {
-  const full = players.length >= QUICK_MATCH_MAX;
   return {
     players,
     fillUntil: now + FILL_WINDOW_MS,
-    countdownEndsAt: full ? now + START_COUNTDOWN_MS : null,
+    countdownEndsAt: null,
   };
 }
 
@@ -84,9 +83,6 @@ export function enqueueTicket(state: QueueState, ticket: QueueTicket, now: numbe
   const next = copyState(state);
   if (next.lobby && next.lobby.countdownEndsAt == null && next.lobby.players.length < QUICK_MATCH_MAX) {
     next.lobby.players.push(ticket);
-    if (next.lobby.players.length >= QUICK_MATCH_MAX) {
-      next.lobby.countdownEndsAt = now + START_COUNTDOWN_MS;
-    }
     return next;
   }
   next.waiting.push(ticket);
@@ -132,11 +128,10 @@ export function advanceQueue(state: QueueState, now: number): { state: QueueStat
   }
   if (!next.lobby) return { state: next, ready: null };
 
-  if (next.lobby.countdownEndsAt == null && (next.lobby.players.length >= QUICK_MATCH_MAX || now >= next.lobby.fillUntil)) {
-    next.lobby.countdownEndsAt = now + START_COUNTDOWN_MS;
-  }
-
-  if (next.lobby.countdownEndsAt != null && now >= next.lobby.countdownEndsAt) {
+  const fillDone = now >= next.lobby.fillUntil;
+  const full = next.lobby.players.length >= QUICK_MATCH_MAX;
+  const countdownDone = next.lobby.countdownEndsAt != null && now >= next.lobby.countdownEndsAt;
+  if (fillDone || full || countdownDone) {
     const ready = next.lobby.players;
     next.lobby = null;
     const formed = pullLobby(next.waiting, now);

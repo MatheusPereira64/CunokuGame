@@ -20,6 +20,8 @@ interface WaitingRoomProps {
   onStart: () => void;
   networkMode?: "lan" | "server";
   lanJoinUrl?: string | null;
+  /** Segundos até a partida rápida começar. null fora desse countdown. */
+  startCountdown?: number | null;
 }
 
 export function WaitingRoom({
@@ -33,6 +35,7 @@ export function WaitingRoom({
   onStart,
   networkMode = "server",
   lanJoinUrl,
+  startCountdown = null,
 }: WaitingRoomProps) {
   const { t } = useI18n();
   const canStart = players.length >= 2;
@@ -182,7 +185,20 @@ export function WaitingRoom({
             </div>
           </div>
 
-          {canStart && isHost && (
+          {canStart && startCountdown != null && (
+            <div
+              className={cn(
+                "w-full rounded-xl border-2 border-indigo-300 bg-indigo-50 text-center",
+                isLandscape ? "mt-1 p-3" : "mt-6 p-6"
+              )}
+            >
+              <div className={cn("font-display font-bold text-indigo-900", isLandscape ? "text-2xl" : "text-4xl")}>
+                {t("queue.countdown", { seconds: String(Math.max(startCountdown, 1)) })}
+              </div>
+            </div>
+          )}
+
+          {canStart && isHost && startCountdown == null && (
             <Button
               variant="primary"
               size="lg"
@@ -196,7 +212,7 @@ export function WaitingRoom({
             </Button>
           )}
 
-          {canStart && !isHost && (
+          {canStart && !isHost && startCountdown == null && (
             <div
               className={cn(
                 "w-full bg-indigo-50 rounded-xl border border-indigo-200 text-center",

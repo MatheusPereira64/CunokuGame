@@ -95,6 +95,7 @@ export async function registerRoutes(
     try {
       const { playerName } = api.matchmaking.enqueue.input.parse(req.body);
       const result = await getMatchmaker().enqueue(playerName);
+      res.set("Cache-Control", "no-store");
       res.json(result);
     } catch {
       res.status(400).json({ message: "Invalid input" });
@@ -104,6 +105,7 @@ export async function registerRoutes(
   app.get("/api/matchmaking/:ticketId", async (req, res) => {
     const result = await getMatchmaker().status(req.params.ticketId);
     if (!result) return res.status(404).json({ message: "Ticket not found" });
+    res.set("Cache-Control", "no-store");
     res.json(result);
   });
 

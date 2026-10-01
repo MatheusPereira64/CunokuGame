@@ -44,12 +44,25 @@ export function HomeFeatures({ name, menuBtnClass, menuIconClass, onNeedName }: 
   const [queueOpen, setQueueOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [queueView, setQueueView] = useState<QueueResponse | null>(null);
+  const [clock, setClock] = useState(() => Date.now());
+  const [fillDeadline, setFillDeadline] = useState<number | null>(null);
   const cancelRef = useRef(false);
   const ticketRef = useRef("");
 
   useEffect(() => {
     setSession(loadActiveSession());
   }, []);
+
+  useEffect(() => {
+    if (!searching) return;
+    const id = window.setInterval(() => setClock(Date.now()), 250);
+    return () => window.clearInterval(id);
+  }, [searching]);
+
+  useEffect(() => {
+    if (queueView?.status !== "filling" || queueView.secondsLeft == null) return;
+    setFillDeadline(Date.now() + queueView.secondsLeft * 1000);
+  }, [queueView?.status, queueView?.secondsLeft]);
 
   const useCloud = () => {
     if (isNativeApp()) setServerBase(DEFAULT_CLOUD_SERVER);
@@ -91,6 +104,7 @@ export function HomeFeatures({ name, menuBtnClass, menuIconClass, onNeedName }: 
     try {
       const first = await fetch(apiUrl(api.matchmaking.enqueue.path), {
         method: "POST",
+        cache: "no-store",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playerName }),
       });
@@ -102,8 +116,9 @@ export function HomeFeatures({ name, menuBtnClass, menuIconClass, onNeedName }: 
         if (cancelRef.current) return;
         await new Promise((r) => setTimeout(r, 1000));
         if (cancelRef.current) return;
-        const poll = await fetch(apiUrl(`/api/matchmaking/${ticketRef.current}`));
-        if (!poll.ok) throw new Error("queue");
+        const poll = await fetch(apiUrl(`/api/matchmaking/${ticketRef.current}`), { cache: "no-store" });
+        if (poll.status === 404) throw new Error("queue");
+        if (!poll.ok) continue;
         data = api.matchmaking.enqueue.responses[200].parse(await poll.json()) as QueueResponse;
         setQueueView(data);
       }
@@ -175,7 +190,13 @@ export function HomeFeatures({ name, menuBtnClass, menuIconClass, onNeedName }: 
               ) : queueView?.status === "filling" ? (
                 <>
                   <div className="font-display text-xl text-indigo-900">
-                    {t("queue.filling", { seconds: String(queueView.secondsLeft ?? 60) })}
+                    {t("queue.filling", {
+                      seconds: String(
+                        fillDeadline != null
+                          ? Math.max(0, Math.ceil((fillDeadline - clock) / 1000))
+                          : (queueView.secondsLeft ?? 60)
+                      ),
+                    })}
                   </div>
                   <p className="text-sm text-gray-500">
                     {t("queue.players", { count: String(queueView.players ?? 2) })}

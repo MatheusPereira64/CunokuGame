@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   FILL_WINDOW_MS,
-  START_COUNTDOWN_MS,
   advanceQueue,
   emptyQueue,
   enqueueTicket,
@@ -22,7 +21,7 @@ describe("fila rápida", () => {
     expect(advanceQueue(state, 0).ready).toBeNull();
   });
 
-  it("o segundo jogador abre 1 minuto de busca e só depois conta 10s", () => {
+  it("o segundo jogador abre 1 minuto de busca e só depois a sala fica pronta", () => {
     let state = enqueueTicket(emptyQueue(), ticket("a"), 0);
     state = enqueueTicket(state, ticket("b"), 1_000);
     expect(viewTicket(state, "a", 1_000)?.status).toBe("filling");
@@ -33,12 +32,7 @@ describe("fila rápida", () => {
     expect(viewTicket(mid.state, "b", 1_000 + 30_000)?.status).toBe("filling");
 
     const afterMinute = advanceQueue(state, 1_000 + FILL_WINDOW_MS);
-    expect(afterMinute.ready).toBeNull();
-    expect(viewTicket(afterMinute.state, "a", 1_000 + FILL_WINDOW_MS)?.status).toBe("countdown");
-    expect(viewTicket(afterMinute.state, "a", 1_000 + FILL_WINDOW_MS)?.secondsLeft).toBe(10);
-
-    const done = advanceQueue(afterMinute.state, 1_000 + FILL_WINDOW_MS + START_COUNTDOWN_MS);
-    expect(done.ready?.map((t) => t.ticketId)).toEqual(["a", "b"]);
+    expect(afterMinute.ready?.map((t) => t.ticketId)).toEqual(["a", "b"]);
   });
 
   it("aceita mais jogadores durante a busca e enche a mesa na hora", () => {
@@ -49,8 +43,8 @@ describe("fila rápida", () => {
     expect(state.lobby?.countdownEndsAt).toBeNull();
 
     state = enqueueTicket(state, ticket("d"), 6_000);
-    expect(viewTicket(state, "d", 6_000)?.status).toBe("countdown");
-    expect(viewTicket(state, "d", 6_000)?.players).toBe(4);
+    const full = advanceQueue(state, 6_000);
+    expect(full.ready?.map((t) => t.ticketId)).toEqual(["a", "b", "c", "d"]);
   });
 });
 
