@@ -1,5 +1,5 @@
 /** Versão embutida do app — mantenha alinhada com package.json / tags de Release. */
-export const APP_VERSION = "1.0.13";
+export const APP_VERSION = "1.0.14";
 
 export const GITHUB_OWNER = "MatheusPereira64";
 export const GITHUB_REPO = "CunokuGame";
@@ -18,8 +18,8 @@ export function normalizeVersion(tag: string): string {
  * Retorna >0 se a > b, <0 se a < b, 0 se iguais.
  */
 export function compareSemver(a: string, b: string): number {
-  const pa = normalizeVersion(a).split(".").map((n) => parseInt(n, 10) || 0);
-  const pb = normalizeVersion(b).split(".").map((n) => parseInt(n, 10) || 0);
+  const pa = normalizeVersion(a).split(".").map((n) => Number.parseInt(n, 10) || 0);
+  const pb = normalizeVersion(b).split(".").map((n) => Number.parseInt(n, 10) || 0);
   const len = Math.max(pa.length, pb.length, 3);
   for (let i = 0; i < len; i++) {
     const x = pa[i] ?? 0;

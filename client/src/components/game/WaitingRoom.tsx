@@ -20,6 +20,8 @@ interface WaitingRoomProps {
   onStart: () => void;
   networkMode?: "lan" | "server";
   lanJoinUrl?: string | null;
+  /** Mesa montada pela fila rápida: sem código nem convite. */
+  quickMatch?: boolean;
   /** Segundos até a partida rápida começar. null fora desse countdown. */
   startCountdown?: number | null;
 }
@@ -35,6 +37,7 @@ export function WaitingRoom({
   onStart,
   networkMode = "server",
   lanJoinUrl,
+  quickMatch = false,
   startCountdown = null,
 }: WaitingRoomProps) {
   const { t } = useI18n();
@@ -80,16 +83,19 @@ export function WaitingRoom({
                 isLandscape ? "text-xl" : "text-3xl"
               )}
             >
-              {t("waiting.title")}
+              {quickMatch ? t("queue.matched") : t("waiting.title")}
             </h2>
             <p className={cn("text-gray-500", isLandscape ? "mt-1 text-xs" : "mt-2")}>
-              {isLan ? t("waiting.shareLan") : t("waiting.shareCode")}
+              {quickMatch ? t("queue.matchedDesc") : isLan ? t("waiting.shareLan") : t("waiting.shareCode")}
             </p>
           </div>
 
-          <div
+          {!quickMatch && (
+          <>
+          <button
+            type="button"
             className={cn(
-              "flex items-center gap-2 bg-gray-100 rounded-xl cursor-pointer hover:bg-gray-200 transition-colors",
+              "flex w-full items-center gap-2 bg-gray-100 rounded-xl cursor-pointer hover:bg-gray-200 transition-colors border-0 text-left",
               isLandscape ? "p-2 mb-2" : "p-4 mb-4"
             )}
             onClick={onCopyCode}
@@ -103,7 +109,7 @@ export function WaitingRoom({
               {roomCode}
             </div>
             <Copy className="w-5 h-5 text-gray-500" />
-          </div>
+          </button>
 
           {onShareInvite && (
             <Button variant="outline" className={cn("w-full", isLandscape ? "mb-0 h-9 text-sm" : "mb-4")} onClick={onShareInvite}>
@@ -133,6 +139,8 @@ export function WaitingRoom({
                 <p className="text-xs text-indigo-600 mt-2">{t("waiting.lanHint")}</p>
               )}
             </div>
+          )}
+          </>
           )}
         </div>
 

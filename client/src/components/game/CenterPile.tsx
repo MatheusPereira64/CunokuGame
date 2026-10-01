@@ -33,17 +33,23 @@ export function CenterPile({
   const { t } = useI18n();
 
   const cardClass = isCompact ? "w-12 h-[4.25rem]" : "w-20 h-28 md:w-24 md:h-36";
+  const canDraw = isMyTurn && phase === "draw";
 
   return (
     <div className={cn("flex items-center", isCompact ? "gap-2.5" : "gap-10")}>
       {/* Baralho */}
       <div className="relative group" ref={deckRef}>
         {gameState.deck.length > 0 ? (
-          <div
-            onClick={() => isMyTurn && phase === "draw" && onDrawDeck()}
-            className={isMyTurn && phase === "draw" ? "cursor-pointer" : ""}
+          <button
+            type="button"
+            disabled={!canDraw}
+            onClick={onDrawDeck}
+            className={cn(
+              "relative block border-0 bg-transparent p-0 text-left disabled:opacity-100",
+              canDraw ? "cursor-pointer" : "cursor-default"
+            )}
           >
-            {isMyTurn && phase === "draw" && !isCompact && (
+            {canDraw && !isCompact && (
               <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-center whitespace-nowrap z-10">
                 <div className="text-[10px] md:text-xs text-yellow-400 font-bold animate-pulse">
                   {t("game.clickToDraw")}
@@ -55,7 +61,7 @@ export function CenterPile({
               className={cn(
                 "transition-all",
                 cardClass,
-                isMyTurn && phase === "draw"
+                canDraw
                   ? "cursor-pointer hover:ring-4 ring-white/50 hover:scale-105"
                   : "opacity-80"
               )}
@@ -65,13 +71,13 @@ export function CenterPile({
                 className={cn(
                   "font-bold transition-all drop-shadow-md",
                   isCompact ? "text-[8px]" : "text-sm",
-                  isMyTurn && phase === "draw" ? "text-white" : "text-white/80"
+                  canDraw ? "text-white" : "text-white/80"
                 )}
               >
                 {t("game.deck")}
               </span>
             </div>
-          </div>
+          </button>
         ) : (
           <div
             className={cn(

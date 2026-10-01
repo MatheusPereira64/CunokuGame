@@ -155,9 +155,10 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                 )}
               </AnimatePresence>
 
-              <div
+              <button
+                type="button"
                 onClick={() => handleCardClick(i)}
-                className="w-full relative"
+                className="relative block w-full border-0 bg-transparent p-0 text-left"
                 ref={(el) => registerCardPosition(`${me.id}_${i}`, el, card)}
               >
                 <PlayingCard
@@ -178,7 +179,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                     canQuickDiscard ? "cursor-pointer hover:ring-4 ring-blue-400" : ""
                   )}
                 />
-              </div>
+              </button>
 
               {isKnownCard && !showDiscardButtons && !isCompact && (
                 <div className="text-center mt-0.5 font-bold text-yellow-400 uppercase tracking-wider text-[10px]">

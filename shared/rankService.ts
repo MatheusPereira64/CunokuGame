@@ -1,5 +1,5 @@
 import { asc, eq, sql } from "drizzle-orm";
-import { rankPlayers, type RankPlayer } from "./schema";
+import { rankPlayers, rankSessions, type RankPlayer } from "./schema";
 import {
   effectiveRank,
   normalizeNickname,
@@ -117,10 +117,10 @@ export async function registerRankPlayer(
       bestScore: null,
       progress: {},
       achievements: [],
-      authTokenHash: tokenHash,
       updatedAt: new Date(),
     })
     .returning();
+  await db.insert(rankSessions).values({ tokenHash, playerId: id });
 
   return { token, profile: toPublic(row, null, { includeProgress: true }) };
 }
@@ -141,21 +141,23 @@ export async function loginRankPlayer(
 
   const token = randomHex(32);
   const tokenHash = await hashToken(token);
-  const [updated] = await db
-    .update(rankPlayers)
-    .set({ authTokenHash: tokenHash, updatedAt: new Date() })
-    .where(eq(rankPlayers.id, row.id))
-    .returning();
+  await db.insert(rankSessions).values({ tokenHash, playerId: row.id });
 
-  const position = await findPosition(db, updated.id);
-  return { token, profile: toPublic(updated, position, { includeProgress: true }) };
+  const position = await findPosition(db, row.id);
+  return { token, profile: toPublic(row, position, { includeProgress: true }) };
 }
 
 export async function getPlayerByToken(db: any, token: string): Promise<RankPlayer | null> {
   if (!token) return null;
   const tokenHash = await hashToken(token);
-  const [row] = await db.select().from(rankPlayers).where(eq(rankPlayers.authTokenHash, tokenHash)).limit(1);
-  return row ?? null;
+  const [session] = await db.select().from(rankSessions).where(eq(rankSessions.tokenHash, tokenHash)).limit(1);
+  if (session) {
+    const [row] = await db.select().from(rankPlayers).where(eq(rankPlayers.id, session.playerId)).limit(1);
+    return row ?? null;
+  }
+  // Tokens emitidos antes de rank_sessions
+  const [legacy] = await db.select().from(rankPlayers).where(eq(rankPlayers.authTokenHash, tokenHash)).limit(1);
+  return legacy ?? null;
 }
 
 export async function getMe(

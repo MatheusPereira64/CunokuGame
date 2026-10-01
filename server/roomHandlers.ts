@@ -4,6 +4,7 @@ import { GameLogic } from "./game";
 import { BotPlayer, createBots, type BotDifficulty } from "./bot";
 import { autoPlayDisconnectedTurn, syncReconnectWindow } from "./disconnectTurn";
 import type { IStorage } from "./storage";
+import { QUICK_MATCH_MODE } from "@shared/matchQueue";
 
 export type RoomMessenger = {
   /** Envia JSON a um jogador conectado. */
@@ -170,7 +171,10 @@ export async function handleStartGame(
     return;
   }
 
-  if (room.hostId !== playerId) {
+  if (room.gameState) return;
+
+  const quickMatch = room.gameMode === QUICK_MATCH_MODE;
+  if (room.hostId !== playerId && !quickMatch) {
     messenger.send(playerId, { type: "error", message: "Only the host can start the game" });
     return;
   }

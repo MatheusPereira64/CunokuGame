@@ -3,6 +3,7 @@ import { Button } from "@/components/Button";
 import { Download } from "lucide-react";
 import { useI18n } from "@/contexts/i18n-context";
 import { cn } from "@/lib/utils";
+import { isNativeApp } from "@/lib/gameServer";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -22,7 +23,7 @@ export function InstallAppButton({ className, compact }: { className?: string; c
     const standalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
-    if (standalone) {
+    if (standalone || isNativeApp()) {
       setInstalled(true);
       return;
     }
@@ -79,14 +80,15 @@ export function InstallAppButton({ className, compact }: { className?: string; c
       variant="outline"
       size={compact ? "sm" : "md"}
       className={cn(
-        "border-indigo-300 text-indigo-900 bg-white/90 hover:bg-white shadow-md",
-        compact ? "h-8 text-xs px-2" : "",
+        "shrink-0 whitespace-nowrap border-indigo-300 text-indigo-900 bg-white/90 hover:bg-white shadow-md",
+        compact ? "h-8 text-xs px-2" : "h-10 px-3 text-sm max-[440px]:w-10 max-[440px]:px-0",
         className
       )}
       onClick={handleInstall}
+      aria-label={t("install.addToHome")}
     >
-      <Download className={cn(compact ? "w-3.5 h-3.5 mr-1" : "w-4 h-4 mr-2")} />
-      {t("install.addToHome")}
+      <Download className={cn(compact ? "w-3.5 h-3.5 mr-1" : "w-4 h-4 mr-2 max-[440px]:mr-0")} />
+      <span className={cn(!compact && "max-[440px]:hidden")}>{t("install.addToHome")}</span>
     </Button>
   );
 }

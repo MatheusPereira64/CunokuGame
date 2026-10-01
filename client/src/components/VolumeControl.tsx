@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/Button";
@@ -24,6 +24,9 @@ export function VolumeControl() {
   const isPortrait = useIsPortrait();
   const isCompactGame = useIsCompactGame();
   const isLandscapeMenu = isCompactGame && !isPortrait;
+  const muteId = useId();
+  const musicVolumeId = useId();
+  const sfxVolumeId = useId();
 
   // Atualiza estados quando o diálogo abre
   useEffect(() => {
@@ -79,9 +82,10 @@ export function VolumeControl() {
         </DialogHeader>
         <div className={cn(isLandscapeMenu ? "space-y-3 py-1" : "space-y-6 py-4")}>
           {/* Controle de Mute */}
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">Som</label>
+          <label htmlFor={muteId} className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium">Som</span>
             <Button
+              id={muteId}
               variant="outline"
               size="sm"
               onClick={handleMuteToggle}
@@ -99,17 +103,19 @@ export function VolumeControl() {
                 </>
               )}
             </Button>
-          </div>
+          </label>
 
           {/* Volume da Música */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Volume da Música</label>
+              <label id={`${musicVolumeId}-label`} htmlFor={musicVolumeId} className="text-sm font-medium">Volume da Música</label>
               <span className="text-sm text-muted-foreground">
                 {Math.round(musicVolume * 100)}%
               </span>
             </div>
             <Slider
+              id={musicVolumeId}
+              aria-labelledby={`${musicVolumeId}-label`}
               value={[musicVolume]}
               onValueChange={handleMusicVolumeChange}
               max={1}
@@ -123,12 +129,14 @@ export function VolumeControl() {
           {/* Volume dos Efeitos Sonoros */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Volume dos Efeitos</label>
+              <label id={`${sfxVolumeId}-label`} htmlFor={sfxVolumeId} className="text-sm font-medium">Volume dos Efeitos</label>
               <span className="text-sm text-muted-foreground">
                 {Math.round(sfxVolume * 100)}%
               </span>
             </div>
             <Slider
+              id={sfxVolumeId}
+              aria-labelledby={`${sfxVolumeId}-label`}
               value={[sfxVolume]}
               onValueChange={handleSfxVolumeChange}
               max={1}

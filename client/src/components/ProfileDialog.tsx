@@ -110,7 +110,15 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
     setPin("");
     if (isRankLoggedIn()) {
       void fetchRankMe()
-        .then((rp) => applyRankProfile(rp))
+        .then((rp) => {
+          applyRankProfile(rp);
+          if (!rp) return;
+          const synced = loadProfile();
+          setProfile(synced);
+          setName(synced.displayName);
+          setIconId(synced.iconId);
+          setAccent(synced.accent);
+        })
         .catch(() => applyRankProfile(null));
     } else {
       applyRankProfile(null);
@@ -171,6 +179,12 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
             })
           : await loginRankAccount({ nickname, pin });
       applyRankProfile(rp);
+      const synced = loadProfile();
+      setProfile(synced);
+      setName(synced.displayName);
+      setIconId(synced.iconId);
+      setAccent(synced.accent);
+      onSaved?.(synced);
       setPin("");
       setAccountTab("look");
     } catch (err: any) {

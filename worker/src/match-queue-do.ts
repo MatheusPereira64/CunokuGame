@@ -8,6 +8,7 @@ import {
   leaveTicket,
   pruneMatches,
   viewTicket,
+  QUICK_MATCH_MODE,
   type QueueState,
   type QueueTicket,
 } from "../../shared/matchQueue";
@@ -47,7 +48,7 @@ export class MatchQueueDurableObject extends DurableObject<Env> {
       code,
       hostId,
       status: "waiting",
-      gameMode: "multiplayer",
+      gameMode: QUICK_MATCH_MODE,
       botDifficulty: "medium",
       maxPlayers: Math.max(group.length, 2),
       botCount: 0,

@@ -44,6 +44,8 @@ import {
 } from "@/lib/playerProfile";
 import { isRankLoggedIn, reportRankMatchResult, countsForGlobalRank } from "@/lib/rankAuth";
 
+const QUEUE_START_RETRY_MS = 2000;
+
 export default function Game() {
   const [, params] = useRoute("/game/:code");
   const [, setLocation] = useLocation();
@@ -59,7 +61,7 @@ export default function Game() {
   const isOffline = searchParams.get("mode") === "offline" || roomCode === "offline";
   const fromQueue = searchParams.get("queue") === "1";
   const tableTheme = useSyncExternalStore(subscribeTableTheme, loadTableTheme, loadTableTheme);
-  const queueStartedRef = useRef(false);
+  const queueLastStartRef = useRef(0);
   const queueStartAtRef = useRef<number | null>(null);
   const [queueCountdown, setQueueCountdown] = useState<number | null>(null);
 
@@ -180,17 +182,16 @@ export default function Game() {
       if (startAt == null) return;
       const left = Math.max(0, Math.ceil((startAt - Date.now()) / 1000));
       setQueueCountdown(left);
-      if (left > 0 || queueStartedRef.current) return;
-      const hostId = sessionStorage.getItem(`hostId_${roomCode}`);
-      if (hostId !== playerId) return;
+      if (left > 0) return;
+      if (Date.now() - queueLastStartRef.current < QUEUE_START_RETRY_MS) return;
       if (socketRef.current?.readyState !== WebSocket.OPEN) return;
-      queueStartedRef.current = true;
+      queueLastStartRef.current = Date.now();
       socketRef.current.send(JSON.stringify({ type: "start_game" }));
     };
     tick();
     const id = window.setInterval(tick, 200);
     return () => window.clearInterval(id);
-  }, [fromQueue, isOffline, gameState, roomCode, playerId, socketRef]);
+  }, [fromQueue, isOffline, gameState, socketRef]);
   const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
 
   const {
@@ -517,10 +518,20 @@ export default function Game() {
       return;
     }
     let unlock: (() => void) | undefined;
-    lockLandscape().then((fn) => {
-      unlock = fn;
-    });
+    let cancelled = false;
+    void lockLandscape()
+      .then((fn) => {
+        if (cancelled) {
+          fn();
+          return;
+        }
+        unlock = fn;
+      })
+      .catch(() => {
+        // Screen Orientation API indisponível neste dispositivo
+      });
     return () => {
+      cancelled = true;
       unlock?.();
       void unlockOrientation();
     };
@@ -787,6 +798,7 @@ export default function Game() {
         onCopyLanUrl={handleCopyLanUrl}
         networkMode={getNetworkMode()}
         lanJoinUrl={getLanJoinUrl()}
+        quickMatch={fromQueue}
         startCountdown={fromQueue ? queueCountdown : null}
         onStart={() => {
           if (socketRef.current?.readyState === WebSocket.OPEN) {
@@ -871,7 +883,8 @@ export default function Game() {
           )}
         </div>
 
-        <div
+        <button
+          type="button"
           className={cn(
             "bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center pointer-events-auto cursor-pointer",
             isCompact ? "px-2.5 py-1" : "px-6 py-2"
@@ -889,7 +902,7 @@ export default function Game() {
           >
             {roomCode} <Copy className={cn(isCompact ? "w-2.5 h-2.5" : "w-3 h-3")} />
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Banner "Sua vez" ou janela de reconexão */}
@@ -1135,26 +1148,31 @@ export default function Game() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            onClick={() => {
-              if (revealedOpponentCard?.timer) {
-                clearTimeout(revealedOpponentCard.timer);
-              }
-              setRevealedOpponentCard(null);
-              if (!isOffline) {
-                setOnlineRevealedCard(null);
-              }
-            }}
+            className="fixed inset-0 z-[100] flex items-center justify-center"
           >
+            <button
+              type="button"
+              className="absolute inset-0 cursor-pointer border-0 bg-black/80 p-0 backdrop-blur-sm"
+              onClick={() => {
+                if (revealedOpponentCard?.timer) {
+                  clearTimeout(revealedOpponentCard.timer);
+                }
+                setRevealedOpponentCard(null);
+                if (!isOffline) {
+                  setOnlineRevealedCard(null);
+                }
+              }}
+            >
+              <span className="sr-only">{t("game.cardRevealed")}</span>
+            </button>
             <motion.div
               initial={{ scale: 0.8, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.8, y: 20 }}
               className={cn(
-                "bg-gradient-to-br from-indigo-900 to-purple-900 rounded-3xl border-4 border-yellow-400 shadow-2xl p-8 flex flex-col items-center gap-6",
+                "relative z-10 bg-gradient-to-br from-indigo-900 to-purple-900 rounded-3xl border-4 border-yellow-400 shadow-2xl p-8 flex flex-col items-center gap-6",
                 isMobile ? "mx-4 max-w-[90vw]" : "max-w-md"
               )}
-              onClick={(e) => e.stopPropagation()}
             >
               <div className="text-center">
                 <h3 className={cn("font-bold text-yellow-400 mb-2", isMobile ? "text-lg" : "text-2xl")}>

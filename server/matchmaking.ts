@@ -7,6 +7,7 @@ import {
   leaveTicket,
   pruneMatches,
   viewTicket,
+  QUICK_MATCH_MODE,
   type QueueState,
   type TicketView,
 } from "@shared/matchQueue";
@@ -60,7 +61,7 @@ class Matchmaker {
       code,
       hostId,
       status: "waiting",
-      gameMode: "multiplayer",
+      gameMode: QUICK_MATCH_MODE,
       botDifficulty: "medium",
       maxPlayers: Math.max(stepped.ready.length, 2),
       botCount: 0,

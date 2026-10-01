@@ -56,10 +56,10 @@ export function RulesDialog({ compact = false }: { compact?: boolean }) {
           size="lg"
           className={cn(
             "w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold border-yellow-600",
-            compact ? "text-sm py-3 h-auto min-h-0" : "text-xl py-8"
+            compact ? "text-sm py-3 h-auto min-h-0" : "text-lg py-6 h-auto sm:text-xl sm:py-8"
           )}
         >
-          <BookOpen className={cn(compact ? "mr-2 w-4 h-4" : "mr-3 w-6 h-6")} /> {t("menu.rules")}
+          <BookOpen className={cn(compact ? "mr-2 w-4 h-4" : "mr-3 w-5 h-5 sm:w-6 sm:h-6")} /> {t("menu.rules")}
         </Button>
       </DialogTrigger>
       <DialogContent

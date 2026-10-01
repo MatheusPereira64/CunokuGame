@@ -92,6 +92,13 @@ export const rankPlayers = pgTable("rank_players", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+/** Um login por aparelho: entrar em outro dispositivo não derruba os demais. */
+export const rankSessions = pgTable("rank_sessions", {
+  tokenHash: text("token_hash").primaryKey(),
+  playerId: text("player_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export type RankPlayer = typeof rankPlayers.$inferSelect;
 export type InsertRankPlayer = typeof rankPlayers.$inferInsert;
 

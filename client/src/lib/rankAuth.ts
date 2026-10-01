@@ -1,4 +1,5 @@
 import { apiUrl } from "./gameServer";
+import { saveProfile, type ProfileAccent, type ProfileIconId } from "./playerProfile";
 import type { PublicRankProfile, LeaderboardEntry, RankTier } from "@shared/rank";
 
 const TOKEN_KEY = "cunoku_rank_token";
@@ -29,6 +30,16 @@ export function isRankLoggedIn(): boolean {
 function saveSession(token: string, playerId: string) {
   localStorage.setItem(TOKEN_KEY, token);
   localStorage.setItem(PLAYER_KEY, playerId);
+}
+
+/** A conta do ranking é a fonte do nome/ícone: o aparelho guarda uma cópia. */
+function rememberRankProfile(profile: PublicRankProfile): PublicRankProfile {
+  saveProfile({
+    displayName: profile.displayName || profile.nickname,
+    iconId: profile.iconId as ProfileIconId,
+    accent: profile.accent as ProfileAccent,
+  });
+  return profile;
 }
 
 export function logoutRank(): void {
@@ -83,7 +94,7 @@ export async function registerRankAccount(input: {
   if (!res.ok) throw new Error(await parseError(res));
   const data = await parseJson<{ token: string; profile: PublicRankProfile }>(res);
   saveSession(data.token, data.profile.playerId);
-  return data.profile;
+  return rememberRankProfile(data.profile);
 }
 
 export async function loginRankAccount(input: {
@@ -98,7 +109,7 @@ export async function loginRankAccount(input: {
   if (!res.ok) throw new Error(await parseError(res));
   const data = await parseJson<{ token: string; profile: PublicRankProfile }>(res);
   saveSession(data.token, data.profile.playerId);
-  return data.profile;
+  return rememberRankProfile(data.profile);
 }
 
 export async function fetchRankMe(): Promise<PublicRankProfile | null> {
@@ -113,7 +124,7 @@ export async function fetchRankMe(): Promise<PublicRankProfile | null> {
   }
   if (!res.ok) throw new Error(await parseError(res));
   const data = await parseJson<{ profile: PublicRankProfile }>(res);
-  return data.profile;
+  return rememberRankProfile(data.profile);
 }
 
 export async function syncRankProfile(patch: {

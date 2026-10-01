@@ -6,7 +6,9 @@ import {
   createFilteringMessenger,
   handleJoinMessage,
   handlePlayerDisconnect,
+  handleStartGame,
 } from "./roomHandlers";
+import { QUICK_MATCH_MODE } from "@shared/matchQueue";
 
 function playingRoom(): Room {
   const state: GameState = {
@@ -111,6 +113,38 @@ describe("reentrada na partida", () => {
     expect(store.room.gameState?.players[0]?.isConnected).toBe(false);
     expect(store.room.gameState?.reconnectPlayerId).toBe("p1");
     expect(store.room.gameState?.reconnectDeadline).toBeGreaterThan(Date.now());
+  });
+
+  it("na fila rápida qualquer jogador inicia, e só uma vez", async () => {
+    const store = memoryStorage({ ...playingRoom(), gameMode: QUICK_MATCH_MODE, status: "waiting", gameState: null });
+    const session = createEmptySession();
+    session.playerNames.set("p1", "Ana");
+    session.playerNames.set("p2", "Bia");
+    const sent: { to: string; msg: { type?: string } }[] = [];
+    const messenger = createFilteringMessenger(
+      (id) => ({ open: true, send: (data) => sent.push({ to: id, msg: JSON.parse(data) }) }),
+      () => ["p1", "p2"],
+    );
+
+    await handleStartGame(store, session, messenger, "ABCD", "p2", () => undefined);
+    const started = store.room.gameState;
+    expect(started?.players.map((p) => p.id)).toEqual(["p1", "p2"]);
+    expect(sent.some((s) => s.msg.type === "error")).toBe(false);
+
+    await handleStartGame(store, session, messenger, "ABCD", "p1", () => undefined);
+    expect(store.room.gameState).toBe(started);
+  });
+
+  it("fora da fila rápida só o host inicia", async () => {
+    const store = memoryStorage({ ...playingRoom(), status: "waiting", gameState: null });
+    const sent: { type?: string; message?: string }[] = [];
+    const messenger = createFilteringMessenger(
+      () => ({ open: true, send: (data) => sent.push(JSON.parse(data)) }),
+      () => ["p1", "p2"],
+    );
+    await handleStartGame(store, createEmptySession(), messenger, "ABCD", "p2", () => undefined);
+    expect(store.room.gameState).toBeNull();
+    expect(sent).toContainEqual({ type: "error", message: "Only the host can start the game" });
   });
 
   it("recusa quem não estava na partida", async () => {

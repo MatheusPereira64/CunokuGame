@@ -18,6 +18,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(AppUpdaterPlugin.class);
         super.onCreate(savedInstanceState);
         enableImmersiveMode();
         scheduleAllowMediaAutoplay();

@@ -22,6 +22,7 @@ import { useI18n, type Language } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait, unlockOrientation } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
 import { loadProfile } from "@/lib/playerProfile";
+import { fetchRankMe, isRankLoggedIn } from "@/lib/rankAuth";
 import { APP_VERSION } from "@/lib/appVersion";
 import {
   clearServerBase,
@@ -74,9 +75,9 @@ export default function Home() {
   const isLandscapeMenu = isCompactGame && !isPortrait;
   const menuBtnClass = cn(
     "w-full",
-    isLandscapeMenu ? "text-sm py-3 h-auto min-h-0" : "text-xl py-8"
+    isLandscapeMenu ? "text-sm py-3 h-auto min-h-0" : "text-lg py-6 h-auto sm:text-xl sm:py-8"
   );
-  const menuIconClass = cn(isLandscapeMenu ? "mr-2 w-4 h-4" : "mr-3 w-6 h-6");
+  const menuIconClass = cn(isLandscapeMenu ? "mr-2 w-4 h-4" : "mr-3 w-5 h-5 sm:w-6 sm:h-6");
   /** Dialog encaixa em tela baixa (celular deitado) sem cortar o botão de ação */
   const dialogContentClass = cn(
     "sm:max-w-md",
@@ -115,6 +116,19 @@ export default function Home() {
   const [hostAddress, setHostAddress] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [showNameHint, setShowNameHint] = useState(false);
+
+  useEffect(() => {
+    if (!isRankLoggedIn()) return;
+    let cancelled = false;
+    void fetchRankMe()
+      .then((rp) => {
+        if (!cancelled && rp) setName(loadProfile().displayName);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const createRoom = useCreateRoom();
   const joinRoom = useJoinRoom();
@@ -261,11 +275,15 @@ export default function Home() {
     <div
       className={cn(
         "flex items-center justify-center relative overflow-hidden",
-        isLandscapeMenu ? "h-[100dvh] min-h-0 p-2 pt-10 pb-2" : "min-h-screen p-4"
+        isLandscapeMenu ? "h-[100dvh] min-h-0 p-2 pt-10 pb-2" : "min-h-[100dvh] px-4 pt-20 pb-8"
       )}
     >
-      {/* Language Selector - Top Left */}
-      <div className={cn("absolute z-20", isLandscapeMenu ? "top-2 left-2" : "top-4 left-4")}>
+      <div
+        className={cn(
+          "absolute inset-x-0 top-0 z-20 flex items-center justify-between",
+          isLandscapeMenu ? "gap-1.5 p-2" : "gap-2 p-3 sm:p-4"
+        )}
+      >
         <Select
           value={language}
           onValueChange={(value: Language) => {
@@ -277,12 +295,18 @@ export default function Home() {
         >
           <SelectTrigger
             className={cn(
-              "bg-white/90 text-indigo-900 border-indigo-200 hover:bg-white shadow-md",
-              isLandscapeMenu ? "w-[118px] h-8 text-xs" : "w-[140px]"
+              "shrink-0 bg-white/90 text-indigo-900 border-indigo-200 hover:bg-white shadow-md",
+              isLandscapeMenu ? "w-[118px] h-8 text-xs" : "h-10 w-[140px] max-[440px]:w-auto max-[440px]:gap-1 max-[440px]:px-2.5"
             )}
+            aria-label={t(`lang.${language}`)}
           >
-            <Languages className={cn("mr-2", isLandscapeMenu ? "h-3.5 w-3.5" : "h-4 w-4")} />
-            <SelectValue />
+            <Languages className={cn("mr-2 max-[440px]:mr-0", isLandscapeMenu ? "h-3.5 w-3.5" : "h-4 w-4")} />
+            <span className={cn(!isLandscapeMenu && "max-[440px]:!hidden")}>
+              <SelectValue />
+            </span>
+            {!isLandscapeMenu && (
+              <span className="!hidden max-[440px]:!inline font-semibold uppercase">{language}</span>
+            )}
           </SelectTrigger>
           <SelectContent position="popper" className="z-[100] bg-white" sideOffset={5}>
             <SelectItem value="pt">{t("lang.pt")}</SelectItem>
@@ -290,15 +314,11 @@ export default function Home() {
             <SelectItem value="en">{t("lang.en")}</SelectItem>
           </SelectContent>
         </Select>
-      </div>
 
-      {/* Volume + ranking + perfil + instalar app - Top Right */}
       <div
         className={cn(
-          "absolute z-20 flex items-center justify-end",
-          isLandscapeMenu
-            ? "top-2 right-2 left-36 gap-1.5"
-            : "top-4 right-4 left-[9.75rem] gap-2 max-[400px]:gap-1.5"
+          "flex min-w-0 items-center justify-end",
+          isLandscapeMenu ? "gap-1.5" : "gap-2 max-[440px]:gap-1.5"
         )}
       >
         <InstallAppButton compact={isLandscapeMenu} />
@@ -334,6 +354,7 @@ export default function Home() {
           <TableThemeButton />
         </div>
       </div>
+      </div>
 
       {/* Decorative Background Elements */}
       {!isLandscapeMenu && (
@@ -355,7 +376,7 @@ export default function Home() {
             : "max-w-md"
         )}
       >
-        <div className={cn("text-center", isLandscapeMenu ? "mb-0 shrink-0 text-left w-[38%] max-w-[14rem]" : "mb-12")}>
+        <div className={cn("text-center", isLandscapeMenu ? "mb-0 shrink-0 text-left w-[38%] max-w-[14rem]" : "mb-8 sm:mb-12")}>
           <motion.div
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
@@ -383,7 +404,7 @@ export default function Home() {
           </p>
         </div>
 
-        <div className={cn("flex-1 min-w-0", isLandscapeMenu ? "grid grid-cols-2 gap-2" : "grid gap-6")}>
+        <div className={cn("flex-1 min-w-0", isLandscapeMenu ? "grid grid-cols-2 gap-2" : "grid gap-4 sm:gap-6")}>
           <Dialog
             open={createDialogOpen}
             onOpenChange={(open) => {
@@ -817,7 +838,7 @@ export default function Home() {
         </div>
 
         {!isLandscapeMenu && (
-          <div className="mt-12 text-center text-sm text-gray-500">
+          <div className="mt-8 sm:mt-12 text-center text-sm text-gray-500">
             <p>{t("menu.copyright")}</p>
           </div>
         )}

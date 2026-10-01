@@ -5,6 +5,8 @@ export const QUICK_MATCH_MAX = 4;
 export const FILL_WINDOW_MS = 60_000;
 export const START_COUNTDOWN_MS = 10_000;
 export const MATCH_TTL_MS = 30 * 60 * 1000;
+/** `rooms.game_mode` das salas abertas pela fila: qualquer jogador da mesa pode iniciar. */
+export const QUICK_MATCH_MODE = "quick";
 
 export type QueueTicket = {
   ticketId: string;
