@@ -28,10 +28,22 @@ export type ProfileIconId =
 
 export type ProfileAccent = "indigo" | "red" | "amber" | "emerald" | "slate";
 
+/** Quantos dias de histórico ficam guardados no aparelho. */
+const HISTORY_RETENTION_DAYS = 60;
+export const CHART_DAYS = 30;
+
 export interface PlayerStats {
   gamesPlayed: number;
   wins: number;
   bestScore: number | null;
+  /** Partidas por dia local do aparelho (YYYY-MM-DD). */
+  history: Record<string, { games: number; wins: number }>;
+}
+
+export interface DailyStat {
+  day: string;
+  games: number;
+  wins: number;
 }
 
 export interface PlayerProfile {
@@ -78,9 +90,33 @@ export function defaultProfile(): PlayerProfile {
       gamesPlayed: 0,
       wins: 0,
       bestScore: null,
+      history: {},
     },
     updatedAt: new Date(0).toISOString(),
   };
+}
+
+export function localDayKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function normalizeHistory(raw: unknown): PlayerStats["history"] {
+  if (!raw || typeof raw !== "object") return {};
+  const history: PlayerStats["history"] = {};
+  for (const [day, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !value || typeof value !== "object") continue;
+    const games = Number((value as Record<string, unknown>).games);
+    const wins = Number((value as Record<string, unknown>).wins);
+    if (!Number.isFinite(games) || games <= 0) continue;
+    const safeGames = Math.floor(games);
+    history[day] = {
+      games: safeGames,
+      wins: Number.isFinite(wins) ? Math.min(safeGames, Math.max(0, Math.floor(wins))) : 0,
+    };
+  }
+  return history;
 }
 
 function isIconId(v: unknown): v is ProfileIconId {
@@ -115,6 +151,7 @@ export function normalizeProfile(raw: unknown): PlayerProfile {
       gamesPlayed: Number.isFinite(gamesPlayed) && gamesPlayed >= 0 ? Math.floor(gamesPlayed) : 0,
       wins: Number.isFinite(wins) && wins >= 0 ? Math.floor(wins) : 0,
       bestScore,
+      history: normalizeHistory(statsRaw.history),
     },
     updatedAt: typeof o.updatedAt === "string" ? o.updatedAt : base.updatedAt,
   };
@@ -146,6 +183,7 @@ export function saveProfile(partial: Partial<Omit<PlayerProfile, "stats">> & { s
         partial.stats && "bestScore" in partial.stats
           ? (partial.stats.bestScore as number | null)
           : current.stats.bestScore,
+      history: partial.stats?.history ?? current.stats.history,
     },
     updatedAt: new Date().toISOString(),
   };
@@ -164,7 +202,7 @@ export interface MatchResultInput {
 }
 
 /** Atualiza estatísticas após uma partida. bestScore = menor valor (Cunoku). */
-export function recordMatchResult(input: MatchResultInput): PlayerProfile {
+export function recordMatchResult(input: MatchResultInput, now = new Date()): PlayerProfile {
   const current = loadProfile();
   const finalScore = Number(input.finalScore);
   const score = Number.isFinite(finalScore) ? finalScore : 0;
@@ -172,11 +210,23 @@ export function recordMatchResult(input: MatchResultInput): PlayerProfile {
   const nextBest =
     current.stats.bestScore === null ? score : Math.min(current.stats.bestScore, score);
 
+  const today = localDayKey(now);
+  const oldest = localDayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - HISTORY_RETENTION_DAYS));
+  const history = Object.fromEntries(
+    Object.entries(current.stats.history).filter(([day]) => day >= oldest),
+  );
+  const todayStats = history[today] ?? { games: 0, wins: 0 };
+  history[today] = {
+    games: todayStats.games + 1,
+    wins: todayStats.wins + (input.won ? 1 : 0),
+  };
+
   return saveProfile({
     stats: {
       gamesPlayed: current.stats.gamesPlayed + 1,
       wins: current.stats.wins + (input.won ? 1 : 0),
       bestScore: nextBest,
+      history,
     },
   });
 }
@@ -192,6 +242,14 @@ export function getProfileAccent(accent: ProfileAccent) {
 export function winRate(stats: PlayerStats): number {
   if (stats.gamesPlayed <= 0) return 0;
   return Math.round((stats.wins / stats.gamesPlayed) * 100);
+}
+
+/** Série dos últimos dias, do mais antigo para hoje, com zero nos dias sem partida. */
+export function recentDailyStats(stats: PlayerStats, days = CHART_DAYS, now = new Date()): DailyStat[] {
+  return Array.from({ length: days }, (_, i) => {
+    const day = localDayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1 - i)));
+    return { day, games: stats.history[day]?.games ?? 0, wins: stats.history[day]?.wins ?? 0 };
+  });
 }
 
 /** Guard de sessão para não contar a mesma partida duas vezes. */

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { type GameState, type WsMessage, type GameAction, type Card } from "@shared/schema";
+import { type GameState, type WsMessage, type GameAction, type Card, type MatchReward } from "@shared/schema";
+import type { EmoteId } from "@shared/emotes";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/contexts/i18n-context";
 import { wsUrl } from "@/lib/gameServer";
+import { getPlayerKey } from "@/lib/playerKey";
 
 export function useGameSocket(roomCode: string, playerId: string) {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -12,6 +14,9 @@ export function useGameSocket(roomCode: string, playerId: string) {
   const { translateBotMessage } = useI18n();
   const [revealedCard, setRevealedCard] = useState<{ card: Card; playerName: string; targetPlayerId?: string; targetCardIndex?: number } | null>(null);
   const [swapInfo, setSwapInfo] = useState<{ player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number } | null>(null);
+
+  const [incomingEmote, setIncomingEmote] = useState<{ playerId: string; emoteId: string; at: number } | null>(null);
+  const [matchReward, setMatchReward] = useState<MatchReward | null>(null);
 
   useEffect(() => {
     if (!roomCode || !playerId) return;
@@ -33,7 +38,8 @@ export function useGameSocket(roomCode: string, playerId: string) {
         type: "join",
         code: roomCode,
         playerId: playerId,
-        name: playerName
+        name: playerName,
+        playerKey: getPlayerKey()
       }));
     };
 
@@ -131,6 +137,12 @@ export function useGameSocket(roomCode: string, playerId: string) {
               });
             }
             break;
+          case "emote":
+            setIncomingEmote({ playerId: message.playerId, emoteId: message.emoteId, at: Date.now() });
+            break;
+          case "match_reward":
+            setMatchReward({ points: message.points, daily: message.daily });
+            break;
           case "card_swap":
             // Informação de troca de cartas - para animação
             if ((message as any).swapInfo) {
@@ -168,5 +180,11 @@ export function useGameSocket(roomCode: string, playerId: string) {
     }
   }, [toast]);
 
-  return { gameState, connected, sendAction, socketRef, revealedCard, setRevealedCard, swapInfo, setSwapInfo };
+  const sendEmote = useCallback((emoteId: EmoteId) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: "emote", emoteId }));
+    }
+  }, []);
+
+  return { gameState, connected, sendAction, socketRef, revealedCard, setRevealedCard, swapInfo, setSwapInfo, sendEmote, incomingEmote, matchReward };
 }

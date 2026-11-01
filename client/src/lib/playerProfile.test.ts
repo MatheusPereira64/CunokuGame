@@ -6,6 +6,7 @@ import {
   markMatchStatsRecorded,
   normalizeProfile,
   PROFILE_STORAGE_KEY,
+  recentDailyStats,
   recordMatchResult,
   saveProfile,
   winRate,
@@ -89,5 +90,38 @@ describe("playerProfile", () => {
     expect(hasRecordedMatchStats("abc")).toBe(false);
     markMatchStatsRecorded("abc");
     expect(hasRecordedMatchStats("abc")).toBe(true);
+  });
+});
+
+describe("histórico de 30 dias", () => {
+  beforeEach(() => {
+    vi.stubGlobal("localStorage", mockStorage());
+  });
+
+  it("agrupa partidas por dia e preenche dias vazios", () => {
+    const now = new Date(2026, 10, 15, 12);
+    recordMatchResult({ won: true, finalScore: 3 }, now);
+    recordMatchResult({ won: false, finalScore: 9 }, now);
+    recordMatchResult({ won: true, finalScore: 1 }, new Date(2026, 10, 14, 23));
+
+    const series = recentDailyStats(loadProfile().stats, 30, now);
+    expect(series).toHaveLength(30);
+    expect(series[29]).toEqual({ day: "2026-11-15", games: 2, wins: 1 });
+    expect(series[28]).toEqual({ day: "2026-11-14", games: 1, wins: 1 });
+    expect(series[0]).toEqual({ day: "2026-10-17", games: 0, wins: 0 });
+  });
+
+  it("descarta dias além da retenção", () => {
+    recordMatchResult({ won: true, finalScore: 3 }, new Date(2026, 0, 1, 12));
+    recordMatchResult({ won: true, finalScore: 3 }, new Date(2026, 10, 15, 12));
+    expect(Object.keys(loadProfile().stats.history)).toEqual(["2026-11-15"]);
+    expect(loadProfile().stats.gamesPlayed).toBe(2);
+  });
+
+  it("ignora histórico corrompido e nunca conta mais vitórias que partidas", () => {
+    const { history } = normalizeProfile({
+      stats: { history: { lixo: { games: 1 }, "2026-11-01": { games: 2, wins: 9 }, "2026-11-02": { games: -1 } } },
+    }).stats;
+    expect(history).toEqual({ "2026-11-01": { games: 2, wins: 2 } });
   });
 });

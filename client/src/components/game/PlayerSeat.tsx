@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Eye } from "lucide-react";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import type { SeatSide } from "./seatPositions";
+import { EmoteBubble } from "./EmotePicker";
 
 interface PlayerSeatProps {
   player: Player;
@@ -22,6 +23,8 @@ interface PlayerSeatProps {
   side?: SeatSide;
   /** Força modo compacto (cartas/avatar menores) */
   compact?: boolean;
+  /** Emote ativo deste jogador */
+  emoteId?: string;
   style?: React.CSSProperties;
   className?: string;
 }
@@ -35,6 +38,7 @@ export function PlayerSeat({
   opponentCount = 1,
   side = "top",
   compact: compactProp,
+  emoteId,
   style,
   className,
 }: PlayerSeatProps) {
@@ -125,14 +129,17 @@ export function PlayerSeat({
   );
 
   const avatar = (
-    <Avatar
-      name={player.name}
-      isBot={player.isBot}
-      score={player.score}
-      isActive={isActive}
-      compact={compact || isCompact}
-      className={isCompact ? "scale-[0.85] origin-center" : undefined}
-    />
+    <div className="relative">
+      <Avatar
+        name={player.name}
+        isBot={player.isBot}
+        score={player.score}
+        isActive={isActive}
+        compact={compact || isCompact}
+        className={isCompact ? "scale-[0.85] origin-center" : undefined}
+      />
+      <EmoteBubble emoteId={emoteId} className="left-1/2 top-0 -translate-x-1/2" />
+    </div>
   );
 
   // Avatar fica no lado de fora da mesa; leque aponta para o feltro

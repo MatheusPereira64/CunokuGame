@@ -24,6 +24,7 @@ import { CenterPile } from "@/components/game/CenterPile";
 import { MyArea } from "@/components/game/MyArea";
 import { WaitingRoom } from "@/components/game/WaitingRoom";
 import { GameOverModal } from "@/components/game/GameOverModal";
+import { EmoteBubble, EmotePicker } from "@/components/game/EmotePicker";
 import { AbilityModal } from "@/components/game/AbilityModal";
 import { AbilityAction, hasSpecialAbility, getAbilityDescription } from "@/components/game/helpers";
 import { getSeatPositions } from "@/components/game/seatPositions";
@@ -31,6 +32,7 @@ import { LandscapePrompt } from "@/components/game/LandscapePrompt";
 import { useIsPortrait, lockLandscape, useIsCompactGame } from "@/hooks/use-landscape";
 import { getLanJoinUrl, getNetworkMode } from "@/lib/gameServer";
 import { copyToClipboard } from "@/lib/clipboard";
+import type { EmoteId } from "@shared/emotes";
 import {
   hasRecordedMatchStats,
   markMatchStatsRecorded,
@@ -111,6 +113,9 @@ export default function Game() {
     setRevealedCard: setOnlineRevealedCard,
     swapInfo: onlineSwapInfo,
     setSwapInfo: setOnlineSwapInfo,
+    sendEmote: sendOnlineEmote,
+    incomingEmote,
+    matchReward,
   } = useGameSocket(isOffline ? "" : roomCode, isOffline ? "" : playerId);
 
   // Posições das cartas na tela (para animações)
@@ -133,6 +138,39 @@ export default function Game() {
     playerName: string;
     actionType: OpponentActionType;
   } | null>(null);
+
+  // Emote visível por jogador; some sozinho depois de alguns segundos
+  const [activeEmotes, setActiveEmotes] = useState<Record<string, string>>({});
+  const emoteTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const showEmote = useCallback((emotePlayerId: string, emoteId: string) => {
+    const timers = emoteTimersRef.current;
+    const previous = timers.get(emotePlayerId);
+    if (previous) clearTimeout(previous);
+    setActiveEmotes((current) => ({ ...current, [emotePlayerId]: emoteId }));
+    timers.set(
+      emotePlayerId,
+      setTimeout(() => {
+        setActiveEmotes(({ [emotePlayerId]: _removed, ...rest }) => rest);
+        timers.delete(emotePlayerId);
+      }, 2500),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (incomingEmote) showEmote(incomingEmote.playerId, incomingEmote.emoteId);
+  }, [incomingEmote, showEmote]);
+
+  useEffect(() => {
+    const timers = emoteTimersRef.current;
+    return () => timers.forEach((timer) => clearTimeout(timer));
+  }, []);
+
+  const handleSendEmote = (emoteId: EmoteId) => {
+    // Online o emote volta pelo servidor; contra bots só existe nesta tela
+    if (isOffline) showEmote(playerId, emoteId);
+    else sendOnlineEmote(emoteId);
+  };
 
   const gameState = isOffline ? offlineGameStateFromHook : onlineGameState;
   const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
@@ -490,7 +528,8 @@ export default function Game() {
         audioManager.playGameLost();
       }
 
-      const matchId = roomCode || playerId;
+      // Toda partida offline usa a rota /game/offline: o id único dela é o playerId
+      const matchId = isOffline ? playerId : roomCode;
       if (!hasRecordedMatchStats(matchId)) {
         recordMatchResult({
           won: gameState.winnerId === playerId,
@@ -499,7 +538,7 @@ export default function Game() {
         markMatchStatsRecorded(matchId);
       }
     }
-  }, [gameState?.winnerId, playerId, me, roomCode]);
+  }, [gameState?.winnerId, playerId, me, roomCode, isOffline]);
 
   // Early returns APÓS todos os hooks
   if (!playerId || (!isOffline && !roomCode)) {
@@ -714,27 +753,39 @@ export default function Game() {
           >
             <VolumeControl />
           </div>
+          {!gameState.winnerId && <EmotePicker compact={isCompact} onSelect={handleSendEmote} />}
         </div>
 
-        <div
-          className={cn(
-            "bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center pointer-events-auto cursor-pointer",
-            isCompact ? "px-2.5 py-1" : "px-6 py-2"
-          )}
-          onClick={handleCopyCode}
-        >
-          <div className={cn("text-white/60 font-mono", isCompact ? "text-[8px] leading-tight" : "text-xs")}>
-            {t("game.roomCode")}
-          </div>
+        {gameState.dailyDay ? (
           <div
             className={cn(
-              "font-bold tracking-widest font-mono flex items-center gap-1",
-              isCompact ? "text-[11px]" : "text-xl"
+              "bg-black/40 backdrop-blur-md rounded-full border border-white/10 font-bold pointer-events-auto",
+              isCompact ? "px-2.5 py-1 text-[11px]" : "px-6 py-2 text-lg"
             )}
           >
-            {roomCode} <Copy className={cn(isCompact ? "w-2.5 h-2.5" : "w-3 h-3")} />
+            {t("daily.title")}
           </div>
-        </div>
+        ) : (
+          <div
+            className={cn(
+              "bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center pointer-events-auto cursor-pointer",
+              isCompact ? "px-2.5 py-1" : "px-6 py-2"
+            )}
+            onClick={handleCopyCode}
+          >
+            <div className={cn("text-white/60 font-mono", isCompact ? "text-[8px] leading-tight" : "text-xs")}>
+              {t("game.roomCode")}
+            </div>
+            <div
+              className={cn(
+                "font-bold tracking-widest font-mono flex items-center gap-1",
+                isCompact ? "text-[11px]" : "text-xl"
+              )}
+            >
+              {roomCode} <Copy className={cn(isCompact ? "w-2.5 h-2.5" : "w-3 h-3")} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Banner "Sua vez" */}
@@ -881,6 +932,7 @@ export default function Game() {
                   opponentCount={opponents.length}
                   side={pos.side}
                   compact={opponents.length >= 3 || isCompact}
+                  emoteId={activeEmotes[p.id]}
                   className="absolute z-20"
                   style={{
                     left: `${pos.left}%`,
@@ -908,6 +960,7 @@ export default function Game() {
                   opponentCount={opponents.length}
                   side="top"
                   compact
+                  emoteId={activeEmotes[p.id]}
                 />
               ))}
             </div>
@@ -931,6 +984,11 @@ export default function Game() {
               onUseAbility={() => setAbilityModalOpen(true)}
             />
           </div>
+
+          <EmoteBubble
+            emoteId={activeEmotes[playerId]}
+            className={cn("left-1/2 -translate-x-1/2", isCompact ? "bottom-[34%]" : "bottom-[30%]")}
+          />
 
           {/* Minha área — faixa inferior reservada */}
           {me && (
@@ -1021,6 +1079,7 @@ export default function Game() {
           players={gameState.players}
           winnerId={gameState.winnerId}
           localPlayerId={playerId}
+          reward={matchReward}
           onBackHome={() => setLocation("/")}
         />
       )}

@@ -40,6 +40,13 @@ npm run deploy:cf
 
 Alternativas Node: Railway / Render com `npm run build` + `npm start`.
 
+## Competição
+
+- **Desafio diário**: mesma seed para todos contra 3 bots, uma tentativa por dia (UTC), com streak e ranking do dia.
+- **Liga semanal**: soma pontos do desafio e de partidas online com 2+ pessoas; zera toda segunda (UTC).
+- Os resultados são calculados no servidor e identificados por uma chave anônima do aparelho (sem login).
+- Precisa de servidor: em LAN sem banco, o ranking fica na memória daquele servidor.
+
 ## Como Jogar
 
 1. Crie uma nova sala ou entre em uma existente

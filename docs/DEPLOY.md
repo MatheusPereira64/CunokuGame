@@ -111,6 +111,7 @@ LAN: continue usando `npm run dev` / `npm start` (Express + `ws`).
 | `DATABASE_URL` missing / salas falham | `wrangler secret put DATABASE_URL` |
 | WS 400 Missing room code | Client deve enviar `?code=` (já no `wsUrl(roomCode)`) |
 | Tabela rooms | Criada automaticamente no primeiro request API |
+| Tabelas `daily_entries` / `match_results` | Criadas automaticamente na primeira chamada de ranking |
 | Hyperdrive id inválido | Deixe o bloco comentado e use só `DATABASE_URL` |
 
 ## Legado Railway / Render

@@ -6,13 +6,14 @@ import {
   createFilteringMessenger,
   deserializeBots,
   executeBotTurn,
+  handleEmote,
   handleJoinMessage,
   handlePlayerAction,
   handleStartGame,
   serializeBots,
   type RoomSessionData,
 } from "../../server/roomHandlers";
-import { createStorage } from "./storage";
+import { createCompetitionStore, createStorage } from "./storage";
 import type { Env } from "./env";
 
 type Attachment = {
@@ -80,11 +81,14 @@ export class RoomDurableObject extends DurableObject<Env> {
       names: [string, string][];
       bots: { id: string; name: string; difficulty: "easy" | "medium" | "hard" }[];
       roomCode?: string;
+      playerKeys?: [string, string][];
     }>("session");
     if (stored) {
       this.session = {
+        ...createEmptySession(),
         playerNames: new Map(stored.names),
         bots: deserializeBots(stored.bots || []),
+        playerKeys: new Map(stored.playerKeys || []),
       };
       if (stored.roomCode) this.roomCode = stored.roomCode;
     }
@@ -96,6 +100,7 @@ export class RoomDurableObject extends DurableObject<Env> {
       names: Array.from(this.session.playerNames.entries()),
       bots: serializeBots(this.session.bots),
       roomCode: this.roomCode,
+      playerKeys: Array.from(this.session.playerKeys.entries()),
     });
   }
 
@@ -201,13 +206,13 @@ export class RoomDurableObject extends DurableObject<Env> {
       const messenger = this.makeMessenger();
 
       if (msg.type === "join") {
-        const { code, playerId, name } = msg;
+        const { code, playerId, name, playerKey } = msg;
         this.roomCode = String(code).toUpperCase();
         await handleJoinMessage(
           storage,
           this.session,
           messenger,
-          { code: this.roomCode, playerId, name },
+          { code: this.roomCode, playerId, name, playerKey },
           (id) => {
             this.setAttachment(ws, { playerId: id, roomCode: this.roomCode });
           },
@@ -218,6 +223,7 @@ export class RoomDurableObject extends DurableObject<Env> {
               /* ignore */
             }
           },
+          (c, s) => this.scheduleBot(c, s),
         );
         await this.saveSession();
         return;
@@ -258,8 +264,16 @@ export class RoomDurableObject extends DurableObject<Env> {
           playerId,
           msg.action,
           (c, s) => this.scheduleBot(c, s),
+          this.session,
+          createCompetitionStore(this.env),
         );
         await this.saveSession();
+        return;
+      }
+
+      if (msg.type === "emote") {
+        if (!playerId) return;
+        handleEmote(this.session, messenger, playerId, msg.emoteId);
       }
     } catch (e) {
       console.error("RoomDO message error", e);
@@ -279,6 +293,7 @@ export class RoomDurableObject extends DurableObject<Env> {
       this.makeMessenger(),
       this.roomCode,
       (c, s) => this.scheduleBot(c, s),
+      createCompetitionStore(this.env),
     );
     await this.saveSession();
   }

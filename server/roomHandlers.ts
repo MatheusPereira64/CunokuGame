@@ -1,8 +1,12 @@
-import type { GameState, Player } from "@shared/schema";
+import type { GameState, Player, Room } from "@shared/schema";
 import { filterGameStateForPlayer } from "@shared/gameFilter";
 import { GameLogic } from "./game";
 import { BotPlayer, createBots, type BotDifficulty } from "./bot";
 import type { IStorage } from "./storage";
+import { EMOTE_COOLDOWN_MS, isEmoteId } from "@shared/emotes";
+import { isPlayerKey } from "@shared/competition";
+import { recordFinishedMatch, type RecordedReward } from "./competition";
+import type { CompetitionStore } from "./competitionStore";
 
 export type RoomMessenger = {
   /** Envia JSON a um jogador conectado. */
@@ -16,10 +20,13 @@ export type RoomMessenger = {
 export type RoomSessionData = {
   playerNames: Map<string, string>;
   bots: BotPlayer[];
+  /** playerId da sala → chave estável do aparelho (ranking). */
+  playerKeys: Map<string, string>;
+  lastEmoteAt: Map<string, number>;
 };
 
 export function createEmptySession(): RoomSessionData {
-  return { playerNames: new Map(), bots: [] };
+  return { playerNames: new Map(), bots: [], playerKeys: new Map(), lastEmoteAt: new Map() };
 }
 
 export function serializeBots(bots: BotPlayer[]): { id: string; name: string; difficulty: BotDifficulty }[] {
@@ -48,12 +55,13 @@ export async function handleJoinMessage(
   storage: IStorage,
   session: RoomSessionData,
   messenger: RoomMessenger,
-  msg: { code: string; playerId: string; name: string },
+  msg: { code: string; playerId: string; name: string; playerKey?: unknown },
   registerConnection: (playerId: string) => void,
   /** Envio direto no socket que está entrando (antes de estar no mapa). */
   reply: (msg: unknown) => void,
+  scheduleBot: (roomCode: string, state: GameState) => void,
 ): Promise<void> {
-  const { code, playerId, name } = msg;
+  const { code, playerId, name, playerKey } = msg;
   const room = await storage.getRoom(code);
   if (!room) {
     reply({ type: "error", message: "Room not found" });
@@ -63,6 +71,17 @@ export async function handleJoinMessage(
   const maxPlayers = (room as { maxPlayers?: number }).maxPlayers || 4;
 
   if (room.gameState) {
+    const state = room.gameState as GameState;
+    // Desafio diário: o dono da tentativa pode sair e retomar a mesma partida
+    if (room.gameMode === "daily" && state.players.some((p) => p.id === playerId)) {
+      registerConnection(playerId);
+      session.playerNames.set(playerId, name);
+      reply({ type: "game_state", state: filterGameStateForPlayer(state, playerId) });
+      if (!state.winnerId && state.players[state.currentPlayerIndex]?.isBot) {
+        scheduleBot(code, state);
+      }
+      return;
+    }
     reply({ type: "error", message: "Game has already started" });
     return;
   }
@@ -80,6 +99,7 @@ export async function handleJoinMessage(
 
   registerConnection(playerId);
   session.playerNames.set(playerId, name);
+  if (isPlayerKey(playerKey)) session.playerKeys.set(playerId, playerKey);
 
   const lobbyPlayers = buildLobbyPlayers(session, messenger.getConnectedPlayerIds());
   messenger.broadcast(
@@ -186,6 +206,8 @@ export async function handlePlayerAction(
   playerId: string,
   action: unknown,
   scheduleBot: (roomCode: string, state: GameState) => void,
+  session: RoomSessionData,
+  competition: CompetitionStore,
 ): Promise<void> {
   if (!roomCode || !playerId) return;
 
@@ -193,10 +215,13 @@ export async function handlePlayerAction(
   if (!room || !room.gameState) return;
 
   const state = room.gameState as GameState;
+  if (state.winnerId) return;
   const result = GameLogic.processAction(state, action as never, playerId);
 
   await storage.updateGameState(roomCode, result.newState);
+  const rewards = await settleFinishedMatch(competition, room, result.newState, session);
   messenger.broadcast({ type: "game_state", state: result.newState });
+  sendRewards(messenger, rewards);
 
   if ((action as { type?: string }).type === "declare_finish" && result.newState.isFinalRound) {
     const declarer = result.newState.players.find((p) => p.id === playerId);
@@ -220,7 +245,7 @@ export async function handlePlayerAction(
     messenger.broadcast({ type: "card_swap", swapInfo: result.swapInfo });
   }
 
-  if (result.newState.players[result.newState.currentPlayerIndex]?.isBot) {
+  if (!result.newState.winnerId && result.newState.players[result.newState.currentPlayerIndex]?.isBot) {
     scheduleBot(roomCode, result.newState);
   }
 }
@@ -231,16 +256,20 @@ export async function executeBotTurn(
   messenger: RoomMessenger,
   roomCode: string,
   scheduleBot: (roomCode: string, state: GameState) => void,
+  competition: CompetitionStore,
 ): Promise<void> {
   const room = await storage.getRoom(roomCode);
   if (!room || !room.gameState) return;
 
   let updatedState = room.gameState as GameState;
+  if (updatedState.winnerId) return;
   const currentPlayer = updatedState.players[updatedState.currentPlayerIndex];
   if (!currentPlayer?.isBot) return;
 
-  const bot = session.bots.find((b) => b.id === currentPlayer.id);
-  if (!bot) return;
+  // Salas do desafio diário nascem fora do lobby: o bot é reconstruído a partir do estado
+  const bot =
+    session.bots.find((b) => b.id === currentPlayer.id) ??
+    new BotPlayer(currentPlayer.name, (room.botDifficulty as BotDifficulty) || "medium", currentPlayer.id);
 
   const playerIdx = updatedState.players.findIndex((p) => p.id === currentPlayer.id);
 
@@ -292,12 +321,51 @@ export async function executeBotTurn(
     }
 
     await storage.updateGameState(roomCode, updatedState);
+    const rewards = await settleFinishedMatch(competition, room, updatedState, session);
     messenger.broadcast({ type: "game_state", state: updatedState });
+    sendRewards(messenger, rewards);
   }
 
-  if (updatedState.players[updatedState.currentPlayerIndex]?.isBot) {
+  if (!updatedState.winnerId && updatedState.players[updatedState.currentPlayerIndex]?.isBot) {
     scheduleBot(roomCode, updatedState);
   }
+}
+
+/** Registra o resultado uma única vez; falha de ranking nunca pode travar a partida. */
+async function settleFinishedMatch(
+  competition: CompetitionStore,
+  room: Room,
+  state: GameState,
+  session: RoomSessionData,
+): Promise<RecordedReward[]> {
+  if (!state.winnerId) return [];
+  try {
+    return await recordFinishedMatch(competition, room, state, session.playerKeys);
+  } catch (e) {
+    console.error("Failed to record match result", e);
+    return [];
+  }
+}
+
+function sendRewards(messenger: RoomMessenger, rewards: RecordedReward[]): void {
+  for (const { playerId, reward } of rewards) {
+    messenger.send(playerId, { type: "match_reward", ...reward });
+  }
+}
+
+export function handleEmote(
+  session: RoomSessionData,
+  messenger: RoomMessenger,
+  playerId: string,
+  emoteId: unknown,
+  now = Date.now(),
+): void {
+  if (!isEmoteId(emoteId)) return;
+  const last = session.lastEmoteAt.get(playerId) ?? 0;
+  // Pequena folga em relação ao cooldown do cliente por causa da latência
+  if (now - last < EMOTE_COOLDOWN_MS - 250) return;
+  session.lastEmoteAt.set(playerId, now);
+  messenger.broadcast({ type: "emote", playerId, emoteId });
 }
 
 /** Cria messenger que filtra game_state por jogador. */

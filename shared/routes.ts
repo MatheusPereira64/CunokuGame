@@ -14,6 +14,24 @@ export const errorSchemas = {
   }),
 };
 
+const dailyRankingRowSchema = z.object({
+  rank: z.number(),
+  name: z.string(),
+  score: z.number(),
+  won: z.boolean(),
+  isMe: z.boolean(),
+});
+
+const leagueRowSchema = z.object({
+  rank: z.number(),
+  name: z.string(),
+  points: z.number(),
+  wins: z.number(),
+  games: z.number(),
+  tier: z.enum(['bronze', 'silver', 'gold', 'diamond']),
+  isMe: z.boolean(),
+});
+
 export const api = {
   rooms: {
     create: {
@@ -56,6 +74,63 @@ export const api = {
       responses: {
         200: z.custom<typeof rooms.$inferSelect>(),
         404: errorSchemas.notFound,
+      },
+    },
+  },
+  daily: {
+    status: {
+      method: 'GET' as const,
+      path: '/api/daily',
+      responses: {
+        200: z.object({
+          day: z.string(),
+          resetsAt: z.string(),
+          inProgress: z.boolean(),
+          result: z.object({
+            rank: z.number(),
+            score: z.number(),
+            won: z.boolean(),
+            points: z.number(),
+          }).nullable(),
+          streak: z.object({ current: z.number(), best: z.number() }),
+          total: z.number(),
+          top: z.array(dailyRankingRowSchema),
+        }),
+      },
+    },
+    start: {
+      method: 'POST' as const,
+      path: '/api/daily/start',
+      input: z.object({
+        playerKey: z.string().uuid(),
+        playerName: z.string().trim().min(1).max(24),
+      }),
+      responses: {
+        200: z.object({
+          alreadyPlayed: z.boolean(),
+          code: z.string().nullable(),
+          playerId: z.string().nullable(),
+        }),
+        400: errorSchemas.validation,
+      },
+    },
+  },
+  league: {
+    standings: {
+      method: 'GET' as const,
+      path: '/api/league',
+      responses: {
+        200: z.object({
+          week: z.string(),
+          resetsAt: z.string(),
+          totalPlayers: z.number(),
+          top: z.array(leagueRowSchema),
+          me: leagueRowSchema.nullable(),
+          lastWeek: z.object({
+            week: z.string(),
+            podium: z.array(leagueRowSchema),
+          }),
+        }),
       },
     },
   },

@@ -1,6 +1,7 @@
 import { getDb } from "./db";
 import { rooms, type Room, type InsertRoom, type GameState } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { DrizzleCompetitionStore, MemoryCompetitionStore, type CompetitionStore } from "./competitionStore";
 
 export interface IStorage {
   createRoom(room: InsertRoom): Promise<Room>;
@@ -146,3 +147,7 @@ export class MemoryStorage implements IStorage {
 export const storage = process.env.DATABASE_URL 
   ? new DatabaseStorage() 
   : new MemoryStorage();
+
+export const competitionStore: CompetitionStore = process.env.DATABASE_URL
+  ? new DrizzleCompetitionStore(getDb)
+  : new MemoryCompetitionStore();

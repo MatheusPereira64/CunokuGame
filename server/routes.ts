@@ -1,16 +1,19 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { storage } from "./storage";
+import { competitionStore, storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import type { GameState } from "@shared/schema";
 import { generateRoomCode, newPlayerId } from "@shared/roomCode";
+import { PLAYER_KEY_HEADER } from "@shared/competition";
 import { buildLanInfo } from "./lanInfo";
+import { getDailyStatus, getLeagueStandings, startDailyChallenge } from "./competition";
 import {
   createEmptySession,
   createFilteringMessenger,
   executeBotTurn,
+  handleEmote,
   handleJoinMessage,
   handlePlayerAction,
   handleStartGame,
@@ -20,6 +23,7 @@ import {
 type RoomLive = {
   sockets: Map<string, WebSocket>;
   session: RoomSessionData;
+  botTimer?: ReturnType<typeof setTimeout>;
 };
 
 export async function registerRoutes(
@@ -70,7 +74,7 @@ export async function registerRoutes(
     try {
       const { code } = api.rooms.join.input.parse(req.body);
       const room = await storage.getRoom(code);
-      if (!room) return res.status(404).json({ message: "Room not found" });
+      if (!room || room.gameMode === "daily") return res.status(404).json({ message: "Room not found" });
       const playerId = newPlayerId();
       res.json({ code, playerId, room });
     } catch {
@@ -80,13 +84,44 @@ export async function registerRoutes(
 
   app.get(api.rooms.list.path, async (_req, res) => {
     const rooms = await storage.listRooms();
-    res.json(rooms);
+    res.json(rooms.filter((room) => room.gameMode !== "daily"));
   });
 
   app.get(api.rooms.get.path, async (req, res) => {
     const room = await storage.getRoom(req.params.code);
-    if (!room) return res.status(404).json({ message: "Room not found" });
+    if (!room || room.gameMode === "daily") return res.status(404).json({ message: "Room not found" });
     res.json(room);
+  });
+
+  app.get(api.daily.status.path, async (req, res) => {
+    try {
+      res.json(await getDailyStatus(competitionStore, req.header(PLAYER_KEY_HEADER)));
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message || "Failed to load daily challenge" });
+    }
+  });
+
+  app.post(api.daily.start.path, async (req, res) => {
+    const parsed = api.daily.start.input.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
+    try {
+      const { createdRoom: _createdRoom, ...result } = await startDailyChallenge(
+        storage,
+        competitionStore,
+        parsed.data,
+      );
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message || "Failed to start daily challenge" });
+    }
+  });
+
+  app.get(api.league.standings.path, async (req, res) => {
+    try {
+      res.json(await getLeagueStandings(competitionStore, req.header(PLAYER_KEY_HEADER)));
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message || "Failed to load league" });
+    }
   });
 
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
@@ -123,7 +158,10 @@ export async function registerRoutes(
     const messenger = makeMessenger(roomCode);
     messenger.broadcast({ type: "bot_thinking", botName: currentPlayer.name });
 
-    setTimeout(() => {
+    // Um único timer por sala: retomar o desafio diário não pode duplicar o turno do bot
+    const pending = getOrCreateLive(roomCode);
+    if (pending.botTimer) clearTimeout(pending.botTimer);
+    pending.botTimer = setTimeout(() => {
       const live = roomsLive.get(roomCode);
       if (!live) return;
       void executeBotTurn(
@@ -132,6 +170,7 @@ export async function registerRoutes(
         makeMessenger(roomCode),
         roomCode,
         scheduleNextBotTurn,
+        competitionStore,
       );
     }, 3000);
   }
@@ -145,7 +184,7 @@ export async function registerRoutes(
         const msg = JSON.parse(data.toString());
 
         if (msg.type === "join") {
-          const { code, playerId, name } = msg;
+          const { code, playerId, name, playerKey } = msg;
           currentRoom = code;
           currentPlayer = playerId;
           const live = getOrCreateLive(code);
@@ -155,13 +194,14 @@ export async function registerRoutes(
             storage,
             live.session,
             messenger,
-            { code, playerId, name },
+            { code, playerId, name, playerKey },
             (id) => {
               live.sockets.set(id, ws);
             },
             (m) => {
               if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m));
             },
+            scheduleNextBotTurn,
           );
         }
 
@@ -199,7 +239,16 @@ export async function registerRoutes(
             playerId,
             msg.action,
             scheduleNextBotTurn,
+            getOrCreateLive(roomCode).session,
+            competitionStore,
           );
+        }
+
+        if (msg.type === "emote") {
+          const roomCode = currentRoom;
+          const playerId = currentPlayer;
+          if (!roomCode || !playerId) return;
+          handleEmote(getOrCreateLive(roomCode).session, makeMessenger(roomCode), playerId, msg.emoteId);
         }
       } catch (e) {
         console.error("WS Error", e);

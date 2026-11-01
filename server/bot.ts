@@ -1,4 +1,5 @@
 import { GameState, GameAction, Player } from "@shared/schema";
+import { stateRandom } from "@shared/seededRandom";
 
 export type BotDifficulty = "easy" | "medium" | "hard";
 
@@ -38,7 +39,7 @@ export class BotPlayer {
 
     if (this.difficulty === "medium") {
       // Medium: 70% deck, 30% discard
-      return Math.random() < 0.7 ? { type: "draw_deck" } : { type: "draw_discard" };
+      return stateRandom(state, "draw")() < 0.7 ? { type: "draw_deck" } : { type: "draw_discard" };
     }
 
     // Hard: analyze discard pile card value
@@ -59,10 +60,11 @@ export class BotPlayer {
 
     if (this.difficulty === "easy") {
       // Easy: 50% discard, 50% swap random card
-      if (Math.random() < 0.5) {
+      const random = stateRandom(state, "action");
+      if (random() < 0.5) {
         return { type: "discard_drawn" };
       }
-      const randomIdx = Math.floor(Math.random() * 4);
+      const randomIdx = Math.floor(random() * 4);
       return { type: "replace_card", handIndex: randomIdx };
     }
 
@@ -159,7 +161,7 @@ export class BotPlayer {
       if (totalScore < 8) probability = 0.5;
       if (totalScore < 6) probability = 0.8;
       
-      return Math.random() < probability;
+      return stateRandom(state, "finish")() < probability;
     }
 
     if (this.difficulty === "medium") {
@@ -181,7 +183,7 @@ export class BotPlayer {
         }
       }
       
-      return Math.random() < Math.min(probability, 0.95);
+      return stateRandom(state, "finish")() < Math.min(probability, 0.95);
     }
 
     // Hard: declara com pontuação excelente e probabilidade alta
@@ -214,7 +216,7 @@ export class BotPlayer {
       probability += 0.1; // Bônus após muitos rounds
     }
     
-    return Math.random() < Math.min(probability, 0.98);
+    return stateRandom(state, "finish")() < Math.min(probability, 0.98);
   }
 }
 

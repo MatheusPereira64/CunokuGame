@@ -1,6 +1,11 @@
 import { eq, sql } from "drizzle-orm";
 import { rooms, type Room, type InsertRoom, type GameState } from "../../shared/schema";
 import type { IStorage } from "../../server/storage";
+import {
+  DrizzleCompetitionStore,
+  MemoryCompetitionStore,
+  type CompetitionStore,
+} from "../../server/competitionStore";
 import { createDb, ensureSchema, type WorkerDb } from "./db";
 import type { Env } from "./env";
 
@@ -92,6 +97,14 @@ export function createStorage(env: Env): IStorage {
   const db = createDb(env);
   if (db) return new WorkerDatabaseStorage(db);
   return new WorkerMemoryStorage();
+}
+
+const memoryCompetitionStore = new MemoryCompetitionStore();
+
+export function createCompetitionStore(env: Env): CompetitionStore {
+  const db = createDb(env);
+  if (db) return new DrizzleCompetitionStore(() => db);
+  return memoryCompetitionStore;
 }
 
 /** Ping leve para warm-up / health. */

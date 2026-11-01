@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, primaryKey, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -45,6 +45,8 @@ export interface GameState {
   logs: string[];
   finalRoundDeclarerId?: string | null; // ID do jogador que declarou fim de jogo
   isFinalRound?: boolean; // Se está na rodada final
+  seed?: string | null; // Seed do desafio diário (nunca enviada aos clientes)
+  dailyDay?: string | null; // Dia (UTC) do desafio diário; ausente em partidas comuns
 }
 
 // === TABLE DEFINITIONS ===
@@ -61,11 +63,46 @@ export const rooms = pgTable("rooms", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+/** Sala do desafio diário de cada jogador: garante uma tentativa por dia e permite retomar. */
+export const dailyEntries = pgTable("daily_entries", {
+  day: text("day").notNull(),
+  playerKey: text("player_key").notNull(),
+  roomCode: text("room_code").notNull(),
+  playerId: text("player_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.day, t.playerKey] }),
+  index("daily_entries_room_idx").on(t.roomCode),
+]);
+
+/** Resultado registrado pelo servidor; base do ranking do dia e da liga semanal. */
+export const matchResults = pgTable("match_results", {
+  id: serial("id").primaryKey(),
+  playerKey: text("player_key").notNull(),
+  displayName: text("display_name").notNull(),
+  kind: text("kind").notNull(), // daily, online
+  day: text("day").notNull(),
+  week: text("week").notNull(),
+  roomCode: text("room_code").notNull(),
+  won: boolean("won").notNull(),
+  score: integer("score").notNull(),
+  points: integer("points").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  uniqueIndex("match_results_room_player_idx").on(t.roomCode, t.playerKey),
+  index("match_results_day_idx").on(t.day),
+  index("match_results_week_idx").on(t.week),
+  index("match_results_player_idx").on(t.playerKey),
+]);
+
 // === SCHEMAS ===
 export const insertRoomSchema = createInsertSchema(rooms).omit({ id: true, createdAt: true, gameState: true });
 
 export type Room = typeof rooms.$inferSelect;
 export type InsertRoom = z.infer<typeof insertRoomSchema>;
+export type DailyEntry = typeof dailyEntries.$inferSelect;
+export type MatchResult = typeof matchResults.$inferSelect;
+export type InsertMatchResult = typeof matchResults.$inferInsert;
 
 // === API TYPES ===
 export type CreateRoomRequest = { playerName: string; gameMode?: "multiplayer" | "vs_bots"; botDifficulty?: "easy" | "medium" | "hard" };
@@ -84,7 +121,15 @@ export type WsMessage =
   | { type: "bot_thinking"; botName: string }
   | { type: "bot_action"; botName: string; message: string }
   | { type: "card_swap"; swapInfo: { player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number } }
+  | { type: "emote"; playerId: string; emoteId: string }
+  | ({ type: "match_reward" } & MatchReward)
   | WsPrivateMessage;
+
+/** Pontos de liga da partida e, no desafio diário, a posição no ranking do dia. */
+export type MatchReward = {
+  points: number;
+  daily?: { rank: number; total: number; streak: number };
+};
 
 export type GameAction =
   | { type: "draw_deck" }

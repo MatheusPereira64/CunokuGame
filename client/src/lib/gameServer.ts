@@ -114,3 +114,10 @@ export function isLikelyLocalHost(hostname = typeof window !== "undefined" ? win
   if (/^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(hostname)) return true;
   return false;
 }
+
+/** Ranking e liga são globais: voltam ao servidor principal mesmo após entrar numa sala LAN. */
+export function selectMainServer(): void {
+  clearServerBase();
+  setLanJoinUrl(null);
+  setNetworkMode("server");
+}

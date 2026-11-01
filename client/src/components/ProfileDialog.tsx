@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,9 @@ import { useI18n } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
 import {
+  CHART_DAYS,
   loadProfile,
+  recentDailyStats,
   saveProfile,
   winRate,
   PROFILE_ICONS,
@@ -24,6 +26,8 @@ import {
   type ProfileIconId,
 } from "@/lib/playerProfile";
 import { UserRound } from "lucide-react";
+
+const StatsChart = lazy(() => import("@/components/StatsChart"));
 
 interface ProfileDialogProps {
   compact?: boolean;
@@ -59,6 +63,9 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
   };
 
   const rate = winRate(profile.stats);
+  const recent = recentDailyStats(profile.stats);
+  const recentGames = recent.reduce((sum, d) => sum + d.games, 0);
+  const recentWins = recent.reduce((sum, d) => sum + d.wins, 0);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -79,7 +86,8 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
         className={cn(
           "sm:max-w-md",
           isLandscapeMenu &&
-            "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2 overflow-hidden flex flex-col"
+            "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2 overflow-hidden flex flex-col",
+          !isLandscapeMenu && "max-h-[92dvh] overflow-hidden flex flex-col"
         )}
       >
         <DialogHeader className={cn(isLandscapeMenu && "pr-6 space-y-0.5")}>
@@ -97,7 +105,7 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
           className={cn(
             isLandscapeMenu
               ? "min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-3 py-1 pr-1"
-              : "space-y-5 py-2"
+              : "min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-5 py-2 pr-1"
           )}
         >
           <div className="space-y-1.5">
@@ -182,6 +190,28 @@ export function ProfileDialog({ compact = false, onSaved }: ProfileDialogProps) 
             </div>
           </div>
           <p className="text-[11px] text-gray-500 leading-snug">{t("profile.bestScoreHint")}</p>
+
+          <div className="space-y-1.5">
+            <Label>{t("profile.last30Days", { days: String(CHART_DAYS) })}</Label>
+            {recentGames === 0 ? (
+              <p className="rounded-lg bg-gray-50 p-3 text-center text-xs text-gray-600">{t("profile.noRecentGames")}</p>
+            ) : (
+              <>
+                <p className="text-xs text-gray-700">
+                  {t("profile.recentSummary", {
+                    wins: String(recentWins),
+                    games: String(recentGames),
+                    rate: String(Math.round((recentWins / recentGames) * 100)),
+                  })}
+                </p>
+                {open && (
+                  <Suspense fallback={<div className="h-40" />}>
+                    <StatsChart data={recent} />
+                  </Suspense>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         <Button variant="primary" className={cn("w-full", isLandscapeMenu && "h-9 text-sm")} onClick={handleSave}>

@@ -1,6 +1,8 @@
 import { generateRoomCode, newPlayerId } from "../../shared/roomCode";
 import { api } from "../../shared/routes";
-import { createStorage, pingDb } from "./storage";
+import { PLAYER_KEY_HEADER } from "../../shared/competition";
+import { getDailyStatus, getLeagueStandings, startDailyChallenge } from "../../server/competition";
+import { createCompetitionStore, createStorage, pingDb } from "./storage";
 import type { Env } from "./env";
 import { RoomDurableObject } from "./room-do";
 
@@ -27,7 +29,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
       headers: {
         "access-control-allow-origin": "*",
         "access-control-allow-methods": "GET,POST,OPTIONS",
-        "access-control-allow-headers": "content-type",
+        "access-control-allow-headers": `content-type,${PLAYER_KEY_HEADER}`,
       },
     });
   }
@@ -87,7 +89,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
       const body = await request.json();
       const { code } = api.rooms.join.input.parse(body);
       const room = await storage.getRoom(code.toUpperCase());
-      if (!room) return json({ message: "Room not found" }, 404);
+      if (!room || room.gameMode === "daily") return json({ message: "Room not found" }, 404);
       const playerId = newPlayerId();
       return json({ code: room.code, playerId, room });
     } catch {
@@ -97,15 +99,50 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
 
   if (method === "GET" && path === api.rooms.list.path) {
     const rooms = await storage.listRooms();
-    return json(rooms);
+    return json(rooms.filter((room) => room.gameMode !== "daily"));
   }
 
   const getMatch = path.match(/^\/api\/rooms\/([^/]+)$/);
   if (method === "GET" && getMatch) {
     const code = decodeURIComponent(getMatch[1]!).toUpperCase();
     const room = await storage.getRoom(code);
-    if (!room) return json({ message: "Room not found" }, 404);
+    if (!room || room.gameMode === "daily") return json({ message: "Room not found" }, 404);
     return json(room);
+  }
+
+  if (method === "GET" && path === api.daily.status.path) {
+    const store = createCompetitionStore(env);
+    return json(await getDailyStatus(store, request.headers.get(PLAYER_KEY_HEADER)));
+  }
+
+  if (method === "POST" && path === api.daily.start.path) {
+    const parsed = api.daily.start.input.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return json({ message: "Invalid input" }, 400);
+    const { createdRoom, ...result } = await startDailyChallenge(
+      storage,
+      createCompetitionStore(env),
+      parsed.data,
+    );
+    if (createdRoom) {
+      try {
+        const id = env.ROOM.idFromName(createdRoom.code);
+        await env.ROOM.get(id).fetch(
+          new Request("https://room.internal/init", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ room: createdRoom }),
+          }),
+        );
+      } catch (e) {
+        console.warn("Room DO init failed", e);
+      }
+    }
+    return json(result);
+  }
+
+  if (method === "GET" && path === api.league.standings.path) {
+    const store = createCompetitionStore(env);
+    return json(await getLeagueStandings(store, request.headers.get(PLAYER_KEY_HEADER)));
   }
 
   return json({ message: "Not found" }, 404);

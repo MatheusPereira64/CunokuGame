@@ -15,6 +15,8 @@ import { VolumeControl } from "@/components/VolumeControl";
 import { RulesDialog } from "@/components/RulesDialog";
 import { InstallAppButton } from "@/components/InstallAppButton";
 import { ProfileDialog } from "@/components/ProfileDialog";
+import { DailyChallengeDialog } from "@/components/DailyChallengeDialog";
+import { LeagueDialog } from "@/components/LeagueDialog";
 import { useI18n, type Language } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
@@ -748,6 +750,22 @@ export default function Home() {
               )}
             </DialogContent>
           </Dialog>
+
+          {/* Em retrato ficam lado a lado para o menu caber sem rolagem */}
+          <div className={cn(isLandscapeMenu ? "contents" : "grid grid-cols-2 gap-3")}>
+            <DailyChallengeDialog
+              compact={isLandscapeMenu}
+              triggerClassName={isLandscapeMenu ? menuBtnClass : "w-full text-base py-6 h-auto"}
+              iconClassName={isLandscapeMenu ? menuIconClass : "mr-2 w-5 h-5"}
+              name={name}
+              onNameChange={setName}
+            />
+            <LeagueDialog
+              compact={isLandscapeMenu}
+              triggerClassName={isLandscapeMenu ? menuBtnClass : "w-full text-base py-6 h-auto"}
+              iconClassName={isLandscapeMenu ? menuIconClass : "mr-2 w-5 h-5"}
+            />
+          </div>
 
           <RulesDialog compact={isLandscapeMenu} />
         </div>

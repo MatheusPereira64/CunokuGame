@@ -3,6 +3,7 @@ import type { GameState } from "./schema";
 /** Oculta drawnCard de quem não está no turno atual. */
 export function filterGameStateForPlayer(state: GameState, playerId: string): GameState {
   const filteredState: GameState = structuredClone(state);
+  delete filteredState.seed;
 
   if (filteredState.drawnCard) {
     const currentPlayer = state.players[state.currentPlayerIndex];

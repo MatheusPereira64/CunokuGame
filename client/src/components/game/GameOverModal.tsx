@@ -1,4 +1,4 @@
-import { Player } from "@shared/schema";
+import { MatchReward, Player } from "@shared/schema";
 import { Avatar } from "@/components/Avatar";
 import { Button } from "@/components/Button";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,8 @@ interface GameOverModalProps {
   players: Player[];
   winnerId: string;
   localPlayerId?: string;
+  /** Pontos de liga e posição no desafio diário, quando a partida vale ranking */
+  reward?: MatchReward | null;
   onBackHome: () => void;
 }
 
@@ -29,6 +31,7 @@ export function GameOverModal({
   players,
   winnerId,
   localPlayerId,
+  reward,
   onBackHome,
 }: GameOverModalProps) {
   const isMobile = useIsMobile();
@@ -77,6 +80,21 @@ export function GameOverModal({
               </div>
             ))}
         </div>
+
+        {reward && (
+          <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-950">
+            <div className="font-bold">+{reward.points} {t("league.pointsShort")}</div>
+            {reward.daily && (
+              <div>
+                {t("daily.rewardSummary", {
+                  rank: String(reward.daily.rank),
+                  total: String(reward.daily.total),
+                  streak: String(reward.daily.streak),
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         <Button onClick={onBackHome} className="w-full">
           {t("game.backToHome")}

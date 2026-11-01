@@ -1,11 +1,15 @@
 import { Card, GameState, Player, Rank, Suit, RANKS, SUITS } from "@shared/schema";
+import { seededRandom, stateRandom } from "@shared/seededRandom";
 
 export class GameLogic {
-  static createInitialState(players: Player[]): GameState {
+  static createInitialState(
+    players: Player[],
+    options: { seed?: string; dailyDay?: string } = {},
+  ): GameState {
     // Cria baralho baseado no número de jogadores
     // Para cada jogador adicional além de 2, adiciona mais um baralho completo
     const numberOfDecks = Math.max(1, Math.ceil(players.length / 2));
-    const deck = this.createDeck(numberOfDecks);
+    const deck = this.createDeck(numberOfDecks, options.seed ? seededRandom(options.seed) : Math.random);
     
     // Deal 4 cards to each player
     players.forEach(p => {
@@ -33,11 +37,13 @@ export class GameLogic {
       winnerId: null,
       logs: [`Game started! Deck size: ${deck.length + 1} cards (${numberOfDecks} deck${numberOfDecks > 1 ? 's' : ''})`],
       finalRoundDeclarerId: null,
-      isFinalRound: false
+      isFinalRound: false,
+      ...(options.seed ? { seed: options.seed } : {}),
+      ...(options.dailyDay ? { dailyDay: options.dailyDay } : {}),
     };
   }
 
-  static createDeck(numberOfDecks: number = 1): Card[] {
+  static createDeck(numberOfDecks: number = 1, random: () => number = Math.random): Card[] {
     const deck: Card[] = [];
     
     // Cria múltiplos baralhos conforme necessário
@@ -61,7 +67,7 @@ export class GameLogic {
 
     // Shuffle
     for (let i = deck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
     return deck;
@@ -233,8 +239,9 @@ export class GameLogic {
           newState.deck = [...newState.discardPile];
           newState.discardPile = topDiscard ? [topDiscard] : [];
           // Embaralha
+          const reshuffleRandom = stateRandom(newState, "reshuffle");
           for (let i = newState.deck.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
+            const j = Math.floor(reshuffleRandom() * (i + 1));
             [newState.deck[i], newState.deck[j]] = [newState.deck[j], newState.deck[i]];
           }
           newState.logs.push("Baralho reciclado e embaralhado");
@@ -541,8 +548,9 @@ export class GameLogic {
                   newState.deck = [...newState.discardPile];
                   newState.discardPile = topDiscardCard ? [topDiscardCard] : [];
                   // Embaralha
+                  const penaltyRandom = stateRandom(newState, `penalty${i}`);
                   for (let j = newState.deck.length - 1; j > 0; j--) {
-                    const k = Math.floor(Math.random() * (j + 1));
+                    const k = Math.floor(penaltyRandom() * (j + 1));
                     [newState.deck[j], newState.deck[k]] = [newState.deck[k], newState.deck[j]];
                   }
                 }
