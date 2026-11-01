@@ -1,6 +1,7 @@
 import { generateRoomCode, newPlayerId } from "../../shared/roomCode";
 import { api } from "../../shared/routes";
 import { PLAYER_KEY_HEADER } from "../../shared/competition";
+import { toPublicRoom } from "../../shared/gameFilter";
 import { getDailyStatus, getLeagueStandings, startDailyChallenge } from "../../server/competition";
 import { createCompetitionStore, createStorage, pingDb } from "./storage";
 import type { Env } from "./env";
@@ -91,7 +92,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
       const room = await storage.getRoom(code.toUpperCase());
       if (!room || room.gameMode === "daily") return json({ message: "Room not found" }, 404);
       const playerId = newPlayerId();
-      return json({ code: room.code, playerId, room });
+      return json({ code: room.code, playerId, room: toPublicRoom(room) });
     } catch {
       return json({ message: "Invalid input" }, 400);
     }
@@ -99,7 +100,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
 
   if (method === "GET" && path === api.rooms.list.path) {
     const rooms = await storage.listRooms();
-    return json(rooms.filter((room) => room.gameMode !== "daily"));
+    return json(rooms.filter((room) => room.gameMode !== "daily").map(toPublicRoom));
   }
 
   const getMatch = path.match(/^\/api\/rooms\/([^/]+)$/);
@@ -107,7 +108,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     const code = decodeURIComponent(getMatch[1]!).toUpperCase();
     const room = await storage.getRoom(code);
     if (!room || room.gameMode === "daily") return json({ message: "Room not found" }, 404);
-    return json(room);
+    return json(toPublicRoom(room));
   }
 
   if (method === "GET" && path === api.daily.status.path) {

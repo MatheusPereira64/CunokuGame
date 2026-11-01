@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { GameState } from "@shared/schema";
 import { generateRoomCode, newPlayerId } from "@shared/roomCode";
 import { PLAYER_KEY_HEADER } from "@shared/competition";
+import { toPublicRoom } from "@shared/gameFilter";
 import { buildLanInfo } from "./lanInfo";
 import { getDailyStatus, getLeagueStandings, startDailyChallenge } from "./competition";
 import {
@@ -76,7 +77,7 @@ export async function registerRoutes(
       const room = await storage.getRoom(code);
       if (!room || room.gameMode === "daily") return res.status(404).json({ message: "Room not found" });
       const playerId = newPlayerId();
-      res.json({ code, playerId, room });
+      res.json({ code, playerId, room: toPublicRoom(room) });
     } catch {
       res.status(400).json({ message: "Invalid input" });
     }
@@ -84,13 +85,13 @@ export async function registerRoutes(
 
   app.get(api.rooms.list.path, async (_req, res) => {
     const rooms = await storage.listRooms();
-    res.json(rooms.filter((room) => room.gameMode !== "daily"));
+    res.json(rooms.filter((room) => room.gameMode !== "daily").map(toPublicRoom));
   });
 
   app.get(api.rooms.get.path, async (req, res) => {
     const room = await storage.getRoom(req.params.code);
     if (!room || room.gameMode === "daily") return res.status(404).json({ message: "Room not found" });
-    res.json(room);
+    res.json(toPublicRoom(room));
   });
 
   app.get(api.daily.status.path, async (req, res) => {

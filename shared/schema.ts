@@ -20,6 +20,8 @@ export interface Card {
   isFaceUp: boolean;
   /** Dono atual da carta (opcional; usado na distribuição) */
   ownerId?: string;
+  /** Face mascarada pelo servidor: suit/rank/value são apenas marcadores */
+  isHidden?: boolean;
 }
 
 export interface Player {

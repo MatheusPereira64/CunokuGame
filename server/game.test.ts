@@ -169,6 +169,27 @@ describe("GameLogic.processAction", () => {
   });
 });
 
+describe("reciclagem do baralho", () => {
+  it("troca os ids das cartas que voltam do descarte", () => {
+    const state = GameLogic.createInitialState([makePlayer("p1", "Ana"), makePlayer("p2", "Bia")]);
+    state.deck = [];
+    state.turnPhase = "draw";
+    state.currentPlayerIndex = 0;
+    state.discardPile = [
+      makeCard({ id: "old-1", rank: "2" }),
+      makeCard({ id: "old-2", rank: "3" }),
+      makeCard({ id: "top", rank: "4" }),
+    ];
+
+    const { newState } = GameLogic.processAction(state, { type: "draw_deck" }, "p1");
+
+    expect(newState.discardPile.map((c) => c.id)).toEqual(["top"]);
+    const recycled = [...newState.deck, newState.drawnCard!];
+    expect(recycled.map((c) => c.rank).sort()).toEqual(["2", "3"]);
+    for (const card of recycled) expect(["old-1", "old-2"]).not.toContain(card.id);
+  });
+});
+
 describe("GameLogic.handleAbility", () => {
   it("permite peek da própria carta (7/8)", () => {
     const player = makePlayer("p1", "Alice", {

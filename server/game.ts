@@ -1,6 +1,14 @@
 import { Card, GameState, Player, Rank, Suit, RANKS, SUITS } from "@shared/schema";
 import { seededRandom, stateRandom } from "@shared/seededRandom";
 
+/**
+ * Carta reciclada do descarte ganha outro id: cartas mascaradas mantêm o id, que não pode
+ * ligar uma carta na mão de alguém à face que ela mostrou no descarte.
+ */
+function withNewId(card: Card): Card {
+  return { ...card, id: crypto.randomUUID() };
+}
+
 export class GameLogic {
   static createInitialState(
     players: Player[],
@@ -236,7 +244,7 @@ export class GameLogic {
           
           // Recicla pilha de descarte se baralho vazio
           const topDiscard = newState.discardPile.pop();
-          newState.deck = [...newState.discardPile];
+          newState.deck = newState.discardPile.map(withNewId);
           newState.discardPile = topDiscard ? [topDiscard] : [];
           // Embaralha
           const reshuffleRandom = stateRandom(newState, "reshuffle");
@@ -545,7 +553,7 @@ export class GameLogic {
                   
                   // Recicla pilha de descarte se baralho vazio
                   const topDiscardCard = newState.discardPile.pop();
-                  newState.deck = [...newState.discardPile];
+                  newState.deck = newState.discardPile.map(withNewId);
                   newState.discardPile = topDiscardCard ? [topDiscardCard] : [];
                   // Embaralha
                   const penaltyRandom = stateRandom(newState, `penalty${i}`);

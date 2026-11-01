@@ -131,7 +131,7 @@ export default function Game() {
     timer?: NodeJS.Timeout;
   } | null>(null);
   // Cartas de oponentes reveladas temporariamente: chave = `${playerId}_${cardId}`
-  const [revealedOpponentCardsInHand, setRevealedOpponentCardsInHand] = useState<string[]>([]);
+  const [revealedOpponentCardsInHand, setRevealedOpponentCardsInHand] = useState<Record<string, Card>>({});
   const revealedCardTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const [gameOverModalOpen, setGameOverModalOpen] = useState(false);
   const [opponentActionNotification, setOpponentActionNotification] = useState<{
@@ -239,7 +239,7 @@ export default function Game() {
         if (currentPlayer) {
           const cameFromDiscard = prevState.discardPile.length > currentState.discardPile.length;
           const source: "deck" | "discard" = cameFromDiscard ? "discard" : "deck";
-          const animKey = `draw_${currentPlayer.id}_${currentState.drawnCard.rank}_${currentState.drawnCard.suit}`;
+          const animKey = `draw_${currentPlayer.id}_${currentState.drawnCard.id}`;
 
           if (!animationTriggeredRef.current.has(animKey)) {
             animationTriggeredRef.current.add(animKey);
@@ -261,9 +261,7 @@ export default function Game() {
         if (currentPlayer && prevPlayer && currentPlayer.hand.length === prevPlayer.hand.length) {
           // Substituição: carta da mão trocada pela comprada
           const discardedCard = topDiscard;
-          const handIndex = prevPlayer.hand.findIndex(
-            (c) => c.rank === discardedCard.rank && c.suit === discardedCard.suit
-          );
+          const handIndex = prevPlayer.hand.findIndex((c) => c.id === discardedCard.id);
 
           if (drawnCard && discardedCard && handIndex >= 0) {
             const animKey = `replace_${currentPlayer.id}_${handIndex}_${Date.now()}`;
@@ -282,7 +280,7 @@ export default function Game() {
           // Descarte simples da carta comprada
           const discardedCard = drawnCard;
           if (discardedCard && currentPlayer) {
-            const animKey = `discard_drawn_${currentPlayer.id}_${discardedCard.rank}_${discardedCard.suit}`;
+            const animKey = `discard_drawn_${currentPlayer.id}_${discardedCard.id}`;
             if (!animationTriggeredRef.current.has(animKey)) {
               animationTriggeredRef.current.add(animKey);
               audioManager.playCardSlide();
@@ -305,22 +303,19 @@ export default function Game() {
 
           if (player.hand.length < prevPlayer.hand.length) {
             const removedCard = prevPlayer.hand.find(
-              (prevCard) =>
-                !player.hand.some((currCard) => currCard.rank === prevCard.rank && currCard.suit === prevCard.suit)
+              (prevCard) => !player.hand.some((currCard) => currCard.id === prevCard.id)
             );
 
             if (removedCard && currentState.discardPile.length > prevState.discardPile.length) {
               const topDiscard = currentState.discardPile[currentState.discardPile.length - 1];
-              const isMatch = topDiscard.rank === removedCard.rank && topDiscard.suit === removedCard.suit;
+              const isMatch = topDiscard.id === removedCard.id;
               const discardType: "from_hand" | "matched" =
                 prevState.currentPlayerIndex === playerIndex && prevState.turnPhase === "draw"
                   ? "from_hand"
                   : "matched";
-              const cardIndex = prevPlayer.hand.findIndex(
-                (c) => c.rank === removedCard.rank && c.suit === removedCard.suit
-              );
+              const cardIndex = prevPlayer.hand.findIndex((c) => c.id === removedCard.id);
 
-              const animKey = `discard_hand_${player.id}_${removedCard.rank}_${removedCard.suit}_${Date.now()}`;
+              const animKey = `discard_hand_${player.id}_${removedCard.id}_${Date.now()}`;
               const isOpponent = player.id !== playerId;
 
               if (!animationTriggeredRef.current.has(animKey)) {
@@ -329,7 +324,7 @@ export default function Game() {
                 if (isOpponent) {
                   setOpponentActionNotification({ playerName: player.name, actionType: "discard" });
                 } else {
-                  animateDiscard(removedCard, discardType, player.id, cardIndex, isMatch);
+                  animateDiscard(topDiscard, discardType, player.id, cardIndex, isMatch);
                 }
                 setTimeout(() => animationTriggeredRef.current.delete(animKey), 2000);
               }
@@ -348,7 +343,7 @@ export default function Game() {
           if (cardsAdded === 2 && currentState.currentPlayerIndex !== playerIndex) {
             const newCards = player.hand.slice(-2);
             const startingIndex = prevPlayer.hand.length;
-            const animKey = `penalty_${player.id}_${newCards[0]?.rank}_${newCards[1]?.rank}_${Date.now()}`;
+            const animKey = `penalty_${player.id}_${newCards[0]?.id}_${newCards[1]?.id}_${Date.now()}`;
             if (!animationTriggeredRef.current.has(animKey)) {
               animationTriggeredRef.current.add(animKey);
               animatePenalty(newCards, player.id, startingIndex);
@@ -425,10 +420,13 @@ export default function Game() {
       revealedCardTimersRef.current.delete(cardKey);
     }
 
-    setRevealedOpponentCardsInHand((prev) => (prev.includes(cardKey) ? prev : [...prev, cardKey]));
+    setRevealedOpponentCardsInHand((prev) => ({ ...prev, [cardKey]: targetCard }));
 
     const handTimer = setTimeout(() => {
-      setRevealedOpponentCardsInHand((current) => current.filter((key) => key !== cardKey));
+      setRevealedOpponentCardsInHand((current) => {
+        const { [cardKey]: _expired, ...rest } = current;
+        return rest;
+      });
       revealedCardTimersRef.current.delete(cardKey);
     }, 20000);
 
@@ -454,14 +452,9 @@ export default function Game() {
       });
       audioManager.playCardFlip();
 
-      const targetPlayerId = (onlineRevealedCard as any).targetPlayerId;
-      const targetCardIndex = (onlineRevealedCard as any).targetCardIndex;
-
-      if (targetPlayerId !== undefined && targetCardIndex !== undefined) {
-        const targetPlayer = gameState?.players.find((p) => p.id === targetPlayerId);
-        if (targetPlayer && targetPlayer.hand[targetCardIndex]) {
-          revealOpponentCardInHand(targetPlayerId, targetPlayer.hand[targetCardIndex]);
-        }
+      const targetPlayerId = (onlineRevealedCard as any).targetPlayerId as string | undefined;
+      if (targetPlayerId) {
+        revealOpponentCardInHand(targetPlayerId, onlineRevealedCard.card);
       }
 
       return () => clearTimeout(overlayTimer);
@@ -612,7 +605,8 @@ export default function Game() {
     }
 
     if (action.kind === "peek_opponent") {
-      const targetPlayer = gameState.players.find((p) => p.id === action.targetPlayerId);
+      // Online a face chega por private_info: o estado público só traz a carta mascarada
+      const targetPlayer = isOffline ? gameState.players.find((p) => p.id === action.targetPlayerId) : undefined;
       if (targetPlayer && targetPlayer.hand[action.targetCardIndex]) {
         const peekedCard = targetPlayer.hand[action.targetCardIndex];
 
@@ -927,7 +921,7 @@ export default function Game() {
                   player={p}
                   isActive={currentTurnPlayerId === p.id}
                   showAllCards={!!gameState.winnerId}
-                  revealedCardKeys={revealedOpponentCardsInHand}
+                  revealedCards={revealedOpponentCardsInHand}
                   registerCardPosition={registerCardRef}
                   opponentCount={opponents.length}
                   side={pos.side}
@@ -955,7 +949,7 @@ export default function Game() {
                   player={p}
                   isActive={currentTurnPlayerId === p.id}
                   showAllCards={!!gameState.winnerId}
-                  revealedCardKeys={revealedOpponentCardsInHand}
+                  revealedCards={revealedOpponentCardsInHand}
                   registerCardPosition={registerCardRef}
                   opponentCount={opponents.length}
                   side="top"

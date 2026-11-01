@@ -95,8 +95,6 @@ export function CardSwapAnimation(props: CardSwapAnimationProps) {
     return () => clearTimeout(timer);
   }, [onComplete, swapInfo, player1Position, player2Position, player1Card, player2Card, progress, duration]);
 
-  if (!isVisible || !player1Card || !player2Card) return null;
-
   // Calcula distância e altura do arco
   const distance = Math.sqrt(
     Math.pow(player2Position.x - player1Position.x, 2) + 
@@ -147,6 +145,8 @@ export function CardSwapAnimation(props: CardSwapAnimationProps) {
     return midY - arcProgress * arcHeight;
   });
   const glowOpacity = useTransform(springProgress, [0, 0.1, 0.9, 1], [0, 0.9, 0.9, 0]);
+
+  if (!isVisible || !player1Card || !player2Card) return null;
 
   return (
     <AnimatePresence>

@@ -14,8 +14,8 @@ interface PlayerSeatProps {
   isActive: boolean;
   /** Fim de jogo: revela todas as cartas */
   showAllCards: boolean;
-  /** Chaves `${playerId}_${cardId}` de cartas reveladas temporariamente (habilidades 5/6) */
-  revealedCardKeys: string[];
+  /** Faces reveladas temporariamente (habilidades 5/6), por `${playerId}_${cardId}` */
+  revealedCards: Record<string, Card>;
   registerCardPosition: (key: string, el: HTMLElement | null, card?: Card) => void;
   /** Quantidade total de oponentes — define densidade do leque */
   opponentCount?: number;
@@ -33,7 +33,7 @@ export function PlayerSeat({
   player,
   isActive,
   showAllCards,
-  revealedCardKeys,
+  revealedCards,
   registerCardPosition,
   opponentCount = 1,
   side = "top",
@@ -78,7 +78,8 @@ export function PlayerSeat({
     >
       {player.hand.map((card, i) => {
         const cardKey = `${player.id}_${card.id}`;
-        const isTemporarilyRevealed = revealedCardKeys.includes(cardKey);
+        const revealedFace = revealedCards[cardKey];
+        const isTemporarilyRevealed = !!revealedFace;
         const shouldShowCard = showAllCards || isTemporarilyRevealed;
 
         const wasPreviouslyHidden = previousRevealedState.current.get(cardKey) === false;
@@ -102,7 +103,7 @@ export function PlayerSeat({
                 style={{ transformStyle: "preserve-3d" }}
               >
                 <PlayingCard
-                  card={card}
+                  card={revealedFace ?? card}
                   hidden={false}
                   className={cn(cardSize, isTemporarilyRevealed && "ring-2 ring-yellow-400 ring-offset-1")}
                   animate={false}

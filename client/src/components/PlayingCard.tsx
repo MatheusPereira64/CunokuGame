@@ -47,7 +47,7 @@ export function PlayingCard({ card, hidden, onClick, className, selected, animat
     }
   };
 
-  const isBack = hidden || !card;
+  const isBack = hidden || !card || card.isHidden;
   const AbilityIcon = !isBack ? getAbilityIcon(card?.rank) : null;
 
   return (
