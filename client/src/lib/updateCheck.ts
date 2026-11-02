@@ -46,6 +46,36 @@ function pickDownloadAsset(assets: ReleaseAsset[]): ReleaseAsset | null {
   return [...assets].sort((a, b) => score(b.name) - score(a.name))[0] ?? null;
 }
 
+const RETRY_AFTER_FAILURE_MS = 5 * 60_000;
+const MAX_RETRY_DELAY_MS = 60 * 60_000;
+
+/** Falha da consulta, com o instante em que vale tentar de novo (limite por IP do GitHub). */
+export class ReleaseCheckError extends Error {
+  constructor(
+    message: string,
+    readonly retryAt: number | null,
+  ) {
+    super(message);
+  }
+}
+
+/** A API sem login aceita 60 consultas por hora por IP; o limite é compartilhado com a rede toda. */
+export function retryAtFromResponse(status: number, headers: { get(name: string): string | null }): number | null {
+  if (status !== 403 && status !== 429) return null;
+  const retryAfter = Number(headers.get("retry-after"));
+  if (retryAfter > 0) return Date.now() + retryAfter * 1000;
+  if (headers.get("x-ratelimit-remaining") !== "0") return null;
+  const reset = Number(headers.get("x-ratelimit-reset"));
+  return reset > 0 ? reset * 1000 : null;
+}
+
+export function updateRetryDelayMs(err: unknown, now = Date.now()): number {
+  const retryAt = err instanceof ReleaseCheckError ? err.retryAt : null;
+  if (retryAt === null) return RETRY_AFTER_FAILURE_MS;
+  // Margem para o limite já ter reiniciado quando a nova consulta chegar
+  return Math.min(Math.max(retryAt - now, 0) + 5_000, MAX_RETRY_DELAY_MS);
+}
+
 export async function fetchLatestRelease(signal?: AbortSignal): Promise<LatestReleaseInfo | null> {
   const res = await fetch(GITHUB_RELEASES_API, {
     headers: {
@@ -61,7 +91,7 @@ export async function fetchLatestRelease(signal?: AbortSignal): Promise<LatestRe
   }
 
   if (!res.ok) {
-    throw new Error(`GitHub releases: HTTP ${res.status}`);
+    throw new ReleaseCheckError(`GitHub releases: HTTP ${res.status}`, retryAtFromResponse(res.status, res.headers));
   }
 
   const data = (await res.json()) as {
