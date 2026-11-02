@@ -8,6 +8,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/Button";
+import { ProfileIconPicker } from "@/components/ProfileIconPicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/contexts/i18n-context";
@@ -18,8 +19,9 @@ import {
   saveProfile,
   winRate,
   CHART_DAYS,
+  getProfileAccent,
+  getProfileIcon,
   recentDailyStats,
-  PROFILE_ICONS,
   PROFILE_ACCENTS,
   type PlayerProfile,
   type ProfileAccent,
@@ -212,6 +214,8 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
   };
 
   const rate = winRate(profile.stats);
+  const PreviewIcon = getProfileIcon(iconId);
+  const previewAccent = getProfileAccent(accent);
   const recent = recentDailyStats(profile.stats);
   const recentGames = recent.reduce((sum, d) => sum + d.games, 0);
   const recentWins = recent.reduce((sum, d) => sum + d.wins, 0);
@@ -240,7 +244,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
       <DialogContent
         className={cn(
           "sm:max-w-md overflow-hidden flex flex-col",
-          fit(isLandscapeMenu, "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2", "max-h-[min(92dvh,40rem)] gap-3"),
+          fit(isLandscapeMenu, "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2", "w-[calc(100vw-1.5rem)] max-h-[min(92dvh,42rem)] gap-3 rounded-2xl p-5 sm:p-6"),
         )}
       >
         <DialogHeader className={cn(isLandscapeMenu && "pr-6 space-y-0.5")}>
@@ -284,21 +288,35 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
           <>
             <div
               className={cn(
-                "min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1",
-                fit(isLandscapeMenu, "space-y-2.5 py-0.5", "space-y-4 py-1"),
+                "min-h-0 flex-1 overflow-y-auto overscroll-contain -mx-2 px-2",
+                fit(isLandscapeMenu, "space-y-2.5 py-1", "space-y-4 py-1.5"),
               )}
             >
               <div className={cn(fit(isLandscapeMenu, "grid grid-cols-2 gap-2", "space-y-4"))}>
-                <div className="space-y-1.5">
-                  <Label htmlFor="profileName">{t("profile.displayName")}</Label>
-                  <Input
-                    id="profileName"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder={t("profile.namePlaceholder")}
-                    maxLength={24}
-                    className={inputClass}
-                  />
+                <div className="flex items-end gap-3">
+                  <div
+                    className={cn(
+                      "shrink-0 rounded-full border-2 flex items-center justify-center",
+                      fit(isLandscapeMenu, "w-9 h-9", "w-12 h-12"),
+                      previewAccent.ring,
+                      previewAccent.bg,
+                      previewAccent.text,
+                    )}
+                    aria-hidden
+                  >
+                    <PreviewIcon className={fit(isLandscapeMenu, "w-5 h-5", "w-7 h-7")} />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Label htmlFor="profileName">{t("profile.displayName")}</Label>
+                    <Input
+                      id="profileName"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder={t("profile.namePlaceholder")}
+                      maxLength={24}
+                      className={inputClass}
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -323,27 +341,10 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
 
               <div className="space-y-1.5">
                 <Label>{t("profile.icon")}</Label>
-                <div className={cn("grid gap-1.5", fit(isLandscapeMenu, "grid-cols-10", "grid-cols-5 gap-2"))}>
-                  {PROFILE_ICONS.map(({ id, Icon }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setIconId(id)}
-                      className={cn(
-                        "aspect-square rounded-xl border-2 flex items-center justify-center transition-colors",
-                        iconId === id
-                          ? "border-indigo-600 bg-indigo-50 text-indigo-800"
-                          : "border-gray-200 bg-white text-gray-600 hover:border-indigo-300",
-                      )}
-                      aria-label={id}
-                    >
-                      <Icon className={cn(fit(isLandscapeMenu, "w-4 h-4", "w-5 h-5"))} />
-                    </button>
-                  ))}
-                </div>
+                <ProfileIconPicker value={iconId} onChange={setIconId} compact={isLandscapeMenu} />
               </div>
 
-              <div className="grid grid-cols-4 gap-2">
+              <div className={cn("grid gap-2", fit(isLandscapeMenu, "grid-cols-4", "grid-cols-2"))}>
                 <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-2 text-center">
                   <div className="text-[10px] uppercase tracking-wide text-indigo-500 font-semibold">
                     {t("profile.gamesPlayed")}
@@ -440,8 +441,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
           <>
             <div
               className={cn(
-                "min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 space-y-3",
-                isLandscapeMenu && "py-0.5",
+                "min-h-0 flex-1 overflow-y-auto overscroll-contain -mx-2 px-2 py-1 space-y-3",
               )}
             >
               {rankProfile ? (

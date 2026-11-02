@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   defaultProfile,
+  getProfileIconGroup,
+  PROFILE_ICON_GROUPS,
+  PROFILE_ICONS,
   hasRecordedMatchStats,
   loadProfile,
   markMatchStatsRecorded,
@@ -123,5 +126,21 @@ describe("histórico de 30 dias", () => {
       stats: { history: { lixo: { games: 1 }, "2026-11-01": { games: 2, wins: 9 }, "2026-11-02": { games: -1 } } },
     }).stats;
     expect(history).toEqual({ "2026-11-01": { games: 2, wins: 2 } });
+  });
+});
+
+describe("ícones do perfil", () => {
+  it("mantém ícones novos ao salvar e rejeita ids desconhecidos", () => {
+    expect(normalizeProfile({ iconId: "samurai" }).iconId).toBe("samurai");
+    expect(normalizeProfile({ iconId: "nao-existe" }).iconId).toBe("spade");
+  });
+
+  it("tem ids únicos e todo tema tem ícones", () => {
+    const ids = PROFILE_ICONS.map((i) => i.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const group of PROFILE_ICON_GROUPS) {
+      expect(PROFILE_ICONS.some((i) => i.group === group)).toBe(true);
+    }
+    expect(getProfileIconGroup("astronaut")).toBe("explorers");
   });
 });

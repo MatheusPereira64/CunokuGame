@@ -9,10 +9,44 @@ import {
   Moon,
   Sun,
   Zap,
-  type LucideIcon,
 } from "lucide-react";
+import type { ComponentType } from "react";
+import {
+  GiSamuraiHelmet,
+  GiNinjaHead,
+  GiVikingHelmet,
+  GiBlackKnightHelm,
+  GiSpartanHelmet,
+  GiOni,
+  GiWesternHat,
+  GiPirateCaptain,
+  GiAstronautHelmet,
+  GiSherlockHolmes,
+  GiPlanePilot,
+  GiDivingHelmet,
+  GiWizardFace,
+  GiWitchFace,
+  GiWomanElfFace,
+  GiDwarfFace,
+  GiVampireDracula,
+  GiJesterHat,
+  GiRobotHelmet,
+  GiCyborgFace,
+  GiAlienStare,
+  GiUfo,
+  GiFox,
+  GiWolfHead,
+  GiPanda,
+  GiCat,
+  GiDragonHead,
+  GiMonkey,
+} from "react-icons/gi";
 
 export const PROFILE_STORAGE_KEY = "cunoku_player_profile";
+
+export const PROFILE_ICON_GROUPS = ["classic", "warriors", "explorers", "fantasy", "future", "animals"] as const;
+
+export type ProfileIconGroup = (typeof PROFILE_ICON_GROUPS)[number];
 
 export type ProfileIconId =
   | "spade"
@@ -24,7 +58,38 @@ export type ProfileIconId =
   | "flame"
   | "moon"
   | "sun"
-  | "zap";
+  | "zap"
+  | "samurai"
+  | "ninja"
+  | "viking"
+  | "knight"
+  | "spartan"
+  | "oni"
+  | "cowboy"
+  | "pirate"
+  | "astronaut"
+  | "detective"
+  | "pilot"
+  | "diver"
+  | "wizard"
+  | "witch"
+  | "elf"
+  | "dwarf"
+  | "vampire"
+  | "jester"
+  | "robot"
+  | "cyborg"
+  | "alien"
+  | "ufo"
+  | "fox"
+  | "wolf"
+  | "panda"
+  | "cat"
+  | "dragon"
+  | "monkey";
+
+/** Aceita os ícones do lucide e os de personagem do react-icons. */
+export type ProfileIconComponent = ComponentType<{ className?: string; strokeWidth?: string | number }>;
 
 export type ProfileAccent = "indigo" | "red" | "amber" | "emerald" | "slate";
 
@@ -54,17 +119,45 @@ export interface PlayerProfile {
   updatedAt: string;
 }
 
-export const PROFILE_ICONS: { id: ProfileIconId; Icon: LucideIcon }[] = [
-  { id: "spade", Icon: Spade },
-  { id: "heart", Icon: Heart },
-  { id: "club", Icon: Club },
-  { id: "diamond", Icon: Diamond },
-  { id: "crown", Icon: Crown },
-  { id: "star", Icon: Star },
-  { id: "flame", Icon: Flame },
-  { id: "moon", Icon: Moon },
-  { id: "sun", Icon: Sun },
-  { id: "zap", Icon: Zap },
+export const PROFILE_ICONS: { id: ProfileIconId; group: ProfileIconGroup; Icon: ProfileIconComponent }[] = [
+  { id: "spade", group: "classic", Icon: Spade },
+  { id: "heart", group: "classic", Icon: Heart },
+  { id: "club", group: "classic", Icon: Club },
+  { id: "diamond", group: "classic", Icon: Diamond },
+  { id: "crown", group: "classic", Icon: Crown },
+  { id: "star", group: "classic", Icon: Star },
+  { id: "flame", group: "classic", Icon: Flame },
+  { id: "moon", group: "classic", Icon: Moon },
+  { id: "sun", group: "classic", Icon: Sun },
+  { id: "zap", group: "classic", Icon: Zap },
+  { id: "samurai", group: "warriors", Icon: GiSamuraiHelmet },
+  { id: "ninja", group: "warriors", Icon: GiNinjaHead },
+  { id: "viking", group: "warriors", Icon: GiVikingHelmet },
+  { id: "knight", group: "warriors", Icon: GiBlackKnightHelm },
+  { id: "spartan", group: "warriors", Icon: GiSpartanHelmet },
+  { id: "oni", group: "warriors", Icon: GiOni },
+  { id: "cowboy", group: "explorers", Icon: GiWesternHat },
+  { id: "pirate", group: "explorers", Icon: GiPirateCaptain },
+  { id: "astronaut", group: "explorers", Icon: GiAstronautHelmet },
+  { id: "detective", group: "explorers", Icon: GiSherlockHolmes },
+  { id: "pilot", group: "explorers", Icon: GiPlanePilot },
+  { id: "diver", group: "explorers", Icon: GiDivingHelmet },
+  { id: "wizard", group: "fantasy", Icon: GiWizardFace },
+  { id: "witch", group: "fantasy", Icon: GiWitchFace },
+  { id: "elf", group: "fantasy", Icon: GiWomanElfFace },
+  { id: "dwarf", group: "fantasy", Icon: GiDwarfFace },
+  { id: "vampire", group: "fantasy", Icon: GiVampireDracula },
+  { id: "jester", group: "fantasy", Icon: GiJesterHat },
+  { id: "robot", group: "future", Icon: GiRobotHelmet },
+  { id: "cyborg", group: "future", Icon: GiCyborgFace },
+  { id: "alien", group: "future", Icon: GiAlienStare },
+  { id: "ufo", group: "future", Icon: GiUfo },
+  { id: "fox", group: "animals", Icon: GiFox },
+  { id: "wolf", group: "animals", Icon: GiWolfHead },
+  { id: "panda", group: "animals", Icon: GiPanda },
+  { id: "cat", group: "animals", Icon: GiCat },
+  { id: "dragon", group: "animals", Icon: GiDragonHead },
+  { id: "monkey", group: "animals", Icon: GiMonkey },
 ];
 
 export const PROFILE_ACCENTS: {
@@ -231,7 +324,11 @@ export function recordMatchResult(input: MatchResultInput, now = new Date()): Pl
   });
 }
 
-export function getProfileIcon(iconId: ProfileIconId): LucideIcon {
+export function getProfileIconGroup(iconId: ProfileIconId): ProfileIconGroup {
+  return PROFILE_ICONS.find((i) => i.id === iconId)?.group ?? "classic";
+}
+
+export function getProfileIcon(iconId: ProfileIconId): ProfileIconComponent {
   return PROFILE_ICONS.find((i) => i.id === iconId)?.Icon ?? Spade;
 }
 
