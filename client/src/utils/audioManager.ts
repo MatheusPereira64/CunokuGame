@@ -7,6 +7,10 @@ import { randomFloat } from "@shared/secureRandom";
 
 type MusicTrack = "menu" | "game";
 
+function isAbortError(err: unknown): boolean {
+  return (err as { name?: string } | null)?.name === "AbortError";
+}
+
 class AudioManager {
   private menuMusic: HTMLAudioElement | null = null;
   private gameMusic: HTMLAudioElement | null = null;
@@ -22,6 +26,8 @@ class AudioManager {
   private audioCtx: AudioContext | null = null;
   private readonly unlockEvents = ["pointerdown", "touchstart", "keydown", "click"] as const;
   private unlockHandler: (() => void) | null = null;
+  /** Identifica a tentativa de play atual: respostas de tentativas antigas são ignoradas. */
+  private playAttempt = 0;
 
   constructor() {
     const savedMusicVolume = localStorage.getItem("cunoku_music_volume");
@@ -56,14 +62,17 @@ class AudioManager {
     return audio;
   }
 
+  /** Espera o próximo gesto; volta a ser chamado sempre que o navegador bloquear o som. */
   private setupUserInteraction(): void {
+    if (this.unlockHandler) return;
     this.unlockHandler = () => {
+      this.teardownUnlockListeners();
       this.userInteracted = true;
       this.getAudioContext();
+      this.primeIdleTracks();
       if (!this.isMuted) {
         this.unlockAudiblePlayback().catch(() => undefined);
       }
-      this.teardownUnlockListeners();
     };
 
     // Vários eventos: em mobile o primeiro gesto pode ser pointer/touch, não click
@@ -79,6 +88,30 @@ class AudioManager {
       document.removeEventListener(event, this.unlockHandler, true);
     }
     this.unlockHandler = null;
+  }
+
+  /**
+   * iOS/Safari liberam cada elemento de áudio separadamente, e só dentro de um gesto.
+   * Sem isso a música da partida, que começa sem gesto (ex.: ao chegar o estado da sala),
+   * seria bloqueada mesmo com a do menu tocando.
+   */
+  private primeIdleTracks(): void {
+    const tracks: [MusicTrack, HTMLAudioElement | null][] = [
+      ["menu", this.menuMusic],
+      ["game", this.gameMusic],
+    ];
+    for (const [name, el] of tracks) {
+      if (!el || name === this.desiredTrack || !el.paused) continue;
+      el.muted = true;
+      const restore = () => {
+        // A faixa pode ter passado a ser a desejada enquanto era liberada
+        if (this.desiredTrack === name) return;
+        el.pause();
+        el.currentTime = 0;
+        el.muted = false;
+      };
+      el.play().then(restore, restore);
+    }
   }
 
   /** Após gesto: desmuta faixa já tocando ou retoma play audível. */
@@ -135,26 +168,34 @@ class AudioManager {
   private async tryPlay(audio: HTMLAudioElement | null): Promise<boolean> {
     if (!audio || this.isMuted) return false;
 
+    const attempt = ++this.playAttempt;
     audio.volume = this.musicVolume;
 
     // 1) Tenta audível (WebView Android com mediaPlaybackRequiresUserGesture=false)
     try {
       audio.muted = false;
       await audio.play();
+      if (attempt !== this.playAttempt) return false;
       this.userInteracted = true;
       this.awaitingAudibleUnlock = false;
       return true;
-    } catch {
-      // 2) Autoplay mudo (permitido na maioria dos browsers); fica audível no 1º gesto
-      try {
-        audio.muted = true;
-        await audio.play();
-        this.awaitingAudibleUnlock = true;
-        return true;
-      } catch (err) {
+    } catch (err) {
+      // Interrompida por pause(): não é bloqueio do navegador, e a faixa não deve voltar a tocar
+      if (attempt !== this.playAttempt || isAbortError(err)) return false;
+    }
+
+    // 2) Autoplay mudo (permitido na maioria dos browsers); fica audível no próximo gesto
+    this.awaitingAudibleUnlock = true;
+    this.setupUserInteraction();
+    try {
+      audio.muted = true;
+      await audio.play();
+      return attempt === this.playAttempt;
+    } catch (err) {
+      if (attempt === this.playAttempt && !isAbortError(err)) {
         console.log("Menu/game music waiting for user gesture:", err);
-        return false;
       }
+      return false;
     }
   }
 
@@ -166,6 +207,7 @@ class AudioManager {
   }
 
   private pauseAllMusic(resetTime: boolean): void {
+    this.playAttempt += 1;
     for (const track of [this.menuMusic, this.gameMusic]) {
       if (!track) continue;
       track.pause();
