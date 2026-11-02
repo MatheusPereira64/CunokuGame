@@ -1,6 +1,7 @@
 import { getDb } from "./db";
 import { rooms, type Room, type InsertRoom, type GameState } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { ensureRankSchema } from "./rankEnsure";
 import { DrizzleCompetitionStore, MemoryCompetitionStore, type CompetitionStore } from "./competitionStore";
 
 export interface IStorage {
@@ -9,6 +10,39 @@ export interface IStorage {
   listRooms(): Promise<Room[]>;
   updateGameState(code: string, state: GameState): Promise<Room>;
   updateRoomStatus(code: string, status: string): Promise<Room>;
+}
+
+function throwCreateRoomError(err: any, insertRoom: InsertRoom): never {
+  console.error("DatabaseStorage.createRoom - Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+  console.error("DatabaseStorage.createRoom - Error name:", err.name);
+  console.error("DatabaseStorage.createRoom - Error message:", err.message);
+  console.error("DatabaseStorage.createRoom - Error code:", err.code);
+  console.error("DatabaseStorage.createRoom - Error detail:", err.detail);
+  console.error("DatabaseStorage.createRoom - Error constraint:", err.constraint);
+  console.error("DatabaseStorage.createRoom - Error stack:", err.stack);
+  console.error("DatabaseStorage.createRoom - Insert data:", JSON.stringify(insertRoom));
+
+  if (err.stack?.includes("@neondatabase/serverless") && !process.env.DATABASE_URL?.includes("neon.tech")) {
+    console.error("⚠️ ERROR: Using Neon driver but DATABASE_URL is not from Neon!");
+    console.error("DATABASE_URL set:", process.env.DATABASE_URL ? "yes" : "no");
+  }
+
+  let errorMessage = "Unknown error";
+  if (err.message) {
+    errorMessage = err.message;
+  } else if (err.code) {
+    errorMessage = `Database error code: ${err.code}`;
+  } else if (err.detail) {
+    errorMessage = err.detail;
+  } else if (err.name) {
+    errorMessage = `${err.name}: ${errorMessage}`;
+  }
+
+  if (err.constraint) {
+    errorMessage += ` (constraint: ${err.constraint})`;
+  }
+
+  throw new Error(`Failed to create room in database: ${errorMessage}`);
 }
 
 export class DatabaseStorage implements IStorage {
@@ -32,39 +66,7 @@ export class DatabaseStorage implements IStorage {
       console.log("DatabaseStorage.createRoom - Room created:", room.id);
       return room;
     } catch (err: any) {
-      console.error("DatabaseStorage.createRoom - Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
-      console.error("DatabaseStorage.createRoom - Error name:", err.name);
-      console.error("DatabaseStorage.createRoom - Error message:", err.message);
-      console.error("DatabaseStorage.createRoom - Error code:", err.code);
-      console.error("DatabaseStorage.createRoom - Error detail:", err.detail);
-      console.error("DatabaseStorage.createRoom - Error constraint:", err.constraint);
-      console.error("DatabaseStorage.createRoom - Error stack:", err.stack);
-      console.error("DatabaseStorage.createRoom - Insert data:", JSON.stringify(insertRoom));
-      
-      // Check if error is from Neon when it shouldn't be
-      if (err.stack?.includes('@neondatabase/serverless') && !process.env.DATABASE_URL?.includes('neon.tech')) {
-        console.error("⚠️ ERROR: Using Neon driver but DATABASE_URL is not from Neon!");
-        console.error("DATABASE_URL preview:", process.env.DATABASE_URL ? `${process.env.DATABASE_URL.substring(0, 50)}...` : 'none');
-      }
-      
-      // Try to extract more information from the error
-      let errorMessage = "Unknown error";
-      if (err.message) {
-        errorMessage = err.message;
-      } else if (err.code) {
-        errorMessage = `Database error code: ${err.code}`;
-      } else if (err.detail) {
-        errorMessage = err.detail;
-      } else if (err.name) {
-        errorMessage = `${err.name}: ${errorMessage}`;
-      }
-      
-      // Add constraint information if available
-      if (err.constraint) {
-        errorMessage += ` (constraint: ${err.constraint})`;
-      }
-      
-      throw new Error(`Failed to create room in database: ${errorMessage}`);
+      throwCreateRoomError(err, insertRoom);
     }
   }
 
@@ -149,5 +151,5 @@ export const storage = process.env.DATABASE_URL
   : new MemoryStorage();
 
 export const competitionStore: CompetitionStore = process.env.DATABASE_URL
-  ? new DrizzleCompetitionStore(getDb)
+  ? new DrizzleCompetitionStore(ensureRankSchema)
   : new MemoryCompetitionStore();

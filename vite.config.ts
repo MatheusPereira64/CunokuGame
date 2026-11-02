@@ -27,7 +27,7 @@ export default defineConfig({
         background_color: "#1c1917",
         display: "standalone",
         display_override: ["standalone", "fullscreen", "minimal-ui"],
-        orientation: "landscape-primary",
+        orientation: "any",
         start_url: "/",
         scope: "/",
         categories: ["games", "entertainment"],

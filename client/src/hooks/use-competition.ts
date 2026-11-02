@@ -1,11 +1,15 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
-import { PLAYER_KEY_HEADER } from "@shared/competition";
 import { apiUrl } from "@/lib/gameServer";
-import { getPlayerKey } from "@/lib/playerKey";
+import { getRankToken } from "@/lib/rankAuth";
 
-async function fetchWithKey(path: string): Promise<unknown> {
-  const res = await fetch(apiUrl(path), { headers: { [PLAYER_KEY_HEADER]: getPlayerKey() } });
+function authHeaders(): Record<string, string> {
+  const token = getRankToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function fetchWithAccount(path: string): Promise<unknown> {
+  const res = await fetch(apiUrl(path), { headers: authHeaders() });
   if (!res.ok) throw new Error(`Request failed: ${res.status}`);
   return res.json();
 }
@@ -16,7 +20,7 @@ export function useDailyStatus(enabled: boolean) {
     enabled,
     staleTime: 0,
     retry: false,
-    queryFn: async () => api.daily.status.responses[200].parse(await fetchWithKey(api.daily.status.path)),
+    queryFn: async () => api.daily.status.responses[200].parse(await fetchWithAccount(api.daily.status.path)),
   });
 }
 
@@ -27,18 +31,16 @@ export function useLeagueStandings(enabled: boolean) {
     staleTime: 0,
     retry: false,
     queryFn: async () =>
-      api.league.standings.responses[200].parse(await fetchWithKey(api.league.standings.path)),
+      api.league.standings.responses[200].parse(await fetchWithAccount(api.league.standings.path)),
   });
 }
 
 export function useStartDaily() {
   return useMutation({
-    mutationFn: async (playerName: string) => {
-      const body = api.daily.start.input.parse({ playerKey: getPlayerKey(), playerName });
+    mutationFn: async () => {
       const res = await fetch(apiUrl(api.daily.start.path), {
         method: api.daily.start.method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        headers: authHeaders(),
       });
       if (!res.ok) throw new Error(`Request failed: ${res.status}`);
       return api.daily.start.responses[200].parse(await res.json());

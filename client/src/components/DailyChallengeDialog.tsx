@@ -10,28 +10,24 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/Button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useI18n } from "@/contexts/i18n-context";
 import { formatTimeLeft, useDailyStatus, useStartDaily } from "@/hooks/use-competition";
 import { useToast } from "@/hooks/use-toast";
 import { selectMainServer } from "@/lib/gameServer";
+import { loadProfile } from "@/lib/playerProfile";
+import { isRankLoggedIn } from "@/lib/rankAuth";
 import { cn } from "@/lib/utils";
 
 interface DailyChallengeDialogProps {
   compact?: boolean;
   triggerClassName?: string;
   iconClassName?: string;
-  name: string;
-  onNameChange: (name: string) => void;
 }
 
 export function DailyChallengeDialog({
   compact = false,
   triggerClassName,
   iconClassName,
-  name,
-  onNameChange,
 }: DailyChallengeDialogProps) {
   const { t } = useI18n();
   const { toast } = useToast();
@@ -41,20 +37,17 @@ export function DailyChallengeDialog({
   const start = useStartDaily();
   const data = status.data;
 
+  const loggedIn = isRankLoggedIn();
+
   const handlePlay = async () => {
-    const playerName = name.trim();
-    if (!playerName) {
-      toast({ title: t("error.nameRequired"), description: t("error.nameRequiredDesc"), variant: "destructive" });
-      return;
-    }
     try {
-      const result = await start.mutateAsync(playerName);
+      const result = await start.mutateAsync();
       if (result.alreadyPlayed || !result.code || !result.playerId) {
         await status.refetch();
         return;
       }
       sessionStorage.setItem(`player_${result.code}`, result.playerId);
-      sessionStorage.setItem(`playerName_${result.code}`, playerName);
+      sessionStorage.setItem(`playerName_${result.code}`, loadProfile().displayName);
       setOpen(false);
       setLocation(`/game/${result.code}?player=${result.playerId}`);
     } catch {
@@ -154,24 +147,16 @@ export function DailyChallengeDialog({
                 <p className="mt-1.5 text-[11px] text-gray-500">{t("profile.bestScoreHint")}</p>
               </div>
 
-              {!data.result && !data.inProgress && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="dailyName">{t("bots.yourName")}</Label>
-                  <Input
-                    id="dailyName"
-                    value={name}
-                    maxLength={24}
-                    placeholder={t("bots.namePlaceholder")}
-                    onChange={(e) => onNameChange(e.target.value)}
-                    className={compact ? "h-9 text-sm" : undefined}
-                  />
-                </div>
+              {!loggedIn && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                  {t("competition.loginRequired")}
+                </p>
               )}
             </>
           )}
         </div>
 
-        {data && !data.result && (
+        {data && !data.result && loggedIn && (
           <Button className={cn("w-full", compact && "h-9 text-sm")} onClick={handlePlay} isLoading={start.isPending}>
             <Play className="mr-2 h-4 w-4" /> {data.inProgress ? t("daily.resume") : t("daily.play")}
           </Button>

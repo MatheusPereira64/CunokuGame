@@ -3,7 +3,6 @@ import {
   aggregateLeague,
   computeStreak,
   dailyPoints,
-  leagueTier,
   nextDayStart,
   nextWeekStart,
   previousWeekKey,
@@ -12,8 +11,8 @@ import {
 } from "./competition";
 import { seededRandom } from "./seededRandom";
 
-function result(playerKey: string, points: number, overrides: Partial<Parameters<typeof aggregateLeague>[0][number]> = {}) {
-  return { playerKey, displayName: playerKey, won: false, score: 0, points, createdAt: new Date(0), ...overrides };
+function result(rankPlayerId: string, points: number, overrides: Partial<Parameters<typeof aggregateLeague>[0][number]> = {}) {
+  return { rankPlayerId, displayName: rankPlayerId, won: false, score: 0, points, createdAt: new Date(0), ...overrides };
 }
 
 describe("computeStreak", () => {
@@ -57,19 +56,13 @@ describe("semanas", () => {
   });
 });
 
-describe("pontos e faixas", () => {
+describe("pontos", () => {
   it("premia vitória e score baixo com limite de bônus", () => {
     expect(dailyPoints(false, 30)).toBe(10);
     expect(dailyPoints(true, 5)).toBe(35);
     expect(dailyPoints(true, -20)).toBe(40);
   });
 
-  it("define a faixa pelos pontos", () => {
-    expect(leagueTier(0)).toBe("bronze");
-    expect(leagueTier(50)).toBe("silver");
-    expect(leagueTier(120)).toBe("gold");
-    expect(leagueTier(250)).toBe("diamond");
-  });
 });
 
 describe("rankings", () => {
@@ -79,7 +72,7 @@ describe("rankings", () => {
       result("early", 0, { score: 4, createdAt: new Date(1000) }),
       result("best", 0, { score: 1, createdAt: new Date(3000) }),
     ]);
-    expect(rows.map((r) => r.playerKey)).toEqual(["best", "early", "late"]);
+    expect(rows.map((r) => r.rankPlayerId)).toEqual(["best", "early", "late"]);
   });
 
   it("soma por jogador e usa o nome mais recente", () => {
@@ -88,8 +81,8 @@ describe("rankings", () => {
       result("b", 15),
       result("a", 10, { displayName: "Novo", createdAt: new Date(2000) }),
     ]);
-    expect(standings[0]).toMatchObject({ playerKey: "a", name: "Novo", points: 20, wins: 1, games: 2, rank: 1 });
-    expect(standings[1]).toMatchObject({ playerKey: "b", rank: 2 });
+    expect(standings[0]).toMatchObject({ rankPlayerId: "a", name: "Novo", points: 20, wins: 1, games: 2, rank: 1 });
+    expect(standings[1]).toMatchObject({ rankPlayerId: "b", rank: 2 });
   });
 });
 

@@ -2,11 +2,12 @@ import type { GameState, Player, Room } from "@shared/schema";
 import { filterGameStateForPlayer } from "@shared/gameFilter";
 import { GameLogic } from "./game";
 import { BotPlayer, createBots, type BotDifficulty } from "./bot";
+import { autoPlayDisconnectedTurn, syncReconnectWindow } from "./disconnectTurn";
 import type { IStorage } from "./storage";
 import { EMOTE_COOLDOWN_MS, isEmoteId } from "@shared/emotes";
-import { isPlayerKey } from "@shared/competition";
 import { recordFinishedMatch, type RecordedReward } from "./competition";
 import type { CompetitionStore } from "./competitionStore";
+import { QUICK_MATCH_MODE } from "@shared/matchQueue";
 
 export type RoomMessenger = {
   /** Envia JSON a um jogador conectado. */
@@ -20,13 +21,13 @@ export type RoomMessenger = {
 export type RoomSessionData = {
   playerNames: Map<string, string>;
   bots: BotPlayer[];
-  /** playerId da sala → chave estável do aparelho (ranking). */
-  playerKeys: Map<string, string>;
+  /** playerId da sala → conta do ranking, validada pelo token no join. */
+  rankPlayerIds: Map<string, string>;
   lastEmoteAt: Map<string, number>;
 };
 
 export function createEmptySession(): RoomSessionData {
-  return { playerNames: new Map(), bots: [], playerKeys: new Map(), lastEmoteAt: new Map() };
+  return { playerNames: new Map(), bots: [], rankPlayerIds: new Map(), lastEmoteAt: new Map() };
 }
 
 export function serializeBots(bots: BotPlayer[]): { id: string; name: string; difficulty: BotDifficulty }[] {
@@ -55,13 +56,14 @@ export async function handleJoinMessage(
   storage: IStorage,
   session: RoomSessionData,
   messenger: RoomMessenger,
-  msg: { code: string; playerId: string; name: string; playerKey?: unknown },
+  msg: { code: string; playerId: string; name: string; rankToken?: unknown },
   registerConnection: (playerId: string) => void,
   /** Envio direto no socket que está entrando (antes de estar no mapa). */
   reply: (msg: unknown) => void,
-  scheduleBot: (roomCode: string, state: GameState) => void,
+  scheduleFollowUp?: (roomCode: string, state: GameState) => void,
+  competition?: CompetitionStore,
 ): Promise<void> {
-  const { code, playerId, name, playerKey } = msg;
+  const { code, playerId, name, rankToken } = msg;
   const room = await storage.getRoom(code);
   if (!room) {
     reply({ type: "error", message: "Room not found" });
@@ -70,19 +72,25 @@ export async function handleJoinMessage(
 
   const maxPlayers = (room as { maxPlayers?: number }).maxPlayers || 4;
 
+  await rememberRankAccount(competition, session, playerId, rankToken);
+
   if (room.gameState) {
     const state = room.gameState as GameState;
-    // Desafio diário: o dono da tentativa pode sair e retomar a mesma partida
-    if (room.gameMode === "daily" && state.players.some((p) => p.id === playerId)) {
-      registerConnection(playerId);
-      session.playerNames.set(playerId, name);
-      reply({ type: "game_state", state: filterGameStateForPlayer(state, playerId) });
-      if (!state.winnerId && state.players[state.currentPlayerIndex]?.isBot) {
-        scheduleBot(code, state);
-      }
+    const existing = state.players.find((p) => p.id === playerId && !p.isBot);
+    if (!existing) {
+      reply({ type: "error", message: "Game has already started" });
       return;
     }
-    reply({ type: "error", message: "Game has already started" });
+    existing.isConnected = true;
+    if (name) {
+      existing.name = name;
+      session.playerNames.set(playerId, name);
+    }
+    registerConnection(playerId);
+    const synced = syncReconnectWindow(state);
+    await storage.updateGameState(code, synced);
+    messenger.broadcast({ type: "game_state", state: synced });
+    scheduleFollowUp?.(code, synced);
     return;
   }
 
@@ -99,7 +107,6 @@ export async function handleJoinMessage(
 
   registerConnection(playerId);
   session.playerNames.set(playerId, name);
-  if (isPlayerKey(playerKey)) session.playerKeys.set(playerId, playerKey);
 
   const lobbyPlayers = buildLobbyPlayers(session, messenger.getConnectedPlayerIds());
   messenger.broadcast(
@@ -111,6 +118,44 @@ export async function handleJoinMessage(
     null,
   );
   messenger.broadcast({ type: "player_joined", playerId, name }, playerId);
+}
+
+/** Marca o jogador como desconectado se não houver outro socket dele. */
+export async function handlePlayerDisconnect(
+  storage: IStorage,
+  messenger: RoomMessenger,
+  roomCode: string,
+  playerId: string,
+  scheduleFollowUp?: (roomCode: string, state: GameState) => void,
+): Promise<void> {
+  if (messenger.getConnectedPlayerIds().includes(playerId)) return;
+  const room = await storage.getRoom(roomCode);
+  if (!room?.gameState) return;
+  const state = room.gameState as GameState;
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player || player.isBot || !player.isConnected) return;
+  player.isConnected = false;
+  const synced = syncReconnectWindow(state);
+  await storage.updateGameState(roomCode, synced);
+  messenger.broadcast({ type: "game_state", state: synced });
+  scheduleFollowUp?.(roomCode, synced);
+}
+
+/** Compra e descarta pelo jogador que não voltou a tempo. */
+export async function resolveDisconnectedTurn(
+  storage: IStorage,
+  messenger: RoomMessenger,
+  roomCode: string,
+  playerId: string,
+): Promise<GameState | null> {
+  const room = await storage.getRoom(roomCode);
+  const state = room?.gameState as GameState | undefined;
+  if (!state || state.reconnectPlayerId !== playerId) return null;
+  const next = autoPlayDisconnectedTurn(state);
+  if (next === state) return state;
+  await storage.updateGameState(roomCode, next);
+  messenger.broadcast({ type: "game_state", state: next });
+  return next;
 }
 
 export async function handleStartGame(
@@ -135,7 +180,10 @@ export async function handleStartGame(
     return;
   }
 
-  if (room.hostId !== playerId) {
+  if (room.gameState) return;
+
+  const quickMatch = room.gameMode === QUICK_MATCH_MODE;
+  if (room.hostId !== playerId && !quickMatch) {
     messenger.send(playerId, { type: "error", message: "Only the host can start the game" });
     return;
   }
@@ -206,8 +254,8 @@ export async function handlePlayerAction(
   playerId: string,
   action: unknown,
   scheduleBot: (roomCode: string, state: GameState) => void,
-  session: RoomSessionData,
-  competition: CompetitionStore,
+  session?: RoomSessionData,
+  competition?: CompetitionStore,
 ): Promise<void> {
   if (!roomCode || !playerId) return;
 
@@ -217,6 +265,7 @@ export async function handlePlayerAction(
   const state = room.gameState as GameState;
   if (state.winnerId) return;
   const result = GameLogic.processAction(state, action as never, playerId);
+  result.newState = syncReconnectWindow(result.newState);
 
   await storage.updateGameState(roomCode, result.newState);
   const rewards = await settleFinishedMatch(competition, room, result.newState, session);
@@ -245,7 +294,8 @@ export async function handlePlayerAction(
     messenger.broadcast({ type: "card_swap", swapInfo: result.swapInfo });
   }
 
-  if (!result.newState.winnerId && result.newState.players[result.newState.currentPlayerIndex]?.isBot) {
+  const next = result.newState.players[result.newState.currentPlayerIndex];
+  if (!result.newState.winnerId && (next?.isBot || result.newState.reconnectDeadline)) {
     scheduleBot(roomCode, result.newState);
   }
 }
@@ -256,7 +306,7 @@ export async function executeBotTurn(
   messenger: RoomMessenger,
   roomCode: string,
   scheduleBot: (roomCode: string, state: GameState) => void,
-  competition: CompetitionStore,
+  competition?: CompetitionStore,
 ): Promise<void> {
   const room = await storage.getRoom(roomCode);
   if (!room || !room.gameState) return;
@@ -326,21 +376,45 @@ export async function executeBotTurn(
     sendRewards(messenger, rewards);
   }
 
-  if (!updatedState.winnerId && updatedState.players[updatedState.currentPlayerIndex]?.isBot) {
+  const synced = syncReconnectWindow(updatedState);
+  if (synced !== updatedState) {
+    updatedState = synced;
+    await storage.updateGameState(roomCode, updatedState);
+    messenger.broadcast({ type: "game_state", state: updatedState });
+  }
+
+  const next = updatedState.players[updatedState.currentPlayerIndex];
+  if (!updatedState.winnerId && (next?.isBot || updatedState.reconnectDeadline)) {
     scheduleBot(roomCode, updatedState);
+  }
+}
+
+/** O token nunca é confiado sem validação: é ele que liga o jogador da sala à conta do ranking. */
+async function rememberRankAccount(
+  competition: CompetitionStore | undefined,
+  session: RoomSessionData,
+  playerId: string,
+  rankToken: unknown,
+): Promise<void> {
+  if (!competition || typeof rankToken !== "string" || !rankToken) return;
+  try {
+    const account = await competition.getAccountByToken(rankToken);
+    if (account) session.rankPlayerIds.set(playerId, account.id);
+  } catch (e) {
+    console.error("Failed to validate rank token", e);
   }
 }
 
 /** Registra o resultado uma única vez; falha de ranking nunca pode travar a partida. */
 async function settleFinishedMatch(
-  competition: CompetitionStore,
+  competition: CompetitionStore | undefined,
   room: Room,
   state: GameState,
-  session: RoomSessionData,
+  session: RoomSessionData | undefined,
 ): Promise<RecordedReward[]> {
-  if (!state.winnerId) return [];
+  if (!state.winnerId || !competition || !session) return [];
   try {
-    return await recordFinishedMatch(competition, room, state, session.playerKeys);
+    return await recordFinishedMatch(competition, room, state, session.rankPlayerIds);
   } catch (e) {
     console.error("Failed to record match result", e);
     return [];

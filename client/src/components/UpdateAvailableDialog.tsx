@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,10 +11,24 @@ import { Button } from "@/components/Button";
 import { useI18n } from "@/contexts/i18n-context";
 import { useUpdateCheck } from "@/hooks/use-update-check";
 import { Download, Sparkles } from "lucide-react";
+import { SelfUpdateBar } from "@/components/SelfUpdateBar";
+import { canSelfUpdate } from "@/lib/nativeUpdater";
 
 export function UpdateAvailableDialog() {
   const { t } = useI18n();
   const { update, open, setOpen, dismiss, download, currentVersion } = useUpdateCheck();
+  const [selfUpdating, setSelfUpdating] = useState(false);
+
+  if (update && selfUpdating) return <SelfUpdateBar update={update} />;
+
+  const onDownload = () => {
+    if (update && canSelfUpdate(update.assetName)) {
+      setOpen(false);
+      setSelfUpdating(true);
+      return;
+    }
+    download();
+  };
 
   // Sem update válido (versão igual ou mais nova local) → não renderiza
   if (!update || !open) return null;
@@ -47,7 +62,7 @@ export function UpdateAvailableDialog() {
           <Button variant="outline" className="w-full sm:w-auto" onClick={dismiss}>
             {t("update.later")}
           </Button>
-          <Button variant="primary" className="w-full sm:w-auto" onClick={download}>
+          <Button variant="primary" className="w-full sm:w-auto" onClick={onDownload}>
             <Download className="w-4 h-4 mr-2" />
             {t("update.download")}
           </Button>

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { GameState } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Button } from "@/components/Button";
-import { cn } from "@/lib/utils";
+import { cn, fit } from "@/lib/utils";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import { useI18n } from "@/contexts/i18n-context";
 import { hasSpecialAbility } from "./helpers";
@@ -32,18 +32,24 @@ export function CenterPile({
   const isCompact = useIsCompactGame();
   const { t } = useI18n();
 
-  const cardClass = isCompact ? "w-12 h-[4.25rem]" : "w-20 h-28 md:w-24 md:h-36";
+  const cardClass = fit(isCompact, "w-12 h-[4.25rem]", "w-20 h-28 md:w-24 md:h-36");
+  const canDraw = isMyTurn && phase === "draw";
 
   return (
-    <div className={cn("flex items-center", isCompact ? "gap-2.5" : "gap-10")}>
+    <div className={cn("flex items-center", fit(isCompact, "gap-2.5", "gap-10"))}>
       {/* Baralho */}
       <div className="relative group" ref={deckRef}>
         {gameState.deck.length > 0 ? (
-          <div
-            onClick={() => isMyTurn && phase === "draw" && onDrawDeck()}
-            className={isMyTurn && phase === "draw" ? "cursor-pointer" : ""}
+          <button
+            type="button"
+            disabled={!canDraw}
+            onClick={onDrawDeck}
+            className={cn(
+              "relative block border-0 bg-transparent p-0 text-left disabled:opacity-100",
+              fit(canDraw, "cursor-pointer", "cursor-default")
+            )}
           >
-            {isMyTurn && phase === "draw" && !isCompact && (
+            {canDraw && !isCompact && (
               <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-center whitespace-nowrap z-10">
                 <div className="text-[10px] md:text-xs text-yellow-400 font-bold animate-pulse">
                   {t("game.clickToDraw")}
@@ -55,23 +61,21 @@ export function CenterPile({
               className={cn(
                 "transition-all",
                 cardClass,
-                isMyTurn && phase === "draw"
-                  ? "cursor-pointer hover:ring-4 ring-white/50 hover:scale-105"
-                  : "opacity-80"
+                fit(canDraw, "cursor-pointer hover:ring-4 ring-white/50 hover:scale-105", "opacity-80")
               )}
             />
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span
                 className={cn(
                   "font-bold transition-all drop-shadow-md",
-                  isCompact ? "text-[8px]" : "text-sm",
-                  isMyTurn && phase === "draw" ? "text-white" : "text-white/80"
+                  fit(isCompact, "text-[8px]", "text-sm"),
+                  fit(canDraw, "text-white", "text-white/80")
                 )}
               >
                 {t("game.deck")}
               </span>
             </div>
-          </div>
+          </button>
         ) : (
           <div
             className={cn(
@@ -79,7 +83,7 @@ export function CenterPile({
               cardClass
             )}
           >
-            <span className={cn("text-white/20", isCompact ? "text-[8px]" : "text-xs")}>EMPTY</span>
+            <span className={cn("text-white/20", fit(isCompact, "text-[8px]", "text-xs"))}>EMPTY</span>
           </div>
         )}
       </div>
@@ -91,7 +95,7 @@ export function CenterPile({
             initial={{ scale: 0, y: -30 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0, opacity: 0 }}
-            className={cn("relative z-20 flex items-center", isCompact ? "gap-1" : "gap-2")}
+            className={cn("relative z-20 flex items-center", fit(isCompact, "gap-1", "gap-2"))}
           >
             <div className="relative">
               {!isCompact && (
@@ -106,7 +110,7 @@ export function CenterPile({
               <div
                 className={cn(
                   "flex flex-col items-stretch",
-                  isCompact ? "gap-1 min-w-[4.5rem]" : "gap-1.5 min-w-[5.5rem]"
+                  fit(isCompact, "gap-1 min-w-[4.5rem]", "gap-1.5 min-w-[5.5rem]")
                 )}
               >
                 {hasSpecialAbility(gameState.drawnCard) && !gameState.drawnFromDiscard && (
@@ -116,7 +120,7 @@ export function CenterPile({
                     onClick={onUseAbility}
                     className={cn(
                       "bg-yellow-500 hover:bg-yellow-600 text-black font-bold h-auto",
-                      isCompact ? "text-[9px] px-1.5 py-0.5" : "text-xs px-2 py-1"
+                      fit(isCompact, "text-[9px] px-1.5 py-0.5", "text-xs px-2 py-1")
                     )}
                   >
                     {isCompact ? t("game.ability") : t("game.useAbility")}
@@ -126,7 +130,7 @@ export function CenterPile({
                   size="sm"
                   variant="destructive"
                   onClick={onDiscardDrawn}
-                  className={cn("h-auto", isCompact ? "text-[9px] px-1.5 py-0.5" : "text-xs px-2 py-1")}
+                  className={cn("h-auto", fit(isCompact, "text-[9px] px-1.5 py-0.5", "text-xs px-2 py-1"))}
                 >
                   {t("game.discard")}
                 </Button>
@@ -134,7 +138,7 @@ export function CenterPile({
                   <div
                     className={cn(
                       "text-orange-400 text-center leading-tight",
-                      isCompact ? "text-[8px] max-w-[5rem]" : "text-[10px] max-w-[7rem]"
+                      fit(isCompact, "text-[8px] max-w-[5rem]", "text-[10px] max-w-[7rem]")
                     )}
                   >
                     {t("game.fromDiscardNoAbilityShort")}
@@ -167,7 +171,7 @@ export function CenterPile({
               cardClass
             )}
           >
-            <span className={cn("text-white/20", isCompact ? "text-[8px]" : "text-xs")}>EMPTY</span>
+            <span className={cn("text-white/20", fit(isCompact, "text-[8px]", "text-xs"))}>EMPTY</span>
           </div>
         )}
       </div>

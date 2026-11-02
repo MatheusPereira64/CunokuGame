@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { featureTranslations } from "@/contexts/i18n-features";
 
 export type Language = "pt" | "es" | "en";
 
@@ -24,7 +25,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const t = (key: string, params?: Record<string, string>): string => {
     const translations = getTranslations(language);
-    let translation = translations[key] || key;
+    let translation = translations[key] || featureTranslations[language][key] || key;
     
     // Substitui placeholders se houver
     if (params) {
@@ -86,44 +87,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         .replace("{player}", peekOpponentMatch[1]);
     }
     
-    // Declaração de Cunoku: "declarou CUNOKU! Rodada final iniciada."
-    if (message.includes("declarou CUNOKU") || message.includes("declared CUNOKU") || (message.includes("CUNOKU") && (message.includes("Rodada final") || message.includes("Final round")))) {
-      return translations["bot.declaredCunoku"];
-    }
-    
-    // Compra do baralho
-    if (message.includes("comprou uma carta do baralho")) {
-      return translations["bot.drewFromDeck"];
-    }
-    
-    // Compra da pilha de descarte: "comprou a carta X de Y da pilha de descarte"
-    const drawDiscardMatch = message.match(/comprou a carta (.+?) de (.+?) da pilha de descarte/);
-    if (drawDiscardMatch) {
-      return translations["bot.drewFromDiscard"]
-        .replace("{rank}", drawDiscardMatch[1])
-        .replace("{suit}", drawDiscardMatch[2]);
-    }
-    
-    // Descarte correspondente: "descartou a carta X de Y (corresponde ao descarte)"
-    const matchingDiscardMatch = message.match(/descartou a carta (.+?) de (.+?) \(corresponde ao descarte\)/);
-    if (matchingDiscardMatch) {
-      return translations["bot.discardedMatching"]
-        .replace("{rank}", matchingDiscardMatch[1])
-        .replace("{suit}", matchingDiscardMatch[2]);
-    }
-    
-    // Punição: "tentou descartar carta errada! Compra 2 cartas como punição."
-    if (message.includes("tentou descartar carta errada") && message.includes("Compra 2 cartas")) {
-      return translations["bot.punishmentWrongCard"];
-    }
-    
-    // Punição perde vez: "tentou descartar carta errada! Perde a vez (tem 6 cartas)."
-    if (message.includes("tentou descartar carta errada") && message.includes("Perde a vez")) {
-      return translations["bot.punishmentLoseTurn"];
-    }
-    
-    // Se não encontrou padrão, retorna a mensagem original
-    return message;
+    return translateLaterBotMessage(message, translations);
   };
 
   return (
@@ -141,6 +105,40 @@ export function useI18n() {
   return context;
 }
 
+function translateLaterBotMessage(message: string, translations: Record<string, string>): string {
+  if (message.includes("declarou CUNOKU") || message.includes("declared CUNOKU") || (message.includes("CUNOKU") && (message.includes("Rodada final") || message.includes("Final round")))) {
+    return translations["bot.declaredCunoku"];
+  }
+
+  if (message.includes("comprou uma carta do baralho")) {
+    return translations["bot.drewFromDeck"];
+  }
+
+  const drawDiscardMatch = message.match(/comprou a carta (.+?) de (.+?) da pilha de descarte/);
+  if (drawDiscardMatch) {
+    return translations["bot.drewFromDiscard"]
+      .replace("{rank}", drawDiscardMatch[1])
+      .replace("{suit}", drawDiscardMatch[2]);
+  }
+
+  const matchingDiscardMatch = message.match(/descartou a carta (.+?) de (.+?) \(corresponde ao descarte\)/);
+  if (matchingDiscardMatch) {
+    return translations["bot.discardedMatching"]
+      .replace("{rank}", matchingDiscardMatch[1])
+      .replace("{suit}", matchingDiscardMatch[2]);
+  }
+
+  if (message.includes("tentou descartar carta errada") && message.includes("Compra 2 cartas")) {
+    return translations["bot.punishmentWrongCard"];
+  }
+
+  if (message.includes("tentou descartar carta errada") && message.includes("Perde a vez")) {
+    return translations["bot.punishmentLoseTurn"];
+  }
+
+  return message;
+}
+
 function getTranslations(lang: Language): Record<string, string> {
   const translations: Record<Language, Record<string, string>> = {
     pt: {
@@ -153,7 +151,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "menu.rules": "Regras",
       "menu.language": "Idioma",
       "menu.profile": "Perfil",
-      "menu.copyright": "© 2025 Cunoku Card Game. Mínimo 2 jogadores.",
+      "menu.copyright": "© 2026 Cunoku Card Game. Mínimo 2 jogadores.",
       "profile.title": "Seu perfil",
       "profile.description": "Escolha nome, ícone e cor. As estatísticas ficam neste aparelho.",
       "profile.displayName": "Nome padrão",
@@ -169,6 +167,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "menu.daily": "Desafio Diário",
       "menu.league": "Liga",
       "competition.loading": "Carregando...",
+      "competition.loginRequired": "Entre ou crie sua conta do ranking no Perfil para jogar o desafio e pontuar na liga.",
       "competition.offline": "Não foi possível falar com o servidor. O ranking precisa de conexão.",
       "daily.title": "Desafio Diário",
       "daily.description": "A mesma distribuição de cartas para todos contra 3 bots. Você tem uma tentativa por dia; pode sair e continuar depois.",
@@ -186,16 +185,11 @@ function getTranslations(lang: Language): Record<string, string> {
       "league.resetsIn": "A semana termina em {time}.",
       "league.pointsShort": "pts de liga",
       "league.yourRank": "Você está em #{rank} de {total}",
-      "league.nextTier": "Faltam {points} pts para {tier}",
       "league.notRanked": "Você ainda não pontuou nesta semana. Jogue o desafio diário ou uma partida online com outra pessoa.",
       "league.thisWeek": "Esta semana",
       "league.lastWeek": "Pódio da semana passada",
       "league.empty": "Ninguém pontuou nesta semana ainda.",
       "league.rules": "Desafio diário: 10 pts + 15 pela vitória + até 15 por score baixo. Partida online com 2 ou mais pessoas: 10 pela vitória ou 3 por jogar, nas {cap} primeiras do dia. Partidas contra bots fora do desafio não pontuam.",
-      "league.tier.bronze": "Bronze",
-      "league.tier.silver": "Prata",
-      "league.tier.gold": "Ouro",
-      "league.tier.diamond": "Diamante",
       "profile.losses": "Derrotas",
       "profile.last30Days": "Últimos {days} dias",
       "profile.noRecentGames": "Nenhuma partida registrada nesse período. O gráfico começa a contar a partir de agora.",
@@ -209,6 +203,86 @@ function getTranslations(lang: Language): Record<string, string> {
       "emote.sad": "Triste",
       "emote.angry": "Bravo",
       "emote.fire": "Fogo",
+      "rank.leaderboard": "Ranking",
+      "rank.leaderboardDesc": "Classificação global por vitórias. TOP 10 são Entity.",
+      "rank.yourRank": "Seu rank",
+      "rank.loading": "Carregando ranking…",
+      "rank.empty": "Ninguém no ranking ainda. Crie uma conta no perfil e jogue!",
+      "rank.loadError": "Não foi possível carregar o ranking (servidor online necessário).",
+      "rank.accountTitle": "Conta global",
+      "rank.accountHint": "Apelido + PIN no servidor online. Só partidas contra outros jogadores contam no ranking (bots não).",
+      "rank.openAccount": "Criar ou entrar para o ranking",
+      "rank.backToProfile": "Voltar ao perfil",
+      "rank.register": "Criar",
+      "rank.login": "Entrar",
+      "rank.registerSubmit": "Criar conta",
+      "rank.loginSubmit": "Entrar",
+      "rank.logout": "Sair da conta",
+      "rank.nickname": "Apelido",
+      "rank.pin": "PIN (4–6 dígitos)",
+      "rank.tier.bronze": "Bronze",
+      "rank.tier.silver": "Prata",
+      "rank.tier.gold": "Ouro",
+      "rank.tier.platinum": "Platina",
+      "rank.tier.diamond": "Diamante",
+      "rank.tier.grandmaster": "Grandmaster",
+      "rank.tier.celestial": "Celestial",
+      "rank.tier.godlike": "Godlike",
+      "rank.tier.entity": "Entity",
+      "rank.error.nicknameTaken": "Apelido já em uso",
+      "rank.error.credentials": "Apelido ou PIN incorretos",
+      "rank.error.nickname": "Apelido inválido (3–16: letras, números, _)",
+      "rank.error.pin": "PIN deve ter 4 a 6 dígitos",
+      "rank.error.generic": "Falha na conta (verifique o servidor online)",
+      "cosmetic.tabLook": "Aparência",
+      "cosmetic.frame": "Moldura",
+      "cosmetic.titleLabel": "Título",
+      "cosmetic.banner": "Banner",
+      "cosmetic.save": "Salvar aparência",
+      "cosmetic.locked": "Item ainda bloqueado — complete a conquista",
+      "cosmetic.frame.none": "Sem moldura",
+      "cosmetic.frame.bronze_ring": "Anel de bronze",
+      "cosmetic.frame.gold_ring": "Anel de ouro",
+      "cosmetic.frame.neon": "Neon",
+      "cosmetic.frame.entity_aura": "Aura Entity",
+      "cosmetic.title.none": "Sem título",
+      "cosmetic.title.rookie": "Novato",
+      "cosmetic.title.bot_slayer": "Caçador de bots",
+      "cosmetic.title.hard_mode_hero": "Herói do difícil",
+      "cosmetic.title.card_shark": "Tubarão das cartas",
+      "cosmetic.title.entity_contender": "Pretendente Entity",
+      "cosmetic.banner.default": "Padrão",
+      "cosmetic.banner.forest": "Floresta",
+      "cosmetic.banner.night": "Noite",
+      "cosmetic.banner.arena": "Arena",
+      "cosmetic.banner.celestial": "Celestial",
+      "achieve.tab": "Conquistas",
+      "achieve.reward": "Recompensa",
+      "achieve.unlockedToast": "Conquista desbloqueada!",
+      "achieve.wins_1.title": "Primeira vitória",
+      "achieve.wins_1.desc": "Vença qualquer partida uma vez.",
+      "achieve.bot_easy_10.title": "Aquecimento fácil",
+      "achieve.bot_easy_10.desc": "Vença 10 partidas contra bots no fácil.",
+      "achieve.bot_medium_50.title": "Rotina média",
+      "achieve.bot_medium_50.desc": "Vença 50 partidas contra bots no médio.",
+      "achieve.bot_hard_10.title": "Desafio difícil",
+      "achieve.bot_hard_10.desc": "Vença 10 partidas contra bots no difícil.",
+      "achieve.bot_hard_100.title": "Lenda do difícil",
+      "achieve.bot_hard_100.desc": "Vença 100 partidas contra bots no difícil.",
+      "achieve.pvp_10.title": "Dez duelos",
+      "achieve.pvp_10.desc": "Vença 10 partidas contra outros jogadores.",
+      "achieve.pvp_50.title": "Veterano PvP",
+      "achieve.pvp_50.desc": "Vença 50 partidas contra outros jogadores.",
+      "achieve.pvp_100.title": "Centurião",
+      "achieve.pvp_100.desc": "Vença 100 partidas PvP.",
+      "achieve.games_50.title": "Meio século",
+      "achieve.games_50.desc": "Jogue 50 partidas (qualquer modo).",
+      "achieve.games_200.title": "Viciado em Cunoku",
+      "achieve.games_200.desc": "Jogue 200 partidas.",
+      "achieve.streak_5.title": "Sequência quente",
+      "achieve.streak_5.desc": "Vença 5 partidas seguidas.",
+      "achieve.best_score_0.title": "Pontuação perfeita",
+      "achieve.best_score_0.desc": "Termine uma partida com score 0 ou menor.",
       "install.addToHome": "Instalar app",
       "install.iosHint": "No iPhone/iPad: toque em Compartilhar e depois em “Adicionar à Tela de Início”. O ícone do Cunoku aparecerá na área de trabalho.",
       "update.title": "Nova versão disponível",
@@ -302,7 +376,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "rules.fiveAndSix": "5 e 6",
       "rules.nineTen": "Nove e Dez: Faça 2 jogadores trocarem 1 carta (Pode ser entre o próprio jogador e outro player, ou entre dois jogadores que aquele player escolher)",
       "rules.sevenEight": "Sete e Oito: Permitem que você veja 1 carta sua (Fica visível para o jogador por 20 segundos depois é virada novamente)",
-      "rules.fiveSix": "Cinco e Seis: Permitem ver a carta de um oponente",
+      "rules.fiveSix": "Cinco e Seis: Permitem ver a carta de um oponente (popup por 3 segundos; a carta fica revelada na mesa por 20 segundos, só para quem usou a habilidade)",
       "rules.discard": "Regras de descarte: Um jogador pode descartar uma carta da sua mão se ela for igual ao mesmo valor da carta em cima da pilha de descarte ex: 7=7, quando o jogador comprar uma carta ele pode escolher ficar com ela e substituir uma de sua mão ou descartar a carta direto para a pilha de descarte, os jogadores que souberem que possuem a mesma carta podem descartar a mesma (O descarte é possível independente do Naipe, só precisa ser o mesmo número ou letra na carta)",
       "rules.draw": "Regras de compra: Compre uma carta olhe o valor e decida o que fazer com a habilidade pode ser usada",
       "rules.endGame": "Final de partida: pode ocorrer a qualquer momento depois de 5 turnos, quando um jogador estiver satisfeito com seu deck e declarar o fim do jogo. A partir daí, haverá mais uma rodada de descarte e/ou poderes até chegar no jogador que declarou o fim do jogo. Então os jogadores revelam suas cartas e somam seus pontos. O jogador com menos pontos é o vencedor",
@@ -446,7 +520,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "menu.rules": "Reglas",
       "menu.language": "Idioma",
       "menu.profile": "Perfil",
-      "menu.copyright": "© 2025 Cunoku Card Game. Mínimo 2 jugadores.",
+      "menu.copyright": "© 2026 Cunoku Card Game. Mínimo 2 jugadores.",
       "profile.title": "Tu perfil",
       "profile.description": "Elige nombre, icono y color. Las estadísticas quedan en este dispositivo.",
       "profile.displayName": "Nombre predeterminado",
@@ -462,6 +536,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "menu.daily": "Desafío Diario",
       "menu.league": "Liga",
       "competition.loading": "Cargando...",
+      "competition.loginRequired": "Inicia sesión o crea tu cuenta del ranking en Perfil para jugar el desafío y puntuar en la liga.",
       "competition.offline": "No se pudo conectar con el servidor. El ranking necesita conexión.",
       "daily.title": "Desafío Diario",
       "daily.description": "El mismo reparto de cartas para todos contra 3 bots. Tienes un intento por día; puedes salir y continuar después.",
@@ -479,16 +554,11 @@ function getTranslations(lang: Language): Record<string, string> {
       "league.resetsIn": "La semana termina en {time}.",
       "league.pointsShort": "pts de liga",
       "league.yourRank": "Estás en #{rank} de {total}",
-      "league.nextTier": "Faltan {points} pts para {tier}",
       "league.notRanked": "Aún no has puntuado esta semana. Juega el desafío diario o una partida online con otra persona.",
       "league.thisWeek": "Esta semana",
       "league.lastWeek": "Podio de la semana pasada",
       "league.empty": "Nadie ha puntuado esta semana todavía.",
       "league.rules": "Desafío diario: 10 pts + 15 por ganar + hasta 15 por score bajo. Partida online con 2 o más personas: 10 por ganar o 3 por jugar, en las {cap} primeras del día. Las partidas contra bots fuera del desafío no puntúan.",
-      "league.tier.bronze": "Bronce",
-      "league.tier.silver": "Plata",
-      "league.tier.gold": "Oro",
-      "league.tier.diamond": "Diamante",
       "profile.losses": "Derrotas",
       "profile.last30Days": "Últimos {days} días",
       "profile.noRecentGames": "No hay partidas registradas en este período. El gráfico empieza a contar desde ahora.",
@@ -502,6 +572,86 @@ function getTranslations(lang: Language): Record<string, string> {
       "emote.sad": "Triste",
       "emote.angry": "Enojado",
       "emote.fire": "Fuego",
+      "rank.leaderboard": "Ranking",
+      "rank.leaderboardDesc": "Clasificación global por victorias. TOP 10 son Entity.",
+      "rank.yourRank": "Tu rango",
+      "rank.loading": "Cargando ranking…",
+      "rank.empty": "Nadie en el ranking aún. Crea una cuenta en el perfil y juega!",
+      "rank.loadError": "No se pudo cargar el ranking (se necesita servidor online).",
+      "rank.accountTitle": "Cuenta global",
+      "rank.accountHint": "Apodo + PIN en el servidor online. Solo partidas contra otros jugadores cuentan (bots no).",
+      "rank.openAccount": "Crear o entrar al ranking",
+      "rank.backToProfile": "Volver al perfil",
+      "rank.register": "Crear",
+      "rank.login": "Entrar",
+      "rank.registerSubmit": "Crear cuenta",
+      "rank.loginSubmit": "Entrar",
+      "rank.logout": "Salir de la cuenta",
+      "rank.nickname": "Apodo",
+      "rank.pin": "PIN (4–6 dígitos)",
+      "rank.tier.bronze": "Bronce",
+      "rank.tier.silver": "Plata",
+      "rank.tier.gold": "Oro",
+      "rank.tier.platinum": "Platino",
+      "rank.tier.diamond": "Diamante",
+      "rank.tier.grandmaster": "Grandmaster",
+      "rank.tier.celestial": "Celestial",
+      "rank.tier.godlike": "Godlike",
+      "rank.tier.entity": "Entity",
+      "rank.error.nicknameTaken": "Apodo ya en uso",
+      "rank.error.credentials": "Apodo o PIN incorrectos",
+      "rank.error.nickname": "Apodo inválido (3–16: letras, números, _)",
+      "rank.error.pin": "El PIN debe tener 4 a 6 dígitos",
+      "rank.error.generic": "Fallo de cuenta (verifica el servidor online)",
+      "cosmetic.tabLook": "Apariencia",
+      "cosmetic.frame": "Marco",
+      "cosmetic.titleLabel": "Título",
+      "cosmetic.banner": "Banner",
+      "cosmetic.save": "Guardar apariencia",
+      "cosmetic.locked": "Objeto bloqueado — completa el logro",
+      "cosmetic.frame.none": "Sin marco",
+      "cosmetic.frame.bronze_ring": "Anillo de bronce",
+      "cosmetic.frame.gold_ring": "Anillo de oro",
+      "cosmetic.frame.neon": "Neón",
+      "cosmetic.frame.entity_aura": "Aura Entity",
+      "cosmetic.title.none": "Sin título",
+      "cosmetic.title.rookie": "Novato",
+      "cosmetic.title.bot_slayer": "Cazador de bots",
+      "cosmetic.title.hard_mode_hero": "Héroe del difícil",
+      "cosmetic.title.card_shark": "Tiburón de cartas",
+      "cosmetic.title.entity_contender": "Pretendiente Entity",
+      "cosmetic.banner.default": "Predeterminado",
+      "cosmetic.banner.forest": "Bosque",
+      "cosmetic.banner.night": "Noche",
+      "cosmetic.banner.arena": "Arena",
+      "cosmetic.banner.celestial": "Celestial",
+      "achieve.tab": "Logros",
+      "achieve.reward": "Recompensa",
+      "achieve.unlockedToast": "¡Logro desbloqueado!",
+      "achieve.wins_1.title": "Primera victoria",
+      "achieve.wins_1.desc": "Gana cualquier partida una vez.",
+      "achieve.bot_easy_10.title": "Calentamiento fácil",
+      "achieve.bot_easy_10.desc": "Gana 10 partidas contra bots en fácil.",
+      "achieve.bot_medium_50.title": "Rutina media",
+      "achieve.bot_medium_50.desc": "Gana 50 partidas contra bots en medio.",
+      "achieve.bot_hard_10.title": "Desafío difícil",
+      "achieve.bot_hard_10.desc": "Gana 10 partidas contra bots en difícil.",
+      "achieve.bot_hard_100.title": "Leyenda del difícil",
+      "achieve.bot_hard_100.desc": "Gana 100 partidas contra bots en difícil.",
+      "achieve.pvp_10.title": "Diez duelos",
+      "achieve.pvp_10.desc": "Gana 10 partidas contra otros jugadores.",
+      "achieve.pvp_50.title": "Veterano PvP",
+      "achieve.pvp_50.desc": "Gana 50 partidas contra otros jugadores.",
+      "achieve.pvp_100.title": "Centurión",
+      "achieve.pvp_100.desc": "Gana 100 partidas PvP.",
+      "achieve.games_50.title": "Medio siglo",
+      "achieve.games_50.desc": "Juega 50 partidas (cualquier modo).",
+      "achieve.games_200.title": "Adicto a Cunoku",
+      "achieve.games_200.desc": "Juega 200 partidas.",
+      "achieve.streak_5.title": "Racha caliente",
+      "achieve.streak_5.desc": "Gana 5 partidas seguidas.",
+      "achieve.best_score_0.title": "Puntuación perfecta",
+      "achieve.best_score_0.desc": "Termina una partida con score 0 o menor.",
       "install.addToHome": "Instalar app",
       "install.iosHint": "En iPhone/iPad: toca Compartir y luego “Añadir a pantalla de inicio”. El icono de Cunoku aparecerá en el escritorio.",
       "update.title": "Nueva versión disponible",
@@ -595,7 +745,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "rules.fiveAndSix": "5 y 6",
       "rules.nineTen": "Nueve y Diez: Haz que 2 jugadores intercambien 1 carta (Puede ser entre el propio jugador y otro player, o entre dos jugadores que ese player elija)",
       "rules.sevenEight": "Siete y Ocho: Te permiten ver 1 carta tuya (Queda visible para el jugador por 20 segundos y luego se voltea nuevamente)",
-      "rules.fiveSix": "Cinco y Seis: Permiten ver la carta de un oponente",
+      "rules.fiveSix": "Cinco y Seis: Permiten ver la carta de un oponente (popup 3 segundos; la carta queda revelada en la mesa 20 segundos, solo para quien usó la habilidad)",
       "rules.discard": "Reglas de descarte: Un jugador puede descartar una carta de su mano si es igual al mismo valor de la carta en la parte superior de la pila de descarte ej: 7=7, cuando el jugador compre una carta puede elegir quedarse con ella y reemplazar una de su mano o descartar la carta directamente a la pila de descarte, los jugadores que sepan que tienen la misma carta pueden descartar la misma (El descarte es posible independientemente del Palo, solo necesita ser el mismo número o letra en la carta)",
       "rules.draw": "Reglas de compra: Compra una carta mira el valor y decide qué hacer con la habilidad puede ser usada",
       "rules.endGame": "Final de partida: puede ocurrir en cualquier momento después de 5 turnos, cuando un jugador esté satisfecho con su mazo y declare el fin del juego. A partir de ahí, habrá una ronda más de descarte y/o poderes hasta llegar al jugador que declaró el fin del juego. Entonces los jugadores revelan sus cartas y suman sus puntos. El jugador con menos puntos es el ganador",
@@ -739,7 +889,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "menu.rules": "Rules",
       "menu.language": "Language",
       "menu.profile": "Profile",
-      "menu.copyright": "© 2025 Cunoku Card Game. Minimum 2 players.",
+      "menu.copyright": "© 2026 Cunoku Card Game. Minimum 2 players.",
       "profile.title": "Your profile",
       "profile.description": "Pick a name, icon, and color. Stats stay on this device.",
       "profile.displayName": "Default name",
@@ -755,6 +905,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "menu.daily": "Daily Challenge",
       "menu.league": "League",
       "competition.loading": "Loading...",
+      "competition.loginRequired": "Log in or create your ranking account in Profile to play the challenge and score in the league.",
       "competition.offline": "Couldn't reach the server. The ranking needs a connection.",
       "daily.title": "Daily Challenge",
       "daily.description": "The same deal for everyone against 3 bots. You get one attempt per day; you can leave and continue later.",
@@ -772,16 +923,11 @@ function getTranslations(lang: Language): Record<string, string> {
       "league.resetsIn": "The week ends in {time}.",
       "league.pointsShort": "league pts",
       "league.yourRank": "You're #{rank} of {total}",
-      "league.nextTier": "{points} pts to {tier}",
       "league.notRanked": "You haven't scored this week. Play the daily challenge or an online game with another person.",
       "league.thisWeek": "This week",
       "league.lastWeek": "Last week's podium",
       "league.empty": "Nobody has scored this week yet.",
       "league.rules": "Daily challenge: 10 pts + 15 for winning + up to 15 for a low score. Online game with 2 or more people: 10 for winning or 3 for playing, on the first {cap} of the day. Games against bots outside the challenge don't score.",
-      "league.tier.bronze": "Bronze",
-      "league.tier.silver": "Silver",
-      "league.tier.gold": "Gold",
-      "league.tier.diamond": "Diamond",
       "profile.losses": "Losses",
       "profile.last30Days": "Last {days} days",
       "profile.noRecentGames": "No games recorded in this period. The chart starts counting from now on.",
@@ -795,6 +941,86 @@ function getTranslations(lang: Language): Record<string, string> {
       "emote.sad": "Sad",
       "emote.angry": "Angry",
       "emote.fire": "Fire",
+      "rank.leaderboard": "Leaderboard",
+      "rank.leaderboardDesc": "Global ranking by wins. TOP 10 are Entity.",
+      "rank.yourRank": "Your rank",
+      "rank.loading": "Loading leaderboard…",
+      "rank.empty": "No one on the board yet. Create an account in Profile and play!",
+      "rank.loadError": "Could not load leaderboard (online server required).",
+      "rank.accountTitle": "Global account",
+      "rank.accountHint": "Nickname + PIN on the online server. Only matches vs other players count (bots do not).",
+      "rank.openAccount": "Sign up or log in for ranking",
+      "rank.backToProfile": "Back to profile",
+      "rank.register": "Sign up",
+      "rank.login": "Log in",
+      "rank.registerSubmit": "Create account",
+      "rank.loginSubmit": "Log in",
+      "rank.logout": "Log out",
+      "rank.nickname": "Nickname",
+      "rank.pin": "PIN (4–6 digits)",
+      "rank.tier.bronze": "Bronze",
+      "rank.tier.silver": "Silver",
+      "rank.tier.gold": "Gold",
+      "rank.tier.platinum": "Platinum",
+      "rank.tier.diamond": "Diamond",
+      "rank.tier.grandmaster": "Grandmaster",
+      "rank.tier.celestial": "Celestial",
+      "rank.tier.godlike": "Godlike",
+      "rank.tier.entity": "Entity",
+      "rank.error.nicknameTaken": "Nickname already taken",
+      "rank.error.credentials": "Wrong nickname or PIN",
+      "rank.error.nickname": "Invalid nickname (3–16: letters, numbers, _)",
+      "rank.error.pin": "PIN must be 4–6 digits",
+      "rank.error.generic": "Account failed (check online server)",
+      "cosmetic.tabLook": "Look",
+      "cosmetic.frame": "Frame",
+      "cosmetic.titleLabel": "Title",
+      "cosmetic.banner": "Banner",
+      "cosmetic.save": "Save look",
+      "cosmetic.locked": "Still locked — complete the achievement",
+      "cosmetic.frame.none": "No frame",
+      "cosmetic.frame.bronze_ring": "Bronze ring",
+      "cosmetic.frame.gold_ring": "Gold ring",
+      "cosmetic.frame.neon": "Neon",
+      "cosmetic.frame.entity_aura": "Entity aura",
+      "cosmetic.title.none": "No title",
+      "cosmetic.title.rookie": "Rookie",
+      "cosmetic.title.bot_slayer": "Bot slayer",
+      "cosmetic.title.hard_mode_hero": "Hard mode hero",
+      "cosmetic.title.card_shark": "Card shark",
+      "cosmetic.title.entity_contender": "Entity contender",
+      "cosmetic.banner.default": "Default",
+      "cosmetic.banner.forest": "Forest",
+      "cosmetic.banner.night": "Night",
+      "cosmetic.banner.arena": "Arena",
+      "cosmetic.banner.celestial": "Celestial",
+      "achieve.tab": "Achievements",
+      "achieve.reward": "Reward",
+      "achieve.unlockedToast": "Achievement unlocked!",
+      "achieve.wins_1.title": "First win",
+      "achieve.wins_1.desc": "Win any match once.",
+      "achieve.bot_easy_10.title": "Easy warm-up",
+      "achieve.bot_easy_10.desc": "Win 10 matches against bots on easy.",
+      "achieve.bot_medium_50.title": "Medium grind",
+      "achieve.bot_medium_50.desc": "Win 50 matches against bots on medium.",
+      "achieve.bot_hard_10.title": "Hard challenge",
+      "achieve.bot_hard_10.desc": "Win 10 matches against bots on hard.",
+      "achieve.bot_hard_100.title": "Hard mode legend",
+      "achieve.bot_hard_100.desc": "Win 100 matches against bots on hard.",
+      "achieve.pvp_10.title": "Ten duels",
+      "achieve.pvp_10.desc": "Win 10 matches against other players.",
+      "achieve.pvp_50.title": "PvP veteran",
+      "achieve.pvp_50.desc": "Win 50 matches against other players.",
+      "achieve.pvp_100.title": "Centurion",
+      "achieve.pvp_100.desc": "Win 100 PvP matches.",
+      "achieve.games_50.title": "Half century",
+      "achieve.games_50.desc": "Play 50 matches (any mode).",
+      "achieve.games_200.title": "Cunoku addict",
+      "achieve.games_200.desc": "Play 200 matches.",
+      "achieve.streak_5.title": "Hot streak",
+      "achieve.streak_5.desc": "Win 5 matches in a row.",
+      "achieve.best_score_0.title": "Perfect score",
+      "achieve.best_score_0.desc": "Finish a match with score 0 or lower.",
       "install.addToHome": "Install app",
       "install.iosHint": "On iPhone/iPad: tap Share, then “Add to Home Screen”. The Cunoku icon will appear on your home screen.",
       "update.title": "New version available",
@@ -888,7 +1114,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "rules.fiveAndSix": "5 and 6",
       "rules.nineTen": "Nine and Ten: Make 2 players swap 1 card (Can be between the player themselves and another player, or between two players that the player chooses)",
       "rules.sevenEight": "Seven and Eight: Allow you to see 1 of your cards (Visible to the player for 20 seconds then flipped again)",
-      "rules.fiveSix": "Five and Six: Allow seeing an opponent's card",
+      "rules.fiveSix": "Five and Six: Allow seeing an opponent's card (3s popup; the card stays face-up on the table for 20 seconds, only for the player who used the ability)",
       "rules.discard": "Discard rules: A player can discard a card from their hand if it matches the same value as the card on top of the discard pile ex: 7=7, when a player draws a card they can choose to keep it and replace one from their hand or discard the card directly to the discard pile, players who know they have the same card can discard it (Discarding is possible regardless of Suit, it just needs to be the same number or letter on the card)",
       "rules.draw": "Draw rules: Draw a card look at the value and decide what to do with it, the ability can be used",
       "rules.endGame": "End of game: can occur at any time after 5 turns, when a player is satisfied with their deck and declares the end of the game. From then on, there will be one more round of discarding and/or powers until reaching the player who declared the end of the game. Then players reveal their cards and sum their points. The player with the fewest points is the winner",

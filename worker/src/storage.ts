@@ -103,7 +103,13 @@ const memoryCompetitionStore = new MemoryCompetitionStore();
 
 export function createCompetitionStore(env: Env): CompetitionStore {
   const db = createDb(env);
-  if (db) return new DrizzleCompetitionStore(() => db);
+  if (db) {
+    // As contas ficam em rank_players: garante essas tabelas antes das consultas
+    return new DrizzleCompetitionStore(async () => {
+      await ensureSchema(db);
+      return db;
+    });
+  }
   return memoryCompetitionStore;
 }
 

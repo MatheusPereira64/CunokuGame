@@ -1,4 +1,6 @@
 import * as React from "react";
+import { Capacitor } from "@capacitor/core";
+import { ScreenOrientation } from "@capacitor/screen-orientation";
 
 /** True quando a viewport está em modo retrato (altura > largura). */
 export function useIsPortrait() {
@@ -52,12 +54,24 @@ export function useIsCompactGame() {
 }
 
 /**
- * Tenta travar a orientação em paisagem (funciona melhor em PWA / fullscreen).
- * Retorna cleanup que libera o lock.
+ * Trava em paisagem (partida).
+ * No Capacitor usa o plugin nativo; no browser/PWA tenta Screen Orientation API.
  */
 export async function lockLandscape(): Promise<() => void> {
-  const orientation = screen.orientation as ScreenOrientation & {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await ScreenOrientation.lock({ orientation: "landscape" });
+    } catch {
+      // Alguns devices / versões podem falhar — LandscapePrompt cobre
+    }
+    return () => {
+      void unlockOrientation();
+    };
+  }
+
+  const orientation = screen.orientation as typeof screen.orientation & {
     lock?: (orientation: string) => Promise<void>;
+    unlock?: () => void;
   };
 
   try {
@@ -75,4 +89,23 @@ export async function lockLandscape(): Promise<() => void> {
       // ignore
     }
   };
+}
+
+/** Libera orientação (menu / sala de espera — portrait ou landscape). */
+export async function unlockOrientation(): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await ScreenOrientation.unlock();
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  try {
+    const orientation = screen.orientation as typeof screen.orientation & { unlock?: () => void };
+    orientation?.unlock?.();
+  } catch {
+    // ignore
+  }
 }

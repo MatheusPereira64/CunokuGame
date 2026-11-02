@@ -6,7 +6,6 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import type { GameState } from "@shared/schema";
 import { generateRoomCode, newPlayerId } from "@shared/roomCode";
-import { PLAYER_KEY_HEADER } from "@shared/competition";
 import { toPublicRoom } from "@shared/gameFilter";
 import { buildLanInfo } from "./lanInfo";
 import { getDailyStatus, getLeagueStandings, startDailyChallenge } from "./competition";
@@ -17,9 +16,22 @@ import {
   handleEmote,
   handleJoinMessage,
   handlePlayerAction,
+  handlePlayerDisconnect,
   handleStartGame,
+  resolveDisconnectedTurn,
   type RoomSessionData,
 } from "./roomHandlers";
+import { ensureRankSchema } from "./rankEnsure";
+import { getMatchmaker } from "./matchmaking";
+import {
+  bearerToken,
+  getLeaderboard,
+  getMe,
+  loginRankPlayer,
+  recordRankMatch,
+  registerRankPlayer,
+  updateRankProfile,
+} from "@shared/rankService";
 
 type RoomLive = {
   sockets: Map<string, WebSocket>;
@@ -32,7 +44,7 @@ export async function registerRoutes(
   app: Express,
 ): Promise<Server> {
   app.get(api.lan.info.path, (_req, res) => {
-    const port = parseInt(process.env.PORT || "5000", 10);
+    const port = Number.parseInt(process.env.PORT || "5000", 10);
     const info = buildLanInfo(port);
     res.json(api.lan.info.responses[200].parse(info));
   });
@@ -83,6 +95,29 @@ export async function registerRoutes(
     }
   });
 
+  app.post(api.matchmaking.enqueue.path, async (req, res) => {
+    try {
+      const { playerName } = api.matchmaking.enqueue.input.parse(req.body);
+      const result = await getMatchmaker().enqueue(playerName);
+      res.set("Cache-Control", "no-store");
+      res.json(result);
+    } catch {
+      res.status(400).json({ message: "Invalid input" });
+    }
+  });
+
+  app.get("/api/matchmaking/:ticketId", async (req, res) => {
+    const result = await getMatchmaker().status(req.params.ticketId);
+    if (!result) return res.status(404).json({ message: "Ticket not found" });
+    res.set("Cache-Control", "no-store");
+    res.json(result);
+  });
+
+  app.delete("/api/matchmaking/:ticketId", async (req, res) => {
+    await getMatchmaker().leave(req.params.ticketId);
+    res.status(204).end();
+  });
+
   app.get(api.rooms.list.path, async (_req, res) => {
     const rooms = await storage.listRooms();
     res.json(rooms.filter((room) => room.gameMode !== "daily").map(toPublicRoom));
@@ -96,21 +131,17 @@ export async function registerRoutes(
 
   app.get(api.daily.status.path, async (req, res) => {
     try {
-      res.json(await getDailyStatus(competitionStore, req.header(PLAYER_KEY_HEADER)));
+      res.json(await getDailyStatus(competitionStore, bearerToken(req.header("authorization"))));
     } catch (err: any) {
       res.status(500).json({ message: err?.message || "Failed to load daily challenge" });
     }
   });
 
   app.post(api.daily.start.path, async (req, res) => {
-    const parsed = api.daily.start.input.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Invalid input" });
     try {
-      const { createdRoom: _createdRoom, ...result } = await startDailyChallenge(
-        storage,
-        competitionStore,
-        parsed.data,
-      );
+      const started = await startDailyChallenge(storage, competitionStore, bearerToken(req.header("authorization")));
+      if (!started) return res.status(401).json({ message: "unauthorized" });
+      const { createdRoom: _createdRoom, ...result } = started;
       res.json(result);
     } catch (err: any) {
       res.status(500).json({ message: err?.message || "Failed to start daily challenge" });
@@ -119,9 +150,91 @@ export async function registerRoutes(
 
   app.get(api.league.standings.path, async (req, res) => {
     try {
-      res.json(await getLeagueStandings(competitionStore, req.header(PLAYER_KEY_HEADER)));
+      res.json(await getLeagueStandings(competitionStore, bearerToken(req.header("authorization"))));
     } catch (err: any) {
       res.status(500).json({ message: err?.message || "Failed to load league" });
+    }
+  });
+
+  app.post(api.rank.register.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const input = api.rank.register.input.parse(req.body);
+      const result = await registerRankPlayer(db, input);
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      res.status(201).json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.post(api.rank.login.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const input = api.rank.login.input.parse(req.body);
+      const result = await loginRankPlayer(db, input);
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.get(api.rank.me.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const token = bearerToken(req.header("authorization"));
+      if (!token) return res.status(401).json({ message: "unauthorized" });
+      const result = await getMe(db, token);
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.patch(api.rank.profile.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const token = bearerToken(req.header("authorization"));
+      if (!token) return res.status(401).json({ message: "unauthorized" });
+      const input = api.rank.profile.input.parse(req.body);
+      const result = await updateRankProfile(db, token, input);
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.post(api.rank.matchResult.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const token = bearerToken(req.header("authorization"));
+      if (!token) return res.status(401).json({ message: "unauthorized" });
+      const input = api.rank.matchResult.input.parse(req.body);
+      const result = await recordRankMatch(db, token, input);
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.get(api.rank.leaderboard.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const limit = Number(req.query.limit || "50");
+      const entries = await getLeaderboard(db, limit);
+      res.json({ entries });
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
     }
   });
 
@@ -152,28 +265,60 @@ export async function registerRoutes(
     );
   }
 
+  const disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  function clearDisconnectTimer(roomCode: string) {
+    const timer = disconnectTimers.get(roomCode);
+    if (!timer) return;
+    clearTimeout(timer);
+    disconnectTimers.delete(roomCode);
+  }
+
   function scheduleNextBotTurn(roomCode: string, state: GameState) {
     const currentPlayer = state.players[state.currentPlayerIndex];
-    if (!currentPlayer?.isBot) return;
+    const playing = !state.winnerId && state.turnPhase !== "finished" && state.turnPhase !== "waiting";
 
-    const messenger = makeMessenger(roomCode);
-    messenger.broadcast({ type: "bot_thinking", botName: currentPlayer.name });
+    if (playing && currentPlayer?.isBot) {
+      clearDisconnectTimer(roomCode);
+      const messenger = makeMessenger(roomCode);
+      messenger.broadcast({ type: "bot_thinking", botName: currentPlayer.name });
+      // Um único timer por sala: retomar a partida não pode duplicar o turno do bot
+      const pending = getOrCreateLive(roomCode);
+      if (pending.botTimer) clearTimeout(pending.botTimer);
+      pending.botTimer = setTimeout(() => {
+        const live = roomsLive.get(roomCode);
+        if (!live) return;
+        void executeBotTurn(
+          storage,
+          live.session,
+          makeMessenger(roomCode),
+          roomCode,
+          scheduleNextBotTurn,
+          competitionStore,
+        );
+      }, 3000);
+      return;
+    }
 
-    // Um único timer por sala: retomar o desafio diário não pode duplicar o turno do bot
-    const pending = getOrCreateLive(roomCode);
-    if (pending.botTimer) clearTimeout(pending.botTimer);
-    pending.botTimer = setTimeout(() => {
-      const live = roomsLive.get(roomCode);
-      if (!live) return;
-      void executeBotTurn(
-        storage,
-        live.session,
-        makeMessenger(roomCode),
-        roomCode,
-        scheduleNextBotTurn,
-        competitionStore,
-      );
-    }, 3000);
+    clearDisconnectTimer(roomCode);
+    if (!state.reconnectDeadline || !state.reconnectPlayerId) return;
+    const playerId = state.reconnectPlayerId;
+    const delay = Math.max(0, state.reconnectDeadline - Date.now());
+    const timer = setTimeout(() => {
+      disconnectTimers.delete(roomCode);
+      void (async () => {
+        const live = roomsLive.get(roomCode);
+        if (!live) return;
+        const next = await resolveDisconnectedTurn(
+          storage,
+          makeMessenger(roomCode),
+          roomCode,
+          playerId,
+        );
+        if (next) scheduleNextBotTurn(roomCode, next);
+      })();
+    }, delay);
+    disconnectTimers.set(roomCode, timer);
   }
 
   wss.on("connection", (ws) => {
@@ -185,7 +330,7 @@ export async function registerRoutes(
         const msg = JSON.parse(data.toString());
 
         if (msg.type === "join") {
-          const { code, playerId, name, playerKey } = msg;
+          const { code, playerId, name, rankToken } = msg;
           currentRoom = code;
           currentPlayer = playerId;
           const live = getOrCreateLive(code);
@@ -195,7 +340,7 @@ export async function registerRoutes(
             storage,
             live.session,
             messenger,
-            { code, playerId, name, playerKey },
+            { code, playerId, name, rankToken },
             (id) => {
               live.sockets.set(id, ws);
             },
@@ -203,6 +348,7 @@ export async function registerRoutes(
               if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m));
             },
             scheduleNextBotTurn,
+            competitionStore,
           );
         }
 
@@ -257,9 +403,17 @@ export async function registerRoutes(
     });
 
     ws.on("close", () => {
-      if (currentRoom && currentPlayer) {
-        roomsLive.get(currentRoom)?.sockets.delete(currentPlayer);
-      }
+      if (!currentRoom || !currentPlayer) return;
+      const live = roomsLive.get(currentRoom);
+      if (!live || live.sockets.get(currentPlayer) !== ws) return;
+      live.sockets.delete(currentPlayer);
+      void handlePlayerDisconnect(
+        storage,
+        makeMessenger(currentRoom),
+        currentRoom,
+        currentPlayer,
+        scheduleNextBotTurn,
+      );
     });
   });
 

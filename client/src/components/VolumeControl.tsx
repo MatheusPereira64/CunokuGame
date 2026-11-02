@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/Button";
@@ -12,15 +12,21 @@ import {
 } from "@/components/ui/dialog";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
+import { TableThemePicker } from "@/components/TableThemePicker";
+import { useI18n } from "@/contexts/i18n-context";
 
 export function VolumeControl() {
   const [musicVolume, setMusicVolume] = useState(audioManager.getMusicVolume());
   const [sfxVolume, setSfxVolume] = useState(audioManager.getSfxVolume());
   const [isMuted, setIsMuted] = useState(audioManager.getMuted());
   const [isOpen, setIsOpen] = useState(false);
+  const { t } = useI18n();
   const isPortrait = useIsPortrait();
   const isCompactGame = useIsCompactGame();
   const isLandscapeMenu = isCompactGame && !isPortrait;
+  const muteId = useId();
+  const musicVolumeId = useId();
+  const sfxVolumeId = useId();
 
   // Atualiza estados quando o diálogo abre
   useEffect(() => {
@@ -72,13 +78,14 @@ export function VolumeControl() {
         )}
       >
         <DialogHeader className={cn(isLandscapeMenu && "pr-6")}>
-          <DialogTitle className={cn(isLandscapeMenu && "text-base")}>Configurações de Áudio</DialogTitle>
+          <DialogTitle className={cn(isLandscapeMenu && "text-base")}>{t("settings.title")}</DialogTitle>
         </DialogHeader>
         <div className={cn(isLandscapeMenu ? "space-y-3 py-1" : "space-y-6 py-4")}>
           {/* Controle de Mute */}
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">Som</label>
+          <label htmlFor={muteId} className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium">Som</span>
             <Button
+              id={muteId}
               variant="outline"
               size="sm"
               onClick={handleMuteToggle}
@@ -96,17 +103,19 @@ export function VolumeControl() {
                 </>
               )}
             </Button>
-          </div>
+          </label>
 
           {/* Volume da Música */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Volume da Música</label>
+              <label id={`${musicVolumeId}-label`} htmlFor={musicVolumeId} className="text-sm font-medium">Volume da Música</label>
               <span className="text-sm text-muted-foreground">
                 {Math.round(musicVolume * 100)}%
               </span>
             </div>
             <Slider
+              id={musicVolumeId}
+              aria-labelledby={`${musicVolumeId}-label`}
               value={[musicVolume]}
               onValueChange={handleMusicVolumeChange}
               max={1}
@@ -120,12 +129,14 @@ export function VolumeControl() {
           {/* Volume dos Efeitos Sonoros */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Volume dos Efeitos</label>
+              <label id={`${sfxVolumeId}-label`} htmlFor={sfxVolumeId} className="text-sm font-medium">Volume dos Efeitos</label>
               <span className="text-sm text-muted-foreground">
                 {Math.round(sfxVolume * 100)}%
               </span>
             </div>
             <Slider
+              id={sfxVolumeId}
+              aria-labelledby={`${sfxVolumeId}-label`}
               value={[sfxVolume]}
               onValueChange={handleSfxVolumeChange}
               max={1}
@@ -134,6 +145,11 @@ export function VolumeControl() {
               disabled={isMuted}
               className="w-full"
             />
+          </div>
+
+          <div className="border-t border-gray-200 pt-4">
+            <p className="text-sm font-medium mb-3">{t("theme.title")}</p>
+            <TableThemePicker />
           </div>
         </div>
       </DialogContent>

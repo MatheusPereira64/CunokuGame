@@ -1,17 +1,10 @@
 /** Regras puras do desafio diário e da liga semanal (dias e semanas em UTC). */
-export const PLAYER_KEY_HEADER = "x-player-key";
-
 export const DAILY_BOT_COUNT = 3;
 export const DAILY_BOT_DIFFICULTY = "medium" as const;
 /** Partidas online que valem pontos de liga por dia (limita farm entre aparelhos). */
 export const ONLINE_SCORED_MATCHES_PER_DAY = 5;
 
 const DAY_MS = 86_400_000;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export function isPlayerKey(value: unknown): value is string {
-  return typeof value === "string" && UUID_RE.test(value);
-}
 
 export function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -74,21 +67,8 @@ export function onlinePoints(won: boolean): number {
   return won ? 10 : 3;
 }
 
-export const LEAGUE_TIERS = [
-  { id: "diamond", minPoints: 250 },
-  { id: "gold", minPoints: 120 },
-  { id: "silver", minPoints: 50 },
-  { id: "bronze", minPoints: 0 },
-] as const;
-
-export type LeagueTier = (typeof LEAGUE_TIERS)[number]["id"];
-
-export function leagueTier(points: number): LeagueTier {
-  return LEAGUE_TIERS.find((t) => points >= t.minPoints)?.id ?? "bronze";
-}
-
 export interface ScoredResult {
-  playerKey: string;
+  rankPlayerId: string;
   displayName: string;
   won: boolean;
   score: number;
@@ -103,22 +83,21 @@ export function sortDailyResults<T extends ScoredResult>(rows: T[]): T[] {
 }
 
 export interface LeagueStanding {
-  playerKey: string;
+  rankPlayerId: string;
   name: string;
   points: number;
   wins: number;
   games: number;
   rank: number;
-  tier: LeagueTier;
 }
 
 /** Soma os resultados da semana; o nome exibido é o mais recente do jogador. */
 export function aggregateLeague(rows: ScoredResult[]): LeagueStanding[] {
-  const byPlayer = new Map<string, Omit<LeagueStanding, "rank" | "tier"> & { lastAt: number }>();
+  const byPlayer = new Map<string, Omit<LeagueStanding, "rank"> & { lastAt: number }>();
   for (const row of rows) {
     const at = row.createdAt?.getTime() ?? 0;
-    const current = byPlayer.get(row.playerKey) ?? {
-      playerKey: row.playerKey,
+    const current = byPlayer.get(row.rankPlayerId) ?? {
+      rankPlayerId: row.rankPlayerId,
       name: row.displayName,
       points: 0,
       wins: 0,
@@ -132,13 +111,12 @@ export function aggregateLeague(rows: ScoredResult[]): LeagueStanding[] {
       current.lastAt = at;
       current.name = row.displayName;
     }
-    byPlayer.set(row.playerKey, current);
+    byPlayer.set(row.rankPlayerId, current);
   }
   return Array.from(byPlayer.values())
     .sort((a, b) => b.points - a.points || b.wins - a.wins || a.lastAt - b.lastAt)
     .map(({ lastAt: _lastAt, ...standing }, i) => ({
       ...standing,
       rank: i + 1,
-      tier: leagueTier(standing.points),
     }));
 }

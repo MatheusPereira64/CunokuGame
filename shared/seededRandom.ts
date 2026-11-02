@@ -1,3 +1,5 @@
+import { randomFloat } from "./secureRandom";
+
 /** PRNG determinístico (mulberry32) para partidas com seed fixa. */
 export function seededRandom(seed: string): () => number {
   let hash = 1779033703 ^ seed.length;
@@ -22,6 +24,6 @@ export function stateRandom(
   state: { seed?: string | null; logs: string[]; currentPlayerIndex: number },
   salt = "",
 ): () => number {
-  if (!state.seed) return Math.random;
+  if (!state.seed) return randomFloat;
   return seededRandom(`${state.seed}:${state.logs.length}:${state.currentPlayerIndex}:${salt}`);
 }

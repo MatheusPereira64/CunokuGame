@@ -1,6 +1,6 @@
 {
   "name": "rest-express",
-  "version": "1.0.6",
+  "version": "1.0.18",
   "type": "module",
   "license": "MIT",
   "scripts": {
@@ -24,6 +24,7 @@
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capacitor/ios": "^8.5.0",
+    "@capacitor/screen-orientation": "^8.0.1",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^1.0.2",
@@ -92,7 +93,7 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "@cloudflare/workers-types": "^5.20260826.1",
+    "@cloudflare/workers-types": "^5.20260827.1",
     "@replit/vite-plugin-cartographer": "^0.4.4",
     "@replit/vite-plugin-dev-banner": "^0.1.1",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",

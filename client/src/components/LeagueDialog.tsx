@@ -12,24 +12,10 @@ import { Button } from "@/components/Button";
 import { useI18n } from "@/contexts/i18n-context";
 import { formatTimeLeft, useLeagueStandings } from "@/hooks/use-competition";
 import { selectMainServer } from "@/lib/gameServer";
+import { isRankLoggedIn } from "@/lib/rankAuth";
 import { cn } from "@/lib/utils";
-import { LEAGUE_TIERS, ONLINE_SCORED_MATCHES_PER_DAY, type LeagueTier } from "@shared/competition";
-
-const TIER_STYLE: Record<LeagueTier, string> = {
-  bronze: "bg-orange-100 text-orange-900",
-  silver: "bg-slate-200 text-slate-900",
-  gold: "bg-amber-200 text-amber-950",
-  diamond: "bg-sky-200 text-sky-950",
-};
-
-function TierBadge({ tier }: { tier: LeagueTier }) {
-  const { t } = useI18n();
-  return (
-    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold uppercase", TIER_STYLE[tier])}>
-      {t(`league.tier.${tier}`)}
-    </span>
-  );
-}
+import { RankBadge } from "@/components/RankBadge";
+import { ONLINE_SCORED_MATCHES_PER_DAY } from "@shared/competition";
 
 interface LeagueDialogProps {
   compact?: boolean;
@@ -42,10 +28,6 @@ export function LeagueDialog({ compact = false, triggerClassName, iconClassName 
   const [open, setOpen] = useState(false);
   const league = useLeagueStandings(open);
   const data = league.data;
-  // Pontos da faixa acima da atual, para mostrar o próximo objetivo
-  const nextTier = data?.me
-    ? [...LEAGUE_TIERS].reverse().find((tier) => tier.minPoints > data.me!.points)
-    : undefined;
 
   return (
     <Dialog
@@ -89,23 +71,17 @@ export function LeagueDialog({ compact = false, triggerClassName, iconClassName 
                     <span className="font-bold">
                       {t("league.yourRank", { rank: String(data.me.rank), total: String(data.totalPlayers) })}
                     </span>
-                    <TierBadge tier={data.me.tier} />
+                    <RankBadge rank={data.me.tier} />
                   </div>
                   <div className="mt-1 text-sm">
                     {data.me.points} {t("league.pointsShort")} · {data.me.wins} {t("profile.wins").toLowerCase()} ·{" "}
                     {data.me.games} {t("profile.gamesPlayed").toLowerCase()}
                   </div>
-                  {nextTier && (
-                    <div className="mt-1 text-xs">
-                      {t("league.nextTier", {
-                        points: String(nextTier.minPoints - data.me.points),
-                        tier: t(`league.tier.${nextTier.id}`),
-                      })}
-                    </div>
-                  )}
                 </div>
               ) : (
-                <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">{t("league.notRanked")}</p>
+                <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+                  {isRankLoggedIn() ? t("league.notRanked") : t("competition.loginRequired")}
+                </p>
               )}
 
               <div>
@@ -124,7 +100,7 @@ export function LeagueDialog({ compact = false, triggerClassName, iconClassName 
                       >
                         <span className="w-7 font-mono text-gray-600">#{row.rank}</span>
                         <span className="min-w-0 flex-1 truncate">{row.name}</span>
-                        <TierBadge tier={row.tier} />
+                        <RankBadge rank={row.tier} />
                         <span className="w-10 text-right font-mono font-bold">{row.points}</span>
                       </li>
                     ))}

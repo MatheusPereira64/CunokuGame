@@ -49,6 +49,9 @@ export interface GameState {
   isFinalRound?: boolean; // Se está na rodada final
   seed?: string | null; // Seed do desafio diário (nunca enviada aos clientes)
   dailyDay?: string | null; // Dia (UTC) do desafio diário; ausente em partidas comuns
+  /** Epoch ms: jogador offline tem até esse instante para voltar no turno dele */
+  reconnectDeadline?: number | null;
+  reconnectPlayerId?: string | null;
 }
 
 // === TABLE DEFINITIONS ===
@@ -68,19 +71,19 @@ export const rooms = pgTable("rooms", {
 /** Sala do desafio diário de cada jogador: garante uma tentativa por dia e permite retomar. */
 export const dailyEntries = pgTable("daily_entries", {
   day: text("day").notNull(),
-  playerKey: text("player_key").notNull(),
+  rankPlayerId: text("rank_player_id").notNull(),
   roomCode: text("room_code").notNull(),
   playerId: text("player_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
-  primaryKey({ columns: [t.day, t.playerKey] }),
+  primaryKey({ columns: [t.day, t.rankPlayerId] }),
   index("daily_entries_room_idx").on(t.roomCode),
 ]);
 
 /** Resultado registrado pelo servidor; base do ranking do dia e da liga semanal. */
 export const matchResults = pgTable("match_results", {
   id: serial("id").primaryKey(),
-  playerKey: text("player_key").notNull(),
+  rankPlayerId: text("rank_player_id").notNull(),
   displayName: text("display_name").notNull(),
   kind: text("kind").notNull(), // daily, online
   day: text("day").notNull(),
@@ -91,10 +94,10 @@ export const matchResults = pgTable("match_results", {
   points: integer("points").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
-  uniqueIndex("match_results_room_player_idx").on(t.roomCode, t.playerKey),
+  uniqueIndex("match_results_room_player_idx").on(t.roomCode, t.rankPlayerId),
   index("match_results_day_idx").on(t.day),
   index("match_results_week_idx").on(t.week),
-  index("match_results_player_idx").on(t.playerKey),
+  index("match_results_player_idx").on(t.rankPlayerId),
 ]);
 
 // === SCHEMAS ===
@@ -105,6 +108,38 @@ export type InsertRoom = z.infer<typeof insertRoomSchema>;
 export type DailyEntry = typeof dailyEntries.$inferSelect;
 export type MatchResult = typeof matchResults.$inferSelect;
 export type InsertMatchResult = typeof matchResults.$inferInsert;
+
+/** Contas leves para ranking global (apelido + PIN). */
+export const rankPlayers = pgTable("rank_players", {
+  id: text("id").primaryKey(),
+  nickname: text("nickname").notNull().unique(),
+  pinHash: text("pin_hash").notNull(),
+  pinSalt: text("pin_salt").notNull(),
+  displayName: text("display_name").notNull().default(""),
+  iconId: text("icon_id").notNull().default("spade"),
+  accent: text("accent").notNull().default("indigo"),
+  frameId: text("frame_id").notNull().default("none"),
+  titleId: text("title_id").notNull().default("none"),
+  bannerId: text("banner_id").notNull().default("default"),
+  wins: integer("wins").notNull().default(0),
+  gamesPlayed: integer("games_played").notNull().default(0),
+  bestScore: integer("best_score"),
+  progress: jsonb("progress").$type<Record<string, unknown>>().notNull().default({}),
+  achievements: jsonb("achievements").$type<string[]>().notNull().default([]),
+  authTokenHash: text("auth_token_hash"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** Um login por aparelho: entrar em outro dispositivo não derruba os demais. */
+export const rankSessions = pgTable("rank_sessions", {
+  tokenHash: text("token_hash").primaryKey(),
+  playerId: text("player_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type RankPlayer = typeof rankPlayers.$inferSelect;
+export type InsertRankPlayer = typeof rankPlayers.$inferInsert;
 
 // === API TYPES ===
 export type CreateRoomRequest = { playerName: string; gameMode?: "multiplayer" | "vs_bots"; botDifficulty?: "easy" | "medium" | "hard" };

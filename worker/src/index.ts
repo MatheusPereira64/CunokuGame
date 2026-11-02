@@ -1,22 +1,48 @@
 import { generateRoomCode, newPlayerId } from "../../shared/roomCode";
 import { api } from "../../shared/routes";
-import { PLAYER_KEY_HEADER } from "../../shared/competition";
+import { bearerToken } from "../../shared/rankService";
 import { toPublicRoom } from "../../shared/gameFilter";
 import { getDailyStatus, getLeagueStandings, startDailyChallenge } from "../../server/competition";
 import { createCompetitionStore, createStorage, pingDb } from "./storage";
 import type { Env } from "./env";
 import { RoomDurableObject } from "./room-do";
+import { MatchQueueDurableObject } from "./match-queue-do";
+import { handleRankApi } from "./rankApi";
+import { corsHeaders } from "./cors";
 
-export { RoomDurableObject };
+export { RoomDurableObject, MatchQueueDurableObject };
 
-function json(data: unknown, status = 200): Response {
+function json(data: unknown, status = 200, request?: Request): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "access-control-allow-origin": "*",
+      ...(request ? corsHeaders(request) : {}),
     },
   });
+}
+
+async function handleReadApi(request: Request, env: Env, url: URL, path: string, method: string): Promise<Response | null> {
+  const storage = createStorage(env);
+  if (method === "GET" && path === "/api/health") {
+    const dbOk = await pingDb(env).catch(() => false);
+    return json({ ok: true, db: dbOk, memory: !dbOk }, 200, request);
+  }
+  if (method === "GET" && path === api.lan.info.path) {
+    return json({ port: 443, addresses: [], joinBaseUrls: [url.origin] }, 200, request);
+  }
+  if (method === "GET" && path === api.rooms.list.path) {
+    const rooms = await storage.listRooms();
+    return json(rooms.filter((room) => room.gameMode !== "daily").map(toPublicRoom), 200, request);
+  }
+  const getMatch = path.match(/^\/api\/rooms\/([^/]+)$/);
+  if (method === "GET" && getMatch) {
+    const code = decodeURIComponent(getMatch[1]!).toUpperCase();
+    const room = await storage.getRoom(code);
+    if (!room || room.gameMode === "daily") return json({ message: "Room not found" }, 404, request);
+    return json(toPublicRoom(room), 200, request);
+  }
+  return null;
 }
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
@@ -27,26 +53,15 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
   if (method === "OPTIONS") {
     return new Response(null, {
       status: 204,
-      headers: {
-        "access-control-allow-origin": "*",
-        "access-control-allow-methods": "GET,POST,OPTIONS",
-        "access-control-allow-headers": `content-type,${PLAYER_KEY_HEADER}`,
-      },
+      headers: corsHeaders(request),
     });
   }
 
-  if (method === "GET" && path === "/api/health") {
-    const dbOk = await pingDb(env).catch(() => false);
-    return json({ ok: true, db: dbOk, memory: !dbOk });
-  }
+  const rankRes = await handleRankApi(request, env, path, method);
+  if (rankRes) return rankRes;
 
-  if (method === "GET" && path === api.lan.info.path) {
-    return json({
-      port: 443,
-      addresses: [],
-      joinBaseUrls: [url.origin],
-    });
-  }
+  const readRes = await handleReadApi(request, env, url, path, method);
+  if (readRes) return readRes;
 
   if (method === "POST" && path === api.rooms.create.path) {
     try {
@@ -79,10 +94,21 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
         console.warn("Room DO init failed", e);
       }
 
-      return json({ code: roomCode, playerId }, 201);
+      return json({ code: roomCode, playerId }, 201, request);
     } catch (err: any) {
-      return json({ message: err?.message || "Invalid input" }, 400);
+      return json({ message: err?.message || "Invalid input" }, 400, request);
     }
+  }
+
+  if (path === api.matchmaking.enqueue.path || path.startsWith("/api/matchmaking/")) {
+    const id = env.MATCH_QUEUE.idFromName("public");
+    const stub = env.MATCH_QUEUE.get(id);
+    const upstream = await stub.fetch(request);
+    const headers = new Headers(upstream.headers);
+    for (const [key, value] of Object.entries(corsHeaders(request))) {
+      headers.set(key, value);
+    }
+    return new Response(upstream.body, { status: upstream.status, headers });
   }
 
   if (method === "POST" && path === api.rooms.join.path) {
@@ -90,40 +116,25 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
       const body = await request.json();
       const { code } = api.rooms.join.input.parse(body);
       const room = await storage.getRoom(code.toUpperCase());
-      if (!room || room.gameMode === "daily") return json({ message: "Room not found" }, 404);
+      if (!room || room.gameMode === "daily") return json({ message: "Room not found" }, 404, request);
       const playerId = newPlayerId();
-      return json({ code: room.code, playerId, room: toPublicRoom(room) });
+      return json({ code: room.code, playerId, room: toPublicRoom(room) }, 200, request);
     } catch {
-      return json({ message: "Invalid input" }, 400);
+      return json({ message: "Invalid input" }, 400, request);
     }
-  }
-
-  if (method === "GET" && path === api.rooms.list.path) {
-    const rooms = await storage.listRooms();
-    return json(rooms.filter((room) => room.gameMode !== "daily").map(toPublicRoom));
-  }
-
-  const getMatch = path.match(/^\/api\/rooms\/([^/]+)$/);
-  if (method === "GET" && getMatch) {
-    const code = decodeURIComponent(getMatch[1]!).toUpperCase();
-    const room = await storage.getRoom(code);
-    if (!room || room.gameMode === "daily") return json({ message: "Room not found" }, 404);
-    return json(toPublicRoom(room));
   }
 
   if (method === "GET" && path === api.daily.status.path) {
     const store = createCompetitionStore(env);
-    return json(await getDailyStatus(store, request.headers.get(PLAYER_KEY_HEADER)));
+    const token = bearerToken(request.headers.get("authorization"));
+    return json(await getDailyStatus(store, token), 200, request);
   }
 
   if (method === "POST" && path === api.daily.start.path) {
-    const parsed = api.daily.start.input.safeParse(await request.json().catch(() => null));
-    if (!parsed.success) return json({ message: "Invalid input" }, 400);
-    const { createdRoom, ...result } = await startDailyChallenge(
-      storage,
-      createCompetitionStore(env),
-      parsed.data,
-    );
+    const token = bearerToken(request.headers.get("authorization"));
+    const started = await startDailyChallenge(storage, createCompetitionStore(env), token);
+    if (!started) return json({ message: "unauthorized" }, 401, request);
+    const { createdRoom, ...result } = started;
     if (createdRoom) {
       try {
         const id = env.ROOM.idFromName(createdRoom.code);
@@ -138,15 +149,16 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
         console.warn("Room DO init failed", e);
       }
     }
-    return json(result);
+    return json(result, 200, request);
   }
 
   if (method === "GET" && path === api.league.standings.path) {
     const store = createCompetitionStore(env);
-    return json(await getLeagueStandings(store, request.headers.get(PLAYER_KEY_HEADER)));
+    const token = bearerToken(request.headers.get("authorization"));
+    return json(await getLeagueStandings(store, token), 200, request);
   }
 
-  return json({ message: "Not found" }, 404);
+  return json({ message: "Not found" }, 404, request);
 }
 
 export default {

@@ -1,4 +1,5 @@
 import { GameState, Player, Card } from "@shared/schema";
+import { shuffleInPlace } from "@shared/secureRandom";
 
 /**
  * Gera um UUID seguro (Web Crypto quando disponível).
@@ -44,10 +45,7 @@ function createDeck(numberOfDecks: number = 1): Card[] {
   }
   
   // Shuffle
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]];
-  }
+  shuffleInPlace(deck);
   
   return deck;
 }
@@ -61,7 +59,7 @@ function getCardValue(rank: string): number {
   if (rank === "A") return 1;
   if (rank === "J") return 11;
   if (rank === "Q") return 12;
-  return parseInt(rank) || 0;
+  return Number.parseInt(rank) || 0;
 }
 
 /**

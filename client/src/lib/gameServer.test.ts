@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeServerBase, isLikelyLocalHost, apiUrl, wsUrl } from "./gameServer";
+import { normalizeServerBase, isLikelyLocalHost, apiUrl, wsUrl, DEFAULT_CLOUD_SERVER } from "./gameServer";
 
 describe("normalizeServerBase", () => {
   it("aceita IP com porta e adiciona http", () => {
@@ -26,6 +26,12 @@ describe("isLikelyLocalHost", () => {
     expect(isLikelyLocalHost("172.16.5.1")).toBe(true);
     expect(isLikelyLocalHost("8.8.8.8")).toBe(false);
     expect(isLikelyLocalHost("cunoku.example.com")).toBe(false);
+  });
+});
+
+describe("DEFAULT_CLOUD_SERVER", () => {
+  it("aponta para o Worker de produção", () => {
+    expect(DEFAULT_CLOUD_SERVER).toContain("workers.dev");
   });
 });
 

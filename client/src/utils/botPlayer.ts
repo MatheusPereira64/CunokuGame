@@ -1,4 +1,5 @@
 import { GameState, GameAction, Player } from "@shared/schema";
+import { randomChance, randomInt } from "@shared/secureRandom";
 
 export type BotDifficulty = "easy" | "medium" | "hard";
 
@@ -50,7 +51,7 @@ export class BotPlayer {
 
     if (this.difficulty === "medium") {
       // Medium: 70% deck, 30% discard
-      return Math.random() < 0.7 ? { type: "draw_deck" } : { type: "draw_discard" };
+      return randomChance(0.7) ? { type: "draw_deck" } : { type: "draw_discard" };
     }
 
     // Hard: analyze discard pile card value
@@ -70,10 +71,10 @@ export class BotPlayer {
 
     if (this.difficulty === "easy") {
       // Easy: 50% discard, 50% swap random card
-      if (Math.random() < 0.5) {
+      if (randomChance(0.5)) {
         return { type: "discard_drawn" };
       }
-      const randomIdx = Math.floor(Math.random() * 4);
+      const randomIdx = randomInt(4);
       return { type: "replace_card", handIndex: randomIdx };
     }
 
@@ -81,7 +82,7 @@ export class BotPlayer {
       // Medium: compare values
       const knownIndices = Object.entries(player.knownCards)
         .filter(([_, known]) => known)
-        .map(([idx]) => parseInt(idx));
+        .map(([idx]) => Number.parseInt(idx));
 
       if (knownIndices.length > 0) {
         // Check if any known card is worse than drawn
@@ -89,7 +90,7 @@ export class BotPlayer {
           const worstVal = player.hand[worst]?.value ?? 0;
           const currentVal = player.hand[idx]?.value ?? 0;
           return currentVal > worstVal ? idx : worst;
-        });
+        }, knownIndices[0]);
 
         if (player.hand[worstKnownIdx]?.value > drawnCard.value) {
           return { type: "replace_card", handIndex: worstKnownIdx };
@@ -102,13 +103,13 @@ export class BotPlayer {
     // Hard: intelligent strategy
     const knownCards = Object.entries(player.knownCards)
       .filter(([_, known]) => known)
-      .map(([idx]) => ({ idx: parseInt(idx), card: player.hand[parseInt(idx)] }));
+      .map(([idx]) => ({ idx: Number.parseInt(idx), card: player.hand[Number.parseInt(idx)] }));
 
     if (knownCards.length > 0) {
       // Find the worst known card
-      const worstIdx = knownCards.reduce((worst, current) => 
+      const worstIdx = knownCards.reduce((worst, current) =>
         current.card.value > worst.card.value ? current : worst
-      ).idx;
+      , knownCards[0]).idx;
 
       // If drawn card is significantly better, swap
       if (player.hand[worstIdx].value - drawnCard.value > 1) {
@@ -120,7 +121,7 @@ export class BotPlayer {
     if (drawnCard.rank === "7" || drawnCard.rank === "8") {
       const unknownIndices = Object.entries(player.knownCards)
         .filter(([_, known]) => !known)
-        .map(([idx]) => parseInt(idx));
+        .map(([idx]) => Number.parseInt(idx));
 
       if (unknownIndices.length > 0) {
         const peekIdx = unknownIndices[0];

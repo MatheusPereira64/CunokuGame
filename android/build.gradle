@@ -1,7 +1,10 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
-    
+    configurations.classpath {
+        resolutionStrategy.activateDependencyLocking()
+    }
+
     repositories {
         google()
         mavenCentral()
@@ -21,6 +24,10 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+    }
+    // Lock de versões para builds previsíveis (Sonar / supply-chain)
+    dependencyLocking {
+        lockAllConfigurations()
     }
 }
 

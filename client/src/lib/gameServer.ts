@@ -4,6 +4,11 @@ const LAN_JOIN_URL_KEY = "cunoku_lan_join_url";
 
 export type NetworkMode = "lan" | "server";
 
+/** Worker Cloudflare de produção (ranking, salas online, multiplayer cloud). */
+export const DEFAULT_CLOUD_SERVER =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_GAME_SERVER_URL) ||
+  "https://cunoku.cunokugame.workers.dev";
+
 /** Normaliza IP, host:porta ou URL completa para origem http(s). */
 export function normalizeServerBase(input: string): string | null {
   const raw = input.trim();
@@ -24,10 +29,35 @@ export function normalizeServerBase(input: string): string | null {
   }
 }
 
+/** True no APK/IPA Capacitor (assets locais, origin tipicamente https://localhost). */
+export function isNativeApp(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+    if (cap?.isNativePlatform?.()) return true;
+  } catch {
+    // ignore
+  }
+  // Build de produção embutido no WebView Capacitor (scheme https + localhost)
+  const { protocol, hostname } = window.location;
+  if (
+    import.meta.env.PROD &&
+    (hostname === "localhost" || hostname === "127.0.0.1") &&
+    (protocol === "https:" || protocol === "http:" || protocol === "capacitor:")
+  ) {
+    return true;
+  }
+  return protocol === "capacitor:";
+}
+
 export function getServerBase(): string {
   if (typeof window === "undefined") return "";
   const stored = sessionStorage.getItem(SERVER_BASE_KEY);
   if (stored) return stored;
+  // No app nativo, same-origin é o WebView local — API fica no Worker cloud
+  if (isNativeApp()) {
+    return String(DEFAULT_CLOUD_SERVER).replace(/\/$/, "");
+  }
   return window.location.origin;
 }
 

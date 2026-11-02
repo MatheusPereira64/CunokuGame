@@ -7,12 +7,19 @@ import {
   type InsertMatchResult,
   type MatchResult,
 } from "@shared/schema";
+import { rankFromWins, type RankTier } from "@shared/rank";
+import { getPlayerByToken, getRankSummaries } from "@shared/rankService";
 
-export type NewDailyEntry = Pick<DailyEntry, "day" | "playerKey" | "roomCode" | "playerId">;
+export type NewDailyEntry = Pick<DailyEntry, "day" | "rankPlayerId" | "roomCode" | "playerId">;
 export type PlayerResultFilter = { kind?: string; day?: string };
+export type RankAccount = { id: string; displayName: string };
+export type RankSummary = { displayName: string; rank: RankTier };
 
 export interface CompetitionStore {
-  getDailyEntry(day: string, playerKey: string): Promise<DailyEntry | undefined>;
+  /** Conta do ranking dona do token; é a única identidade aceita no desafio e na liga. */
+  getAccountByToken(token: string): Promise<RankAccount | null>;
+  getAccountSummaries(ids: string[]): Promise<Map<string, RankSummary>>;
+  getDailyEntry(day: string, rankPlayerId: string): Promise<DailyEntry | undefined>;
   getDailyEntryByRoom(roomCode: string): Promise<DailyEntry | undefined>;
   /** Em corrida entre requisições, devolve a entrada que ficou gravada. */
   createDailyEntry(entry: NewDailyEntry): Promise<DailyEntry>;
@@ -20,7 +27,7 @@ export interface CompetitionStore {
   insertMatchResults(rows: InsertMatchResult[]): Promise<MatchResult[]>;
   getResultsForDay(day: string, kind: string): Promise<MatchResult[]>;
   getResultsForWeek(week: string): Promise<MatchResult[]>;
-  getPlayerResults(playerKey: string, filter?: PlayerResultFilter): Promise<MatchResult[]>;
+  getPlayerResults(rankPlayerId: string, filter?: PlayerResultFilter): Promise<MatchResult[]>;
 }
 
 export type CompetitionDb = PgDatabase<any, any, any>;
@@ -33,18 +40,18 @@ function ensureCompetitionSchema(db: CompetitionDb): Promise<void> {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS daily_entries (
         day TEXT NOT NULL,
-        player_key TEXT NOT NULL,
+        rank_player_id TEXT NOT NULL,
         room_code TEXT NOT NULL,
         player_id TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW(),
-        PRIMARY KEY (day, player_key)
+        PRIMARY KEY (day, rank_player_id)
       )
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS daily_entries_room_idx ON daily_entries (room_code)`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS match_results (
         id SERIAL PRIMARY KEY,
-        player_key TEXT NOT NULL,
+        rank_player_id TEXT NOT NULL,
         display_name TEXT NOT NULL,
         kind TEXT NOT NULL,
         day TEXT NOT NULL,
@@ -56,10 +63,10 @@ function ensureCompetitionSchema(db: CompetitionDb): Promise<void> {
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
-    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS match_results_room_player_idx ON match_results (room_code, player_key)`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS match_results_room_player_idx ON match_results (room_code, rank_player_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS match_results_day_idx ON match_results (day)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS match_results_week_idx ON match_results (week)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS match_results_player_idx ON match_results (player_key)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS match_results_player_idx ON match_results (rank_player_id)`);
   })().catch((err) => {
     schemaReady = null;
     throw err;
@@ -77,12 +84,21 @@ export class DrizzleCompetitionStore implements CompetitionStore {
     return db;
   }
 
-  async getDailyEntry(day: string, playerKey: string): Promise<DailyEntry | undefined> {
+  async getAccountByToken(token: string): Promise<RankAccount | null> {
+    const row = await getPlayerByToken(await this.db(), token);
+    return row ? { id: row.id, displayName: row.displayName || row.nickname } : null;
+  }
+
+  async getAccountSummaries(ids: string[]): Promise<Map<string, RankSummary>> {
+    return getRankSummaries(await this.db(), ids);
+  }
+
+  async getDailyEntry(day: string, rankPlayerId: string): Promise<DailyEntry | undefined> {
     const db = await this.db();
     const [entry] = await db
       .select()
       .from(dailyEntries)
-      .where(and(eq(dailyEntries.day, day), eq(dailyEntries.playerKey, playerKey)));
+      .where(and(eq(dailyEntries.day, day), eq(dailyEntries.rankPlayerId, rankPlayerId)));
     return entry;
   }
 
@@ -96,7 +112,7 @@ export class DrizzleCompetitionStore implements CompetitionStore {
     const db = await this.db();
     const [created] = await db.insert(dailyEntries).values(entry).onConflictDoNothing().returning();
     if (created) return created;
-    const existing = await this.getDailyEntry(entry.day, entry.playerKey);
+    const existing = await this.getDailyEntry(entry.day, entry.rankPlayerId);
     if (!existing) throw new Error("Daily entry conflict without existing row");
     return existing;
   }
@@ -120,14 +136,14 @@ export class DrizzleCompetitionStore implements CompetitionStore {
     return await db.select().from(matchResults).where(eq(matchResults.week, week));
   }
 
-  async getPlayerResults(playerKey: string, filter: PlayerResultFilter = {}): Promise<MatchResult[]> {
+  async getPlayerResults(rankPlayerId: string, filter: PlayerResultFilter = {}): Promise<MatchResult[]> {
     const db = await this.db();
     return await db
       .select()
       .from(matchResults)
       .where(
         and(
-          eq(matchResults.playerKey, playerKey),
+          eq(matchResults.rankPlayerId, rankPlayerId),
           filter.kind ? eq(matchResults.kind, filter.kind) : undefined,
           filter.day ? eq(matchResults.day, filter.day) : undefined,
         ),
@@ -135,13 +151,32 @@ export class DrizzleCompetitionStore implements CompetitionStore {
   }
 }
 
-/** Ranking em memória para LAN/dev sem banco. */
+/** Em memória para LAN/dev sem banco, onde não há contas: serve só de leitura vazia e aos testes. */
 export class MemoryCompetitionStore implements CompetitionStore {
   private entries: DailyEntry[] = [];
   private results: MatchResult[] = [];
+  private accounts = new Map<string, RankAccount>();
 
-  async getDailyEntry(day: string, playerKey: string): Promise<DailyEntry | undefined> {
-    return this.entries.find((e) => e.day === day && e.playerKey === playerKey);
+  addAccount(token: string, account: RankAccount): void {
+    this.accounts.set(token, account);
+  }
+
+  async getAccountByToken(token: string): Promise<RankAccount | null> {
+    return this.accounts.get(token) ?? null;
+  }
+
+  async getAccountSummaries(ids: string[]): Promise<Map<string, RankSummary>> {
+    const summaries = new Map<string, RankSummary>();
+    for (const account of Array.from(this.accounts.values())) {
+      if (ids.includes(account.id)) {
+        summaries.set(account.id, { displayName: account.displayName, rank: rankFromWins(0) });
+      }
+    }
+    return summaries;
+  }
+
+  async getDailyEntry(day: string, rankPlayerId: string): Promise<DailyEntry | undefined> {
+    return this.entries.find((e) => e.day === day && e.rankPlayerId === rankPlayerId);
   }
 
   async getDailyEntryByRoom(roomCode: string): Promise<DailyEntry | undefined> {
@@ -149,7 +184,7 @@ export class MemoryCompetitionStore implements CompetitionStore {
   }
 
   async createDailyEntry(entry: NewDailyEntry): Promise<DailyEntry> {
-    const existing = await this.getDailyEntry(entry.day, entry.playerKey);
+    const existing = await this.getDailyEntry(entry.day, entry.rankPlayerId);
     if (existing) return existing;
     const created: DailyEntry = { ...entry, createdAt: new Date() };
     this.entries.push(created);
@@ -160,7 +195,7 @@ export class MemoryCompetitionStore implements CompetitionStore {
     const inserted: MatchResult[] = [];
     for (const row of rows) {
       const duplicate = this.results.some(
-        (r) => r.roomCode === row.roomCode && r.playerKey === row.playerKey,
+        (r) => r.roomCode === row.roomCode && r.rankPlayerId === row.rankPlayerId,
       );
       if (duplicate) continue;
       const created: MatchResult = {
@@ -182,10 +217,10 @@ export class MemoryCompetitionStore implements CompetitionStore {
     return this.results.filter((r) => r.week === week);
   }
 
-  async getPlayerResults(playerKey: string, filter: PlayerResultFilter = {}): Promise<MatchResult[]> {
+  async getPlayerResults(rankPlayerId: string, filter: PlayerResultFilter = {}): Promise<MatchResult[]> {
     return this.results.filter(
       (r) =>
-        r.playerKey === playerKey &&
+        r.rankPlayerId === rankPlayerId &&
         (!filter.kind || r.kind === filter.kind) &&
         (!filter.day || r.day === filter.day),
     );

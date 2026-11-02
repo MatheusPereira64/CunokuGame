@@ -1,43 +1,26 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useSyncExternalStore } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useGameSocket } from "@/hooks/use-game-socket";
 import { useOfflineGame } from "@/hooks/use-offline-game";
-import { PlayingCard } from "@/components/PlayingCard";
-import { Button } from "@/components/Button";
 import { GameState, Card } from "@shared/schema";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  useGameAnimations,
-  AnimationRenderer,
-  OpponentActionNotification,
-  OpponentActionType,
-} from "@/components/animations";
-import { ArrowLeft, Copy } from "lucide-react";
+import type { EmoteId } from "@shared/emotes";
+import { START_COUNTDOWN_MS } from "@shared/matchQueue";
+import { useGameAnimations, OpponentActionType } from "@/components/animations";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
 import { audioManager } from "@/utils/audioManager";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { VolumeControl } from "@/components/VolumeControl";
 import { useI18n } from "@/contexts/i18n-context";
-import { PlayerSeat } from "@/components/game/PlayerSeat";
-import { CenterPile } from "@/components/game/CenterPile";
-import { MyArea } from "@/components/game/MyArea";
-import { WaitingRoom } from "@/components/game/WaitingRoom";
-import { GameOverModal } from "@/components/game/GameOverModal";
-import { EmoteBubble, EmotePicker } from "@/components/game/EmotePicker";
-import { AbilityModal } from "@/components/game/AbilityModal";
-import { AbilityAction, hasSpecialAbility, getAbilityDescription } from "@/components/game/helpers";
-import { getSeatPositions } from "@/components/game/seatPositions";
-import { LandscapePrompt } from "@/components/game/LandscapePrompt";
-import { useIsPortrait, lockLandscape, useIsCompactGame } from "@/hooks/use-landscape";
+import { AbilityAction } from "@/components/game/helpers";
+import { useIsPortrait, lockLandscape, unlockOrientation, useIsCompactGame } from "@/hooks/use-landscape";
 import { getLanJoinUrl, getNetworkMode } from "@/lib/gameServer";
+import { clearActiveSession, saveActiveSession } from "@/lib/activeSession";
+import { buildInviteUrl } from "@/lib/inviteLink";
+import { loadTableTheme, subscribeTableTheme } from "@/lib/tableTheme";
 import { copyToClipboard } from "@/lib/clipboard";
-import type { EmoteId } from "@shared/emotes";
-import {
-  hasRecordedMatchStats,
-  markMatchStatsRecorded,
-  recordMatchResult,
-} from "@/lib/playerProfile";
+import { ActiveTable, ConnectingScreen, renderPregame } from "@/pages/gameTable";
+import { applyOfflineSession, isOpeningDeal, leftWaitingRoom, matchInProgress, playTableAnimations, syncFinishedMatch } from "@/pages/gameMotion";
+
+const QUEUE_START_RETRY_MS = 2000;
 
 export default function Game() {
   const [, params] = useRoute("/game/:code");
@@ -52,6 +35,11 @@ export default function Game() {
   const searchParams = new URLSearchParams(window.location.search);
   const playerId = searchParams.get("player") || "";
   const isOffline = searchParams.get("mode") === "offline" || roomCode === "offline";
+  const fromQueue = searchParams.get("queue") === "1";
+  const tableTheme = useSyncExternalStore(subscribeTableTheme, loadTableTheme, loadTableTheme);
+  const queueLastStartRef = useRef(0);
+  const queueStartAtRef = useRef<number | null>(null);
+  const [queueCountdown, setQueueCountdown] = useState<number | null>(null);
 
   // Modo offline: carrega estado do sessionStorage
   const [offlineGameState, setOfflineGameState] = useState<GameState | null>(null);
@@ -61,43 +49,20 @@ export default function Game() {
   useEffect(() => {
     if (isOffline && playerId) {
       setIsLoadingOffline(true);
-      const savedState = sessionStorage.getItem(`offline_game_${playerId}`);
-      const savedDifficulty = sessionStorage.getItem(`offline_difficulty_${playerId}`);
-
-      if (savedState) {
-        try {
-          const parsedState = JSON.parse(savedState) as GameState;
-          if (parsedState && parsedState.players && parsedState.players.length > 0) {
-            setOfflineGameState(parsedState);
-            if (savedDifficulty) {
-              setBotDifficulty(savedDifficulty as "easy" | "medium" | "hard");
-            }
-          } else {
-            toast({
-              title: t("error.generic"),
-              description: t("game.errorInvalidState"),
-              variant: "destructive",
-            });
-          }
-        } catch (e) {
-          toast({
-            title: t("error.generic"),
-            description: t("game.errorFailedToLoad"),
-            variant: "destructive",
-          });
-        }
-      } else {
-        toast({
-          title: t("error.generic"),
-          description: t("game.errorNotFound"),
-          variant: "destructive",
-        });
-      }
+      applyOfflineSession(playerId, setOfflineGameState, setBotDifficulty, (description) => {
+        toast({ title: t("error.generic"), description: t(description), variant: "destructive" });
+      });
       setIsLoadingOffline(false);
-    } else if (!isOffline) {
-      setIsLoadingOffline(false);
+      return;
     }
-  }, [isOffline, playerId, toast]);
+    if (!isOffline) setIsLoadingOffline(false);
+  }, [isOffline, playerId, toast, t]);
+
+  useEffect(() => {
+    if (isOffline || !roomCode || !playerId) return;
+    const name = sessionStorage.getItem(`playerName_${roomCode}`) || "";
+    saveActiveSession({ code: roomCode, playerId, name, savedAt: Date.now() });
+  }, [isOffline, roomCode, playerId]);
 
   const { gameState: offlineGameStateFromHook, sendAction: sendOfflineAction } = useOfflineGame(
     offlineGameState,
@@ -107,6 +72,7 @@ export default function Game() {
 
   const {
     gameState: onlineGameState,
+    connected,
     sendAction: sendOnlineAction,
     socketRef,
     revealedCard: onlineRevealedCard,
@@ -125,14 +91,14 @@ export default function Game() {
 
   const [abilityModalOpen, setAbilityModalOpen] = useState(false);
   const peekTimersRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
+  const opponentRevealTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [revealedOpponentCard, setRevealedOpponentCard] = useState<{
     card: Card;
     playerName: string;
     timer?: NodeJS.Timeout;
   } | null>(null);
-  // Cartas de oponentes reveladas temporariamente: chave = `${playerId}_${cardId}`
+  // Cartas de oponentes reveladas só neste cliente (habilidade 5/6): chave → face real
   const [revealedOpponentCardsInHand, setRevealedOpponentCardsInHand] = useState<Record<string, Card>>({});
-  const revealedCardTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const [gameOverModalOpen, setGameOverModalOpen] = useState(false);
   const [opponentActionNotification, setOpponentActionNotification] = useState<{
     playerName: string;
@@ -173,6 +139,48 @@ export default function Game() {
   };
 
   const gameState = isOffline ? offlineGameStateFromHook : onlineGameState;
+
+  // O desafio diário é retomado pela própria tela dele, não pelo atalho de reentrar na sala
+  const isDailyMatch = !!gameState?.dailyDay;
+  useEffect(() => {
+    if (isDailyMatch) clearActiveSession();
+  }, [isDailyMatch]);
+  const [, setReconnectTick] = useState(0);
+
+  useEffect(() => {
+    if (!gameState?.reconnectDeadline) return;
+    setReconnectTick((n) => n + 1);
+    const id = window.setInterval(() => setReconnectTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [gameState?.reconnectDeadline]);
+
+  useEffect(() => {
+    if (!fromQueue || isOffline) return;
+    if (!gameState || gameState.turnPhase !== "waiting" || gameState.players.length < 2) {
+      if (gameState?.turnPhase === "waiting") {
+        queueStartAtRef.current = null;
+        setQueueCountdown(null);
+      }
+      return;
+    }
+    if (queueStartAtRef.current == null) {
+      queueStartAtRef.current = Date.now() + START_COUNTDOWN_MS;
+    }
+    const tick = () => {
+      const startAt = queueStartAtRef.current;
+      if (startAt == null) return;
+      const left = Math.max(0, Math.ceil((startAt - Date.now()) / 1000));
+      setQueueCountdown(left);
+      if (left > 0) return;
+      if (Date.now() - queueLastStartRef.current < QUEUE_START_RETRY_MS) return;
+      if (socketRef.current?.readyState !== WebSocket.OPEN) return;
+      queueLastStartRef.current = Date.now();
+      socketRef.current.send(JSON.stringify({ type: "start_game" }));
+    };
+    tick();
+    const id = window.setInterval(tick, 200);
+    return () => window.clearInterval(id);
+  }, [fromQueue, isOffline, gameState, socketRef]);
   const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
 
   const {
@@ -201,17 +209,10 @@ export default function Game() {
   useEffect(() => {
     if (!gameState) return;
 
-    // Primeira renderização do jogo: dispara a distribuição inicial de cartas
     if (!prevGameStateRef.current) {
       prevGameStateRef.current = JSON.parse(JSON.stringify(gameState));
-      const isFreshGame =
-        gameState.turnPhase !== "waiting" &&
-        gameState.round === 1 &&
-        !gameState.drawnCard &&
-        gameState.discardPile.length <= 1;
-      if (isFreshGame && !hasDealtRef.current) {
+      if (isOpeningDeal(gameState) && !hasDealtRef.current) {
         hasDealtRef.current = true;
-        // Aguarda os assentos renderizarem para capturar as posições das cartas
         setTimeout(() => {
           animateDeal();
           audioManager.playCardSlide();
@@ -221,10 +222,7 @@ export default function Game() {
     }
 
     const prevState = prevGameStateRef.current;
-    const currentState = gameState;
-
-    // Transição sala de espera -> jogo (online): distribuição inicial
-    if (prevState.turnPhase === "waiting" && currentState.turnPhase !== "waiting" && !hasDealtRef.current) {
+    if (leftWaitingRoom(prevState, gameState) && !hasDealtRef.current) {
       hasDealtRef.current = true;
       setTimeout(() => {
         animateDeal();
@@ -233,128 +231,15 @@ export default function Game() {
     }
 
     const timeoutId = setTimeout(() => {
-      // Compra de carta (do baralho ou do descarte)
-      if (!prevState.drawnCard && currentState.drawnCard) {
-        const currentPlayer = currentState.players[currentState.currentPlayerIndex];
-        if (currentPlayer) {
-          const cameFromDiscard = prevState.discardPile.length > currentState.discardPile.length;
-          const source: "deck" | "discard" = cameFromDiscard ? "discard" : "deck";
-          const animKey = `draw_${currentPlayer.id}_${currentState.drawnCard.id}`;
-
-          if (!animationTriggeredRef.current.has(animKey)) {
-            animationTriggeredRef.current.add(animKey);
-            animateDraw(currentState.drawnCard, source, currentPlayer.id);
-            audioManager.playCardSlide();
-            setTimeout(() => animationTriggeredRef.current.delete(animKey), 2000);
-          }
-        }
-      }
-
-      // Substituição ou descarte da carta comprada
-      if (prevState.drawnCard && !currentState.drawnCard && prevState.discardPile.length < currentState.discardPile.length) {
-        const currentPlayer = currentState.players[currentState.currentPlayerIndex];
-        const prevPlayer = prevState.players[prevState.currentPlayerIndex];
-        const drawnCard = prevState.drawnCard;
-        const topDiscard = currentState.discardPile[currentState.discardPile.length - 1];
-        const isOpponent = currentPlayer.id !== playerId;
-
-        if (currentPlayer && prevPlayer && currentPlayer.hand.length === prevPlayer.hand.length) {
-          // Substituição: carta da mão trocada pela comprada
-          const discardedCard = topDiscard;
-          const handIndex = prevPlayer.hand.findIndex((c) => c.id === discardedCard.id);
-
-          if (drawnCard && discardedCard && handIndex >= 0) {
-            const animKey = `replace_${currentPlayer.id}_${handIndex}_${Date.now()}`;
-            if (!animationTriggeredRef.current.has(animKey)) {
-              animationTriggeredRef.current.add(animKey);
-              audioManager.playCardFlip();
-              if (isOpponent) {
-                setOpponentActionNotification({ playerName: currentPlayer.name, actionType: "replace" });
-              } else {
-                animateReplace(drawnCard, discardedCard, handIndex, currentPlayer.id);
-              }
-              setTimeout(() => animationTriggeredRef.current.delete(animKey), 2000);
-            }
-          }
-        } else {
-          // Descarte simples da carta comprada
-          const discardedCard = drawnCard;
-          if (discardedCard && currentPlayer) {
-            const animKey = `discard_drawn_${currentPlayer.id}_${discardedCard.id}`;
-            if (!animationTriggeredRef.current.has(animKey)) {
-              animationTriggeredRef.current.add(animKey);
-              audioManager.playCardSlide();
-              if (isOpponent) {
-                setOpponentActionNotification({ playerName: currentPlayer.name, actionType: "discard" });
-              } else {
-                animateDiscard(discardedCard, "drawn", currentPlayer.id);
-              }
-              setTimeout(() => animationTriggeredRef.current.delete(animKey), 2000);
-            }
-          }
-        }
-      }
-
-      // Descarte direto da mão (discard_from_hand ou matched_discard)
-      if (!(prevState.drawnCard && !currentState.drawnCard)) {
-        currentState.players.forEach((player, playerIndex) => {
-          const prevPlayer = prevState.players[playerIndex];
-          if (!prevPlayer) return;
-
-          if (player.hand.length < prevPlayer.hand.length) {
-            const removedCard = prevPlayer.hand.find(
-              (prevCard) => !player.hand.some((currCard) => currCard.id === prevCard.id)
-            );
-
-            if (removedCard && currentState.discardPile.length > prevState.discardPile.length) {
-              const topDiscard = currentState.discardPile[currentState.discardPile.length - 1];
-              const isMatch = topDiscard.id === removedCard.id;
-              const discardType: "from_hand" | "matched" =
-                prevState.currentPlayerIndex === playerIndex && prevState.turnPhase === "draw"
-                  ? "from_hand"
-                  : "matched";
-              const cardIndex = prevPlayer.hand.findIndex((c) => c.id === removedCard.id);
-
-              const animKey = `discard_hand_${player.id}_${removedCard.id}_${Date.now()}`;
-              const isOpponent = player.id !== playerId;
-
-              if (!animationTriggeredRef.current.has(animKey)) {
-                animationTriggeredRef.current.add(animKey);
-                audioManager.playCardSlide();
-                if (isOpponent) {
-                  setOpponentActionNotification({ playerName: player.name, actionType: "discard" });
-                } else {
-                  animateDiscard(topDiscard, discardType, player.id, cardIndex, isMatch);
-                }
-                setTimeout(() => animationTriggeredRef.current.delete(animKey), 2000);
-              }
-            }
-          }
-        });
-      }
-
-      // Penalidade (jogador ganhou 2 cartas fora do próprio turno)
-      currentState.players.forEach((player, playerIndex) => {
-        const prevPlayer = prevState.players[playerIndex];
-        if (!prevPlayer) return;
-
-        if (player.hand.length > prevPlayer.hand.length) {
-          const cardsAdded = player.hand.length - prevPlayer.hand.length;
-          if (cardsAdded === 2 && currentState.currentPlayerIndex !== playerIndex) {
-            const newCards = player.hand.slice(-2);
-            const startingIndex = prevPlayer.hand.length;
-            const animKey = `penalty_${player.id}_${newCards[0]?.id}_${newCards[1]?.id}_${Date.now()}`;
-            if (!animationTriggeredRef.current.has(animKey)) {
-              animationTriggeredRef.current.add(animKey);
-              animatePenalty(newCards, player.id, startingIndex);
-              audioManager.playPenalty();
-              setTimeout(() => animationTriggeredRef.current.delete(animKey), 3000);
-            }
-          }
-        }
-      });
-
-      prevGameStateRef.current = JSON.parse(JSON.stringify(currentState));
+      playTableAnimations(
+        prevState,
+        gameState,
+        playerId,
+        animationTriggeredRef.current,
+        { animateDraw, animateDiscard, animateReplace, animatePenalty, animateDeal },
+        (notice) => setOpponentActionNotification(notice),
+      );
+      prevGameStateRef.current = JSON.parse(JSON.stringify(gameState));
     }, 100);
 
     return () => clearTimeout(timeoutId);
@@ -402,38 +287,60 @@ export default function Game() {
 
   // Cleanup de timers ao desmontar
   useEffect(() => {
+    const ownTimers = peekTimersRef.current;
+    const opponentTimers = opponentRevealTimers.current;
     return () => {
-      peekTimersRef.current.forEach((timer) => clearTimeout(timer));
-      peekTimersRef.current.clear();
-      revealedCardTimersRef.current.forEach((timer) => clearTimeout(timer));
-      revealedCardTimersRef.current.clear();
+      ownTimers.forEach((timer) => clearTimeout(timer));
+      ownTimers.clear();
+      opponentTimers.forEach((timer) => clearTimeout(timer));
+      opponentTimers.clear();
     };
   }, []);
 
-  // Marca temporariamente uma carta de oponente como revelada (20 segundos)
+  /** Carta do oponente fica virada só para quem espiou, e volta ao verso em 20s. */
   const revealOpponentCardInHand = useCallback((targetPlayerId: string, targetCard: Card) => {
     const cardKey = `${targetPlayerId}_${targetCard.id}`;
-
-    const existingTimer = revealedCardTimersRef.current.get(cardKey);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
-      revealedCardTimersRef.current.delete(cardKey);
-    }
-
     setRevealedOpponentCardsInHand((prev) => ({ ...prev, [cardKey]: targetCard }));
-
-    const handTimer = setTimeout(() => {
-      setRevealedOpponentCardsInHand((current) => {
-        const { [cardKey]: _expired, ...rest } = current;
-        return rest;
+    const previous = opponentRevealTimers.current.get(cardKey);
+    if (previous) clearTimeout(previous);
+    const timer = setTimeout(() => {
+      opponentRevealTimers.current.delete(cardKey);
+      setRevealedOpponentCardsInHand((prev) => {
+        if (!prev[cardKey]) return prev;
+        const next = { ...prev };
+        delete next[cardKey];
+        return next;
       });
-      revealedCardTimersRef.current.delete(cardKey);
     }, 20000);
-
-    revealedCardTimersRef.current.set(cardKey, handTimer);
+    opponentRevealTimers.current.set(cardKey, timer);
   }, []);
 
-  // Carta revelada pelo servidor (online): mostra por 20 segundos
+  // Remove revelações locais quando a carta não está mais na mão do oponente
+  useEffect(() => {
+    if (!gameState) return;
+    setRevealedOpponentCardsInHand((prev) => {
+      const keys = Object.keys(prev);
+      if (keys.length === 0) return prev;
+      let changed = false;
+      const next = { ...prev };
+      for (const key of keys) {
+        const player = gameState.players.find((p) => key.startsWith(`${p.id}_`));
+        if (!player) {
+          delete next[key];
+          changed = true;
+          continue;
+        }
+        const revealedCardId = key.slice(player.id.length + 1);
+        if (!player.hand.some((c) => c.id === revealedCardId)) {
+          delete next[key];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [gameState]);
+
+  // Carta revelada pelo servidor (online): popup 3s; mesa fica revelada só neste cliente
   useEffect(() => {
     if (!isOffline && onlineRevealedCard) {
       if (revealedOpponentCard?.timer) {
@@ -443,7 +350,7 @@ export default function Game() {
       const overlayTimer = setTimeout(() => {
         setOnlineRevealedCard(null);
         setRevealedOpponentCard(null);
-      }, 20000);
+      }, 3000);
 
       setRevealedOpponentCard({
         card: onlineRevealedCard.card,
@@ -453,7 +360,7 @@ export default function Game() {
       audioManager.playCardFlip();
 
       const targetPlayerId = (onlineRevealedCard as any).targetPlayerId as string | undefined;
-      if (targetPlayerId) {
+      if (targetPlayerId && onlineRevealedCard.card) {
         revealOpponentCardInHand(targetPlayerId, onlineRevealedCard.card);
       }
 
@@ -461,14 +368,33 @@ export default function Game() {
     }
   }, [onlineRevealedCard, isOffline, setOnlineRevealedCard, revealOpponentCardInHand]);
 
-  // Trava orientação em paisagem quando possível (PWA / fullscreen)
+  // Trava landscape só com a partida em andamento (menu/espera ficam livres)
+  const isMatchInProgress = matchInProgress(gameState);
+
   useEffect(() => {
+    if (!isMatchInProgress) {
+      void unlockOrientation();
+      return;
+    }
     let unlock: (() => void) | undefined;
-    lockLandscape().then((fn) => {
-      unlock = fn;
-    });
-    return () => unlock?.();
-  }, []);
+    let cancelled = false;
+    void lockLandscape()
+      .then((fn) => {
+        if (cancelled) {
+          fn();
+          return;
+        }
+        unlock = fn;
+      })
+      .catch(() => {
+        // Screen Orientation API indisponível neste dispositivo
+      });
+    return () => {
+      cancelled = true;
+      unlock?.();
+      void unlockOrientation();
+    };
+  }, [isMatchInProgress]);
 
   // Detecta declaração de Cunoku (offline)
   const prevFinalRound = useRef(false);
@@ -511,60 +437,44 @@ export default function Game() {
     };
   }, [gameState?.winnerId]);
 
-  // Fim de jogo: modal + som de vitória/derrota + estatísticas locais
   useEffect(() => {
-    if (gameState?.winnerId && me && playerId) {
-      setGameOverModalOpen(true);
-      if (gameState.winnerId === playerId) {
-        audioManager.playGameWon();
-      } else {
-        audioManager.playGameLost();
-      }
+    syncFinishedMatch({
+      winnerId: gameState?.winnerId,
+      me,
+      playerId,
+      roomCode,
+      isOffline,
+      players: gameState?.players,
+      botDifficulty,
+      setGameOverModalOpen,
+      toast,
+      t,
+    });
+  }, [gameState?.winnerId, playerId, me, roomCode, isOffline, gameState?.players, botDifficulty, toast, t]);
 
-      // Toda partida offline usa a rota /game/offline: o id único dela é o playerId
-      const matchId = isOffline ? playerId : roomCode;
-      if (!hasRecordedMatchStats(matchId)) {
-        recordMatchResult({
-          won: gameState.winnerId === playerId,
-          finalScore: me.score,
-        });
-        markMatchStatsRecorded(matchId);
-      }
-    }
-  }, [gameState?.winnerId, playerId, me, roomCode, isOffline]);
-
-  // Early returns APÓS todos os hooks
-  if (!playerId || (!isOffline && !roomCode)) {
-    return <div className="h-screen flex items-center justify-center">{t("game.invalidUrl")}</div>;
-  }
-
-  if (isOffline && (isLoadingOffline || !offlineGameStateFromHook)) {
-    // Carregamento terminou mas não há estado salvo (ex.: aba recriada perdeu a
-    // sessão) — mostra erro com saída em vez de carregamento infinito
-    if (!isLoadingOffline && !offlineGameState) {
-      return (
-        <div className="min-h-screen bg-indigo-950 flex flex-col items-center justify-center text-white gap-6 p-8">
-          <div className="text-2xl font-display text-center">{t("game.errorNotFound")}</div>
-          <div className="text-white/50 text-center max-w-sm">{t("error.generic")}</div>
-          <Button variant="primary" onClick={() => setLocation("/")}>
-            {t("game.backToHome")}
-          </Button>
-        </div>
-      );
-    }
-    return (
-      <div className="min-h-screen bg-indigo-950 flex flex-col items-center justify-center text-white">
-        <div className="animate-pulse text-2xl font-display mb-4">{t("game.loading")}</div>
-        <div className="text-white/50">{t("game.settingUp")}</div>
-      </div>
-    );
-  }
 
   const handleCopyCode = async () => {
     const ok = await copyToClipboard(roomCode);
     toast({
       title: ok ? t("game.copied") : t("error.generic"),
       description: ok ? t("game.copiedDesc") : roomCode,
+    });
+  };
+
+  const handleShareInvite = async () => {
+    const url = buildInviteUrl(roomCode);
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "Cunoku", text: roomCode, url });
+        return;
+      } catch {
+        // usuário cancelou ou o WebView não completou — cai no clipboard
+      }
+    }
+    const ok = await copyToClipboard(url);
+    toast({
+      title: ok ? t("invite.copied") : t("error.generic"),
+      description: ok ? t("invite.copiedDesc") : url,
     });
   };
 
@@ -605,18 +515,20 @@ export default function Game() {
     }
 
     if (action.kind === "peek_opponent") {
-      // Online a face chega por private_info: o estado público só traz a carta mascarada
-      const targetPlayer = isOffline ? gameState.players.find((p) => p.id === action.targetPlayerId) : undefined;
-      if (targetPlayer && targetPlayer.hand[action.targetCardIndex]) {
-        const peekedCard = targetPlayer.hand[action.targetCardIndex];
+      // Offline: feedback imediato. Online: private_info do servidor (só quem peekou recebe).
+      if (isOffline) {
+        const targetPlayer = gameState.players.find((p) => p.id === action.targetPlayerId);
+        if (targetPlayer && targetPlayer.hand[action.targetCardIndex]) {
+          const peekedCard = targetPlayer.hand[action.targetCardIndex];
 
-        if (revealedOpponentCard?.timer) {
-          clearTimeout(revealedOpponentCard.timer);
+          if (revealedOpponentCard?.timer) {
+            clearTimeout(revealedOpponentCard.timer);
+          }
+          const overlayTimer = setTimeout(() => setRevealedOpponentCard(null), 3000);
+          setRevealedOpponentCard({ card: peekedCard, playerName: targetPlayer.name, timer: overlayTimer });
+          revealOpponentCardInHand(action.targetPlayerId, peekedCard);
+          audioManager.playCardFlip();
         }
-        const overlayTimer = setTimeout(() => setRevealedOpponentCard(null), 20000);
-        setRevealedOpponentCard({ card: peekedCard, playerName: targetPlayer.name, timer: overlayTimer });
-        revealOpponentCardInHand(action.targetPlayerId, peekedCard);
-        audioManager.playCardFlip();
       }
 
       sendAction({
@@ -652,431 +564,85 @@ export default function Game() {
     }
   };
 
-  // Loading
-  if (!gameState) {
-    return (
-      <div className="min-h-screen bg-indigo-950 flex flex-col items-center justify-center text-white">
-        <div className="animate-pulse text-2xl font-display mb-4">Connecting to Table...</div>
-        <div className="text-white/50">Room: {roomCode}</div>
-      </div>
-    );
-  }
 
-  // Sala de espera
-  if ((gameState.players.length < 2 || gameState.turnPhase === "waiting") && !gameState.winnerId) {
-    const storedHostId = sessionStorage.getItem(`hostId_${roomCode}`);
-    const isHost = storedHostId === playerId;
+  const startTable = () => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: "start_game" }));
+      return;
+    }
+    toast({ title: "Connection Error", description: "Not connected to server", variant: "destructive" });
+  };
 
-    return (
-      <WaitingRoom
-        roomCode={roomCode}
-        players={gameState.players}
-        playerId={playerId}
-        isHost={isHost}
-        onCopyCode={handleCopyCode}
-        onCopyLanUrl={handleCopyLanUrl}
-        networkMode={getNetworkMode()}
-        lanJoinUrl={getLanJoinUrl()}
-        onStart={() => {
-          if (socketRef.current?.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify({ type: "start_game" }));
-          } else {
-            toast({
-              title: "Connection Error",
-              description: "Not connected to server",
-              variant: "destructive",
-            });
-          }
-        }}
-      />
-    );
-  }
+  const closeReveal = () => {
+    if (revealedOpponentCard?.timer) clearTimeout(revealedOpponentCard.timer);
+    setRevealedOpponentCard(null);
+    if (!isOffline) setOnlineRevealedCard(null);
+  };
 
-  const opponents = gameState.players.filter((p) => p.id !== playerId);
-  const seatPositions = getSeatPositions(opponents.length);
-  const currentTurnPlayerId = gameState.players[gameState.currentPlayerIndex]?.id;
-  // Em paisagem (incl. celular deitado) usa assentos em arco; em retrato o overlay impede jogar
-  const useArcSeats = !isPortrait;
+  const storedHostId = sessionStorage.getItem(`hostId_${roomCode}`);
+  const pregame = renderPregame({
+    playerId,
+    isOffline,
+    roomCode,
+    t,
+    isLoadingOffline,
+    offlineHook: offlineGameStateFromHook,
+    offlineSaved: offlineGameState,
+    onHome: () => setLocation("/"),
+    gameState,
+    fromQueue,
+    queueCountdown,
+    isHost: storedHostId === playerId,
+    onCopyCode: handleCopyCode,
+    onShareInvite: handleShareInvite,
+    onCopyLanUrl: handleCopyLanUrl,
+    networkMode: getNetworkMode(),
+    lanJoinUrl: getLanJoinUrl(),
+    onStart: startTable,
+  });
+  if (pregame) return pregame;
+  if (!gameState) return <ConnectingScreen roomCode={roomCode} />;
 
   return (
-    <div className="min-h-[100dvh] bg-neutral-900 text-white relative overflow-hidden flex flex-col pwa-safe game-landscape">
-      {isPortrait && <LandscapePrompt />}
-
-      {/* Sistema de animações de cartas */}
-      <AnimationRenderer
-        currentAnimation={currentAnimation}
-        onComplete={completeCurrentAnimation}
-        playerId={playerId}
-      />
-
-      {/* Notificação de ações de oponentes */}
-      {opponentActionNotification && (
-        <OpponentActionNotification
-          playerName={opponentActionNotification.playerName}
-          actionType={opponentActionNotification.actionType}
-          onComplete={() => setOpponentActionNotification(null)}
-          duration={2000}
-        />
-      )}
-
-      {/* Barra superior */}
-      <div
-        className={cn(
-          "absolute top-0 left-0 right-0 z-50 pointer-events-none flex justify-between items-start",
-          isCompact ? "p-1.5 gap-1" : "p-4"
-        )}
-      >
-        <div className="flex items-center gap-1.5 pointer-events-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            className={cn(
-              "bg-black/20 text-white border-white/20 backdrop-blur-sm",
-              isCompact ? "text-[10px] px-1.5 py-0.5 h-7" : ""
-            )}
-            onClick={() => setLocation("/")}
-          >
-            <ArrowLeft className={cn("w-3.5 h-3.5", isCompact ? "mr-0" : "mr-2")} />
-            {isCompact ? "" : t("game.exit")}
-          </Button>
-          <div
-            className={cn(
-              "[&_button]:bg-black/20 [&_button]:text-white [&_button]:border-white/20 [&_button]:backdrop-blur-sm [&_button]:hover:bg-black/30",
-              isCompact && "[&_button]:h-7 [&_button]:w-7 [&_button]:p-0 scale-90 origin-left"
-            )}
-          >
-            <VolumeControl />
-          </div>
-          {!gameState.winnerId && <EmotePicker compact={isCompact} onSelect={handleSendEmote} />}
-        </div>
-
-        {gameState.dailyDay ? (
-          <div
-            className={cn(
-              "bg-black/40 backdrop-blur-md rounded-full border border-white/10 font-bold pointer-events-auto",
-              isCompact ? "px-2.5 py-1 text-[11px]" : "px-6 py-2 text-lg"
-            )}
-          >
-            {t("daily.title")}
-          </div>
-        ) : (
-          <div
-            className={cn(
-              "bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center pointer-events-auto cursor-pointer",
-              isCompact ? "px-2.5 py-1" : "px-6 py-2"
-            )}
-            onClick={handleCopyCode}
-          >
-            <div className={cn("text-white/60 font-mono", isCompact ? "text-[8px] leading-tight" : "text-xs")}>
-              {t("game.roomCode")}
-            </div>
-            <div
-              className={cn(
-                "font-bold tracking-widest font-mono flex items-center gap-1",
-                isCompact ? "text-[11px]" : "text-xl"
-              )}
-            >
-              {roomCode} <Copy className={cn(isCompact ? "w-2.5 h-2.5" : "w-3 h-3")} />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Banner "Sua vez" */}
-      {isMyTurn && (
-        <div
-          className={cn(
-            "absolute z-40 pointer-events-none left-1/2 -translate-x-1/2",
-            isCompact ? "top-8 max-w-[min(58vw,16rem)]" : "top-20"
-          )}
-        >
-          <motion.div
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -20, opacity: 0 }}
-            className={cn(
-              "bg-gradient-to-r from-yellow-500/90 to-yellow-600/90 backdrop-blur-md rounded-full border-2 border-yellow-400 shadow-xl flex items-center justify-center",
-              isCompact ? "px-3 py-1 gap-1.5" : "px-8 py-3 gap-4"
-            )}
-          >
-            <span className={cn("text-yellow-900 font-bold whitespace-nowrap", isCompact ? "text-[10px]" : "text-lg")}>
-              {t("game.yourTurn")}
-            </span>
-            {phase === "draw" && (
-              <span className={cn("text-yellow-100 text-center", isCompact ? "text-[9px] truncate" : "text-sm")}>
-                {isCompact ? t("game.drawFromDeckShort") : t("game.drawFromDeck")}
-              </span>
-            )}
-            {phase === "action" && (
-              <span className={cn("text-yellow-100 text-center", isCompact ? "text-[9px] truncate" : "text-sm")}>
-                {isCompact ? t("game.replaceOrDiscardShort") : t("game.replaceOrDiscard")}
-              </span>
-            )}
-          </motion.div>
-        </div>
-      )}
-
-      {/* Info da rodada */}
-      <div
-        className={cn(
-          "absolute z-40 pointer-events-none",
-          isCompact ? "top-9 left-1.5" : "top-20 left-8"
-        )}
-      >
-        <motion.div
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          className={cn(
-            "bg-black/60 backdrop-blur-md rounded-lg border border-yellow-500/50 shadow-lg",
-            isCompact ? "px-2 py-1" : "px-6 py-3 border-2 rounded-xl"
-          )}
-        >
-          <div className="text-center">
-            <div className={cn("font-bold text-yellow-400", isCompact ? "text-[10px] leading-tight" : "text-lg mb-1")}>
-              {t("game.round")} {gameState.round}
-              {gameState.round < 5 ? "/5" : ""}
-            </div>
-            {!isCompact &&
-              (gameState.round < 5 ? (
-                <div className="text-white/80 text-xs">{t("game.cunokuAfterRound5")}</div>
-              ) : (
-                <div className="text-white/80 text-xs">
-                  {t("game.turn")}: {gameState.players[gameState.currentPlayerIndex]?.name || "Unknown"}
-                </div>
-              ))}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Dica de habilidade (esquerda) — só desktop amplo */}
-      {isMyTurn && phase === "action" && gameState.drawnCard && hasSpecialAbility(gameState.drawnCard) && !gameState.drawnFromDiscard && !isCompact && (
-        <div className="absolute left-8 bottom-32 z-40 pointer-events-none">
-          <motion.div
-            initial={{ x: -20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -20, opacity: 0 }}
-            className="bg-gradient-to-br from-yellow-500/95 to-yellow-600/95 backdrop-blur-md px-6 py-4 rounded-2xl border-2 border-yellow-400 shadow-2xl max-w-[280px]"
-          >
-            <div className="flex items-start gap-3">
-              <div className="text-2xl">⚡</div>
-              <div className="flex-1">
-                <div className="text-yellow-900 font-bold text-sm mb-1">{t("game.abilityCard")}</div>
-                <div className="text-yellow-950 font-semibold text-base leading-tight">
-                  {getAbilityDescription(gameState.drawnCard.rank, t)}
-                </div>
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-yellow-400/30">
-              <div className="text-yellow-900 text-xs font-medium">{t("game.abilityClickToUse")}</div>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* Dica de substituição (direita) — só desktop amplo */}
-      {isMyTurn && phase === "action" && gameState.drawnCard && !isCompact && (
-        <div className="absolute right-8 bottom-32 z-40 pointer-events-none">
-          <motion.div
-            initial={{ x: 20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 20, opacity: 0 }}
-            className="bg-gradient-to-br from-green-600/95 to-green-700/95 backdrop-blur-md px-6 py-4 rounded-2xl border-2 border-green-400 shadow-2xl max-w-[280px]"
-          >
-            <div className="flex items-start gap-3">
-              <div className="text-2xl">✨</div>
-              <div className="flex-1">
-                <div className="text-green-100 font-bold text-sm mb-1">{t("game.hintTitle")}</div>
-                <div className="text-white font-semibold text-base leading-tight">{t("game.hintReplace")}</div>
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-green-400/30">
-              <div className="text-green-200 text-xs">{t("game.hintHighlighted")}</div>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* Mesa de jogo — zonas: oponentes (arco) | centro elevado | mão inferior */}
-      <div
-        className={cn(
-          "flex-1 flex items-center justify-center relative min-h-0",
-          isCompact ? "p-1" : "p-4 md:p-6"
-        )}
-      >
-        <div
-          className={cn(
-            "w-full relative felt-table shadow-2xl",
-            isCompact
-              ? "max-w-none max-h-[calc(100dvh-0.5rem)] h-[calc(100dvh-0.5rem)] aspect-auto rounded-xl"
-              : "max-w-6xl max-h-[min(100%,calc(100dvh-1rem))] aspect-[16/9] rounded-[100px]"
-          )}
-        >
-          {/* Oponentes no arco externo (sempre em paisagem) */}
-          {useArcSeats ? (
-            opponents.map((p, i) => {
-              const pos = seatPositions[i] ?? seatPositions[seatPositions.length - 1];
-              return (
-                <PlayerSeat
-                  key={p.id}
-                  player={p}
-                  isActive={currentTurnPlayerId === p.id}
-                  showAllCards={!!gameState.winnerId}
-                  revealedCards={revealedOpponentCardsInHand}
-                  registerCardPosition={registerCardRef}
-                  opponentCount={opponents.length}
-                  side={pos.side}
-                  compact={opponents.length >= 3 || isCompact}
-                  emoteId={activeEmotes[p.id]}
-                  className="absolute z-20"
-                  style={{
-                    left: `${pos.left}%`,
-                    top: `${pos.top}%`,
-                    transform: "translate(-50%, -50%)",
-                  }}
-                />
-              );
-            })
-          ) : (
-            <div
-              className={cn(
-                "absolute top-0 left-0 right-0 flex justify-center items-start pt-2 px-1 z-20",
-                opponents.length >= 4 ? "gap-1 flex-wrap" : "gap-2"
-              )}
-            >
-              {opponents.map((p) => (
-                <PlayerSeat
-                  key={p.id}
-                  player={p}
-                  isActive={currentTurnPlayerId === p.id}
-                  showAllCards={!!gameState.winnerId}
-                  revealedCards={revealedOpponentCardsInHand}
-                  registerCardPosition={registerCardRef}
-                  opponentCount={opponents.length}
-                  side="top"
-                  compact
-                  emoteId={activeEmotes[p.id]}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Centro da mesa — baralho e descarte */}
-          <div
-            className={cn(
-              "absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto",
-              isCompact ? "top-[44%]" : "top-[48%]"
-            )}
-          >
-            <CenterPile
-              gameState={gameState}
-              isMyTurn={!!isMyTurn}
-              phase={phase}
-              deckRef={deckRef}
-              discardRef={discardRef}
-              onDrawDeck={() => sendAction({ type: "draw_deck" })}
-              onDiscardDrawn={() => sendAction({ type: "discard_drawn" })}
-              onUseAbility={() => setAbilityModalOpen(true)}
-            />
-          </div>
-
-          <EmoteBubble
-            emoteId={activeEmotes[playerId]}
-            className={cn("left-1/2 -translate-x-1/2", isCompact ? "bottom-[34%]" : "bottom-[30%]")}
-          />
-
-          {/* Minha área — faixa inferior reservada */}
-          {me && (
-            <MyArea
-              gameState={gameState}
-              me={me}
-              isMyTurn={!!isMyTurn}
-              phase={phase}
-              sendAction={sendAction}
-              registerCardPosition={registerCardRef}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Modal de habilidade */}
-      <AbilityModal
-        open={abilityModalOpen}
-        onOpenChange={setAbilityModalOpen}
-        drawnCard={gameState.drawnCard ?? null}
-        players={gameState.players}
-        playerId={playerId}
-        myHand={me?.hand ?? []}
-        onConfirm={confirmAbility}
-      />
-
-      {/* Overlay de carta revelada (habilidades 5 e 6) */}
-      <AnimatePresence>
-        {revealedOpponentCard && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            onClick={() => {
-              if (revealedOpponentCard?.timer) {
-                clearTimeout(revealedOpponentCard.timer);
-              }
-              setRevealedOpponentCard(null);
-              if (!isOffline) {
-                setOnlineRevealedCard(null);
-              }
-            }}
-          >
-            <motion.div
-              initial={{ scale: 0.8, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.8, y: 20 }}
-              className={cn(
-                "bg-gradient-to-br from-indigo-900 to-purple-900 rounded-3xl border-4 border-yellow-400 shadow-2xl p-8 flex flex-col items-center gap-6",
-                isMobile ? "mx-4 max-w-[90vw]" : "max-w-md"
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-center">
-                <h3 className={cn("font-bold text-yellow-400 mb-2", isMobile ? "text-lg" : "text-2xl")}>
-                  {t("game.cardRevealed")}
-                </h3>
-                <p className={cn("text-white/80", isMobile ? "text-sm" : "text-base")}>
-                  {t("game.playerHas").replace("{player}", revealedOpponentCard.playerName)}
-                </p>
-              </div>
-
-              <div className={cn("transform transition-transform", isMobile ? "scale-90" : "scale-110")}>
-                <PlayingCard
-                  card={revealedOpponentCard.card}
-                  hidden={false}
-                  animate={true}
-                  className={isMobile ? "w-32 h-48" : "w-40 h-60"}
-                />
-              </div>
-
-              <div className="text-center">
-                <p className={cn("text-white/60 font-mono", isMobile ? "text-xs" : "text-sm")}>
-                  {t("game.visibleFor20s")}
-                </p>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Modal de fim de jogo */}
-      {gameState.winnerId && (
-        <GameOverModal
-          open={gameOverModalOpen}
-          onOpenChange={setGameOverModalOpen}
-          players={gameState.players}
-          winnerId={gameState.winnerId}
-          localPlayerId={playerId}
-          reward={matchReward}
-          onBackHome={() => setLocation("/")}
-        />
-      )}
-    </div>
+    <ActiveTable
+      isPortrait={isPortrait}
+      isCompact={isCompact}
+      isMobile={isMobile}
+      isOffline={isOffline}
+      connected={connected}
+      roomCode={roomCode}
+      playerId={playerId}
+      tableMat={tableTheme.mat}
+      gameState={gameState}
+      me={me}
+      isMyTurn={!!isMyTurn}
+      phase={phase}
+      t={t}
+      onExit={() => setLocation("/")}
+      onCopyCode={handleCopyCode}
+      onBackHome={() => {
+        clearActiveSession();
+        setLocation("/");
+      }}
+      currentAnimation={currentAnimation}
+      onAnimationComplete={completeCurrentAnimation}
+      opponentNotice={opponentActionNotification}
+      onNoticeDone={() => setOpponentActionNotification(null)}
+      revealedCards={revealedOpponentCardsInHand}
+      registerCardPosition={registerCardRef}
+      deckRef={deckRef}
+      discardRef={discardRef}
+      sendAction={sendAction}
+      abilityOpen={abilityModalOpen}
+      onAbilityOpenChange={setAbilityModalOpen}
+      onConfirmAbility={confirmAbility}
+      revealedOpponentCard={revealedOpponentCard}
+      onCloseReveal={closeReveal}
+      gameOverOpen={gameOverModalOpen}
+      onGameOverOpenChange={setGameOverModalOpen}
+      activeEmotes={activeEmotes}
+      onEmote={handleSendEmote}
+      matchReward={matchReward}
+    />
   );
 }

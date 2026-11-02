@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { insertRoomSchema, rooms } from './schema';
+import { RANK_TIERS } from './rank';
 
 export const errorSchemas = {
   validation: z.object({
@@ -28,7 +29,7 @@ const leagueRowSchema = z.object({
   points: z.number(),
   wins: z.number(),
   games: z.number(),
-  tier: z.enum(['bronze', 'silver', 'gold', 'diamond']),
+  tier: z.enum(RANK_TIERS),
   isMe: z.boolean(),
 });
 
@@ -101,17 +102,12 @@ export const api = {
     start: {
       method: 'POST' as const,
       path: '/api/daily/start',
-      input: z.object({
-        playerKey: z.string().uuid(),
-        playerName: z.string().trim().min(1).max(24),
-      }),
       responses: {
         200: z.object({
           alreadyPlayed: z.boolean(),
           code: z.string().nullable(),
           playerId: z.string().nullable(),
         }),
-        400: errorSchemas.validation,
       },
     },
   },
@@ -134,6 +130,27 @@ export const api = {
       },
     },
   },
+  matchmaking: {
+    enqueue: {
+      method: 'POST' as const,
+      path: '/api/matchmaking',
+      input: z.object({
+        playerName: z.string().min(1).max(24),
+      }),
+      responses: {
+        200: z.object({
+          status: z.enum(["waiting", "filling", "countdown", "matched"]),
+          ticketId: z.string(),
+          playerId: z.string(),
+          code: z.string().optional(),
+          hostId: z.string().optional(),
+          position: z.number().optional(),
+          players: z.number().optional(),
+          secondsLeft: z.number().optional(),
+        }),
+      },
+    },
+  },
   lan: {
     info: {
       method: 'GET' as const,
@@ -145,6 +162,57 @@ export const api = {
           joinBaseUrls: z.array(z.string()),
         }),
       },
+    },
+  },
+  rank: {
+    register: {
+      method: 'POST' as const,
+      path: '/api/rank/register',
+      input: z.object({
+        nickname: z.string().min(3).max(16),
+        pin: z.string().regex(/^\d{4,6}$/),
+        displayName: z.string().max(24).optional(),
+        iconId: z.string().max(32).optional(),
+        accent: z.string().max(32).optional(),
+      }),
+    },
+    login: {
+      method: 'POST' as const,
+      path: '/api/rank/login',
+      input: z.object({
+        nickname: z.string().min(3).max(16),
+        pin: z.string().regex(/^\d{4,6}$/),
+      }),
+    },
+    me: {
+      method: 'GET' as const,
+      path: '/api/rank/me',
+    },
+    profile: {
+      method: 'PATCH' as const,
+      path: '/api/rank/me',
+      input: z.object({
+        displayName: z.string().max(24).optional(),
+        iconId: z.string().max(32).optional(),
+        accent: z.string().max(32).optional(),
+        frameId: z.string().max(32).optional(),
+        titleId: z.string().max(32).optional(),
+        bannerId: z.string().max(32).optional(),
+      }),
+    },
+    matchResult: {
+      method: 'POST' as const,
+      path: '/api/rank/match-result',
+      input: z.object({
+        won: z.boolean(),
+        finalScore: z.number(),
+        mode: z.enum(["pvp", "bots", "offline"]).default("pvp"),
+        botDifficulty: z.enum(["easy", "medium", "hard"]).optional(),
+      }),
+    },
+    leaderboard: {
+      method: 'GET' as const,
+      path: '/api/rank/leaderboard',
     },
   },
 };

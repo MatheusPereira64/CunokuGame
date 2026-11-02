@@ -1,0 +1,6 @@
+# This is a Gradle generated file for dependency locking.
+# Manual edits can break the build and are not advised.
+# This file is expected to be part of source control.
+com.android.tools.build:gradle:8.13.0=classpath
+com.google.gms:google-services:4.4.4=classpath
+empty=classpath

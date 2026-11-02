@@ -72,7 +72,7 @@ export class BotPlayer {
       // Medium: compare values
       const knownIndices = Object.entries(player.knownCards)
         .filter(([_, known]) => known)
-        .map(([idx]) => parseInt(idx));
+        .map(([idx]) => Number.parseInt(idx));
 
       if (knownIndices.length > 0) {
         // Check if any known card is worse than drawn
@@ -80,7 +80,7 @@ export class BotPlayer {
           const worstVal = player.hand[worst]?.value ?? 0;
           const currentVal = player.hand[idx]?.value ?? 0;
           return currentVal > worstVal ? idx : worst;
-        });
+        }, knownIndices[0]);
 
         if (player.hand[worstKnownIdx]?.value > drawnCard.value) {
           return { type: "replace_card", handIndex: worstKnownIdx };
@@ -93,13 +93,13 @@ export class BotPlayer {
     // Hard: intelligent strategy
     const knownCards = Object.entries(player.knownCards)
       .filter(([_, known]) => known)
-      .map(([idx]) => ({ idx: parseInt(idx), card: player.hand[parseInt(idx)] }));
+      .map(([idx]) => ({ idx: Number.parseInt(idx), card: player.hand[Number.parseInt(idx)] }));
 
     if (knownCards.length > 0) {
       // Find the worst known card
-      const worstIdx = knownCards.reduce((worst, current) => 
+      const worstIdx = knownCards.reduce((worst, current) =>
         current.card.value > worst.card.value ? current : worst
-      ).idx;
+      , knownCards[0]).idx;
 
       // If drawn card is significantly better, swap
       if (player.hand[worstIdx].value - drawnCard.value > 1) {
@@ -111,7 +111,7 @@ export class BotPlayer {
     if (drawnCard.rank === "7" || drawnCard.rank === "8") {
       const unknownIndices = Object.entries(player.knownCards)
         .filter(([_, known]) => !known)
-        .map(([idx]) => parseInt(idx));
+        .map(([idx]) => Number.parseInt(idx));
 
       if (unknownIndices.length > 0) {
         const peekIdx = unknownIndices[0];
@@ -142,7 +142,7 @@ export class BotPlayer {
         // Tenta estimar pontuação baseada em cartas conhecidas
         const knownCards = Object.entries(p.knownCards)
           .filter(([_, known]) => known)
-          .map(([idx]) => p.hand[parseInt(idx)]?.value || 0);
+          .map(([idx]) => p.hand[Number.parseInt(idx)]?.value || 0);
         const knownSum = knownCards.reduce((sum, val) => sum + val, 0);
         const unknownCount = 4 - knownCards.length;
         // Estima média de 5 pontos por carta desconhecida (valor médio aproximado)
@@ -150,74 +150,51 @@ export class BotPlayer {
       })
       .filter(score => score > 0);
 
-    if (this.difficulty === "easy") {
-      // Easy: declara apenas com pontuação muito boa e probabilidade baixa
-      // Score < 10: 30% chance
-      // Score < 8: 50% chance
-      // Score < 6: 80% chance
-      if (totalScore >= 10) return false;
-      
-      let probability = 0.3;
-      if (totalScore < 8) probability = 0.5;
-      if (totalScore < 6) probability = 0.8;
-      
-      return stateRandom(state, "finish")() < probability;
-    }
-
-    if (this.difficulty === "medium") {
-      // Medium: declara com pontuação boa e probabilidade média
-      // Score < 8: 40% chance
-      // Score < 6: 60% chance
-      // Score < 4: 85% chance
-      if (totalScore >= 8) return false;
-      
-      let probability = 0.4;
-      if (totalScore < 6) probability = 0.6;
-      if (totalScore < 4) probability = 0.85;
-      
-      // Se outros jogadores parecem ter pontuação pior, aumenta probabilidade
-      if (knownScores.length > 0) {
-        const avgOtherScore = knownScores.reduce((sum, s) => sum + s, 0) / knownScores.length;
-        if (totalScore < avgOtherScore - 2) {
-          probability += 0.15; // Bônus se está claramente na frente
-        }
-      }
-      
-      return stateRandom(state, "finish")() < Math.min(probability, 0.95);
-    }
-
-    // Hard: declara com pontuação excelente e probabilidade alta
-    // Score < 6: 50% chance
-    // Score < 4: 75% chance
-    // Score < 2: 95% chance
-    // Score <= 0: 100% chance (sempre declara)
-    if (totalScore <= 0) return true; // Sempre declara com pontuação perfeita ou negativa
-    
-    if (totalScore >= 6) return false;
-    
-    let probability = 0.5;
-    if (totalScore < 4) probability = 0.75;
-    if (totalScore < 2) probability = 0.95;
-    
-    // Hard bots são mais agressivos: se outros parecem ter pior pontuação, aumenta significativamente
-    if (knownScores.length > 0) {
-      const avgOtherScore = knownScores.reduce((sum, s) => sum + s, 0) / knownScores.length;
-      if (totalScore < avgOtherScore - 1) {
-        probability += 0.2; // Bônus maior para bots hard
-      }
-      // Se está claramente na frente, aumenta ainda mais
-      if (totalScore < avgOtherScore - 3) {
-        probability += 0.15;
-      }
-    }
-    
-    // Considera também o round: quanto mais rounds passaram, mais propenso a declarar
-    if (state.round >= 7) {
-      probability += 0.1; // Bônus após muitos rounds
-    }
-    
-    return stateRandom(state, "finish")() < Math.min(probability, 0.98);
+    const random = stateRandom(state, "finish");
+    if (this.difficulty === "easy") return shouldEasyBotFinish(totalScore, random);
+    if (this.difficulty === "medium") return shouldMediumBotFinish(totalScore, knownScores, random);
+    return shouldHardBotFinish(totalScore, knownScores, state.round, random);
   }
+}
+
+function shouldEasyBotFinish(totalScore: number, random: () => number): boolean {
+  if (totalScore >= 10) return false;
+  let probability = 0.3;
+  if (totalScore < 8) probability = 0.5;
+  if (totalScore < 6) probability = 0.8;
+  return random() < probability;
+}
+
+function shouldMediumBotFinish(totalScore: number, knownScores: number[], random: () => number): boolean {
+  if (totalScore >= 8) return false;
+  let probability = 0.4;
+  if (totalScore < 6) probability = 0.6;
+  if (totalScore < 4) probability = 0.85;
+  if (knownScores.length > 0) {
+    const avgOtherScore = knownScores.reduce((sum, s) => sum + s, 0) / knownScores.length;
+    if (totalScore < avgOtherScore - 2) probability += 0.15;
+  }
+  return random() < Math.min(probability, 0.95);
+}
+
+function shouldHardBotFinish(totalScore: number, knownScores: number[], round: number, random: () => number): boolean {
+  if (totalScore <= 0) return true;
+  if (totalScore >= 6) return false;
+  let probability = 0.5;
+  if (totalScore < 4) probability = 0.75;
+  if (totalScore < 2) probability = 0.95;
+  probability += hardBotLeadBonus(totalScore, knownScores);
+  if (round >= 7) probability += 0.1;
+  return random() < Math.min(probability, 0.98);
+}
+
+function hardBotLeadBonus(totalScore: number, knownScores: number[]): number {
+  if (knownScores.length === 0) return 0;
+  const avgOtherScore = knownScores.reduce((sum, s) => sum + s, 0) / knownScores.length;
+  let bonus = 0;
+  if (totalScore < avgOtherScore - 1) bonus += 0.2;
+  if (totalScore < avgOtherScore - 3) bonus += 0.15;
+  return bonus;
 }
 
 export function createBots(count: number, difficulty: BotDifficulty): BotPlayer[] {

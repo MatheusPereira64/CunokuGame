@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
@@ -9,13 +9,56 @@ import { useIsCompactGame } from "@/hooks/use-landscape";
 import type { SeatSide } from "./seatPositions";
 import { EmoteBubble } from "./EmotePicker";
 
+/** initial sempre é um objeto: trocar para `false` muda a quantidade de hooks do Framer Motion. */
+function FlippableCard({ flip, children }: { flip: boolean; children: ReactNode }) {
+  const [spin] = useState(flip);
+  return (
+    <motion.div
+      initial={{ rotateY: spin ? 180 : 0 }}
+      animate={{ rotateY: 0 }}
+      transition={{ duration: spin ? 0.6 : 0, ease: "easeInOut" }}
+      style={{ transformStyle: "preserve-3d" }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function seatCardSize(compact: boolean, isCompact: boolean) {
+  if (compact && isCompact) return "w-7 h-10";
+  if (compact) return "w-10 h-14 md:w-12 md:h-[4.5rem]";
+  if (isCompact) return "w-8 h-12";
+  return "w-12 h-16 md:w-14 md:h-20";
+}
+
+function seatOverlap(compact: boolean, isCompact: boolean) {
+  if (compact && isCompact) return "-ml-4";
+  if (compact) return "-ml-6 md:-ml-7";
+  if (isCompact) return "-ml-3";
+  return "-ml-5 md:-ml-6";
+}
+
+function seatHandWidth(isCompact: boolean, compact: boolean) {
+  if (isCompact) return "max-w-[6.5rem]";
+  if (compact) return "max-w-[7.5rem] md:max-w-[9rem]";
+  return "max-w-[10rem] md:max-w-[12rem]";
+}
+
+function seatLayout(side: SeatSide) {
+  if (side === "left") return "flex-row-reverse items-center gap-1";
+  if (side === "right") return "flex-row items-center gap-1";
+  return "flex-col items-center gap-0.5";
+}
+
 interface PlayerSeatProps {
   player: Player;
   isActive: boolean;
   /** Fim de jogo: revela todas as cartas */
   showAllCards: boolean;
-  /** Faces reveladas temporariamente (habilidades 5/6), por `${playerId}_${cardId}` */
-  revealedCards: Record<string, Card>;
+  /** Chaves `${playerId}_${cardId}` de cartas reveladas só para este cliente (habilidades 5/6) */
+  revealedCardKeys: string[];
+  /** Faces reais das cartas peekadas (mãos de oponentes vêm filtradas no estado online) */
+  revealedCardsByKey?: Record<string, Card>;
   registerCardPosition: (key: string, el: HTMLElement | null, card?: Card) => void;
   /** Quantidade total de oponentes — define densidade do leque */
   opponentCount?: number;
@@ -33,7 +76,8 @@ export function PlayerSeat({
   player,
   isActive,
   showAllCards,
-  revealedCards,
+  revealedCardKeys,
+  revealedCardsByKey,
   registerCardPosition,
   opponentCount = 1,
   side = "top",
@@ -46,41 +90,22 @@ export function PlayerSeat({
   const previousRevealedState = useRef<Map<string, boolean>>(new Map());
 
   const compact = compactProp ?? (opponentCount >= 4 || isCompact);
-
-  const cardSize = compact
-    ? isCompact
-      ? "w-7 h-10"
-      : "w-10 h-14 md:w-12 md:h-[4.5rem]"
-    : isCompact
-      ? "w-8 h-12"
-      : "w-12 h-16 md:w-14 md:h-20";
-
-  // Overlap do leque: mais forte em mesas lotadas
-  const overlapClass = compact
-    ? isCompact
-      ? "-ml-4"
-      : "-ml-6 md:-ml-7"
-    : isCompact
-      ? "-ml-3"
-      : "-ml-5 md:-ml-6";
+  const cardSize = seatCardSize(compact, isCompact);
+  const overlapClass = seatOverlap(compact, isCompact);
 
   const hand = (
     <div
       className={cn(
         "flex justify-center items-end",
         // Limita o footprint mesmo com mãos grandes (punição)
-        isCompact
-          ? "max-w-[6.5rem]"
-          : compact
-            ? "max-w-[7.5rem] md:max-w-[9rem]"
-            : "max-w-[10rem] md:max-w-[12rem]"
+        seatHandWidth(isCompact, compact)
       )}
     >
       {player.hand.map((card, i) => {
         const cardKey = `${player.id}_${card.id}`;
-        const revealedFace = revealedCards[cardKey];
-        const isTemporarilyRevealed = !!revealedFace;
+        const isTemporarilyRevealed = revealedCardKeys.includes(cardKey);
         const shouldShowCard = showAllCards || isTemporarilyRevealed;
+        const displayCard = (isTemporarilyRevealed && revealedCardsByKey?.[cardKey]) || card;
 
         const wasPreviouslyHidden = previousRevealedState.current.get(cardKey) === false;
         const wasJustRevealed = wasPreviouslyHidden && shouldShowCard;
@@ -96,19 +121,14 @@ export function PlayerSeat({
             ref={(el) => registerCardPosition(positionKey, el, card)}
           >
             {shouldShowCard ? (
-              <motion.div
-                initial={wasJustRevealed ? { rotateY: 180 } : false}
-                animate={{ rotateY: 0 }}
-                transition={{ duration: 0.6, ease: "easeInOut" }}
-                style={{ transformStyle: "preserve-3d" }}
-              >
+              <FlippableCard flip={wasJustRevealed}>
                 <PlayingCard
-                  card={revealedFace ?? card}
+                  card={displayCard}
                   hidden={false}
                   className={cn(cardSize, isTemporarilyRevealed && "ring-2 ring-yellow-400 ring-offset-1")}
                   animate={false}
                 />
-              </motion.div>
+              </FlippableCard>
             ) : (
               <PlayingCard card={card} hidden className={cardSize} animate={false} />
             )}
@@ -144,18 +164,14 @@ export function PlayerSeat({
   );
 
   // Avatar fica no lado de fora da mesa; leque aponta para o feltro
-  const layoutClass =
-    side === "left"
-      ? "flex-row-reverse items-center gap-1"
-      : side === "right"
-        ? "flex-row items-center gap-1"
-        : "flex-col items-center gap-0.5";
+  const layoutClass = seatLayout(side);
 
   return (
     <div
       style={style}
       className={cn(
         "flex rounded-xl transition-all pointer-events-none",
+        !player.isConnected && !player.isBot && "opacity-50",
         layoutClass,
         isCompact ? "p-0" : "p-1",
         className

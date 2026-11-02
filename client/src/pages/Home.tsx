@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/Button";
 import { useCreateRoom, useJoinRoom, fetchLanInfo } from "@/hooks/use-rooms";
 import { useToast } from "@/hooks/use-toast";
-import { Spade, Heart, Club, Diamond, ArrowRight, Gamepad2, Users, Bot, Languages, Wifi, Cloud, ArrowLeft } from "lucide-react";
+import { Spade, Heart, Club, Diamond, ArrowRight, Gamepad2, Users, Bot, Languages, Wifi, Cloud, ArrowLeft, ArrowUp } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,34 +12,113 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createOfflineGame } from "@/utils/localGame";
 import { audioManager } from "@/utils/audioManager";
 import { VolumeControl } from "@/components/VolumeControl";
+import { TableThemeButton } from "@/components/TableThemePicker";
+import { HomeFeatures } from "@/components/HomeFeatures";
 import { RulesDialog } from "@/components/RulesDialog";
 import { InstallAppButton } from "@/components/InstallAppButton";
 import { ProfileDialog } from "@/components/ProfileDialog";
 import { DailyChallengeDialog } from "@/components/DailyChallengeDialog";
 import { LeagueDialog } from "@/components/LeagueDialog";
+import { LeaderboardDialog } from "@/components/LeaderboardDialog";
 import { useI18n, type Language } from "@/contexts/i18n-context";
-import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
-import { cn } from "@/lib/utils";
+import { useIsCompactGame, useIsPortrait, unlockOrientation } from "@/hooks/use-landscape";
+import { cn, fit } from "@/lib/utils";
 import { loadProfile } from "@/lib/playerProfile";
+import { fetchRankMe, isRankLoggedIn } from "@/lib/rankAuth";
 import { APP_VERSION } from "@/lib/appVersion";
 import {
   clearServerBase,
   isLikelyLocalHost,
+  isNativeApp,
   normalizeServerBase,
   setLanJoinUrl,
   setNetworkMode,
   setServerBase,
+  DEFAULT_CLOUD_SERVER,
   type NetworkMode,
 } from "@/lib/gameServer";
 
+type Notice = (opts: { title: string; description?: string; variant?: "destructive" }) => void;
+type Translate = (key: string) => string;
+
+async function startOfflineBots(args: {
+  name: string;
+  botCount: number;
+  botDifficulty: "easy" | "medium" | "hard";
+  setLocation: (path: string) => void;
+  toast: Notice;
+  t: Translate;
+}) {
+  try {
+    const { gameState, playerId } = createOfflineGame(args.name, args.botCount, args.botDifficulty);
+    if (!gameState?.players?.length) throw new Error("Failed to create game state");
+    sessionStorage.setItem(`offline_game_${playerId}`, JSON.stringify(gameState));
+    sessionStorage.setItem(`offline_player_${playerId}`, playerId);
+    sessionStorage.setItem(`offline_difficulty_${playerId}`, args.botDifficulty);
+    setTimeout(() => {
+      args.setLocation(`/game/offline?player=${playerId}&mode=offline`);
+    }, 100);
+  } catch (err: any) {
+    console.error("Error creating offline game:", err);
+    args.toast({ title: args.t("error.generic"), description: err.message || args.t("error.failedToStart"), variant: "destructive" });
+  }
+}
+
+async function prepareCreateNetwork(mode: NetworkMode, toast: Notice, t: Translate) {
+  if (mode !== "lan") {
+    if (isNativeApp()) setServerBase(DEFAULT_CLOUD_SERVER);
+    else clearServerBase();
+    setLanJoinUrl(null);
+    setNetworkMode("server");
+    return true;
+  }
+  if (!isLikelyLocalHost()) {
+    toast({ title: t("create.lanNeedLocalHost"), description: t("create.lanNeedLocalHostDesc"), variant: "destructive" });
+    return false;
+  }
+  try {
+    const lan = await fetchLanInfo();
+    const preferred =
+      lan.joinBaseUrls.find((u) => u.includes(window.location.hostname)) ||
+      lan.joinBaseUrls[0] ||
+      window.location.origin;
+    clearServerBase();
+    setLanJoinUrl(preferred);
+    setNetworkMode("lan");
+    return true;
+  } catch (err: any) {
+    toast({ title: t("error.generic"), description: err.message || t("create.lanInfoFailed"), variant: "destructive" });
+    return false;
+  }
+}
+
 export default function Home() {
-  // Toca música do menu assim que o componente montar
+  // Menu livre em portrait/landscape; libera trava se veio da partida
   useEffect(() => {
-    // Tenta tocar imediatamente
-    audioManager.playMenuMusic();
-    
-    // Cleanup ao desmontar
+    let cancelled = false;
+
+    const startMenuMusic = () => {
+      if (!cancelled) audioManager.playMenuMusic();
+    };
+
+    void unlockOrientation();
+    startMenuMusic();
+
+    // Retries: WebView aplica autoplay um pouco depois; mp3 pode ainda estar carregando
+    const delays = [50, 200, 500, 1000, 2000, 4000];
+    const timers = delays.map((ms) => window.setTimeout(startMenuMusic, ms));
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") startMenuMusic();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", startMenuMusic);
+
     return () => {
+      cancelled = true;
+      timers.forEach((id) => window.clearTimeout(id));
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", startMenuMusic);
       audioManager.stopAllMusic();
     };
   }, []);
@@ -52,29 +131,25 @@ export default function Home() {
   const isLandscapeMenu = isCompactGame && !isPortrait;
   const menuBtnClass = cn(
     "w-full",
-    isLandscapeMenu ? "text-sm py-3 h-auto min-h-0" : "text-xl py-8"
+    fit(isLandscapeMenu, "text-sm py-3 h-auto min-h-0", "text-lg py-6 h-auto sm:text-xl sm:py-8")
   );
-  const menuIconClass = cn(isLandscapeMenu ? "mr-2 w-4 h-4" : "mr-3 w-6 h-6");
+  const menuIconClass = cn(fit(isLandscapeMenu, "mr-2 w-4 h-4", "mr-3 w-5 h-5 sm:w-6 sm:h-6"));
   /** Dialog encaixa em tela baixa (celular deitado) sem cortar o botão de ação */
   const dialogContentClass = cn(
     "sm:max-w-md",
-    isLandscapeMenu
-      ? "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2 overflow-hidden flex flex-col"
-      : "overflow-visible"
+    fit(isLandscapeMenu, "w-[min(96vw,34rem)] max-h-[min(94dvh,28rem)] p-3 gap-2 overflow-hidden flex flex-col", "overflow-visible")
   );
   const dialogBodyClass = cn(
-    isLandscapeMenu
-      ? "min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-2 py-1 pr-1"
-      : "space-y-4 py-4 overflow-visible"
+    fit(isLandscapeMenu, "min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-2 py-1 pr-1", "space-y-4 py-4 overflow-visible")
   );
-  const dialogInputClass = cn(isLandscapeMenu ? "text-sm h-9 py-1.5" : "text-lg py-6");
+  const dialogInputClass = cn(fit(isLandscapeMenu, "text-sm h-9 py-1.5", "text-lg py-6"));
   const dialogSelectClass = cn(
     "w-full",
-    isLandscapeMenu ? "text-sm h-9 py-1.5" : "text-lg py-6"
+    fit(isLandscapeMenu, "text-sm h-9 py-1.5", "text-lg py-6")
   );
   const dialogHeaderClass = cn(isLandscapeMenu && "space-y-0.5 pr-6 text-left");
   const dialogDescClass = cn(isLandscapeMenu && "text-xs leading-snug line-clamp-2");
-  const dialogCtaClass = cn("w-full", isLandscapeMenu ? "mt-2 h-9 text-sm" : "mt-4");
+  const dialogCtaClass = cn("w-full", fit(isLandscapeMenu, "mt-2 h-9 text-sm", "mt-4"));
   const [languageOpen, setLanguageOpen] = useState(false);
   const [name, setName] = useState(() => loadProfile().displayName);
   const [roomCode, setRoomCode] = useState("");
@@ -92,6 +167,20 @@ export default function Home() {
   const [networkChoice, setNetworkChoice] = useState<NetworkMode | null>(null);
   const [hostAddress, setHostAddress] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [showNameHint, setShowNameHint] = useState(false);
+
+  useEffect(() => {
+    if (!isRankLoggedIn()) return;
+    let cancelled = false;
+    void fetchRankMe()
+      .then((rp) => {
+        if (!cancelled && rp) setName(loadProfile().displayName);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const createRoom = useCreateRoom();
   const joinRoom = useJoinRoom();
@@ -103,88 +192,23 @@ export default function Home() {
 
   const handleCreate = async () => {
     if (!name) return toast({ title: t("error.nameRequired"), description: t("error.nameRequiredDesc"), variant: "destructive" });
-    
-    // Se for modo bots, cria partida offline
     if (gameMode === "vs_bots") {
-      try {
-        const { gameState, playerId } = createOfflineGame(name, botCount, botDifficulty);
-        
-        // Valida que o estado foi criado corretamente
-        if (!gameState || !gameState.players || gameState.players.length === 0) {
-          throw new Error("Failed to create game state");
-        }
-        
-        // Salva estado do jogo no sessionStorage
-        const stateString = JSON.stringify(gameState);
-        sessionStorage.setItem(`offline_game_${playerId}`, stateString);
-        sessionStorage.setItem(`offline_player_${playerId}`, playerId);
-        sessionStorage.setItem(`offline_difficulty_${playerId}`, botDifficulty);
-        
-        console.log("Offline game created:", { 
-          playerId, 
-          players: gameState.players.length,
-          state: gameState
-        });
-        
-        // Pequeno delay para garantir que o sessionStorage foi salvo
-        setTimeout(() => {
-          // Redireciona para tela de jogo offline
-          setLocation(`/game/offline?player=${playerId}&mode=offline`);
-        }, 100);
-      } catch (err: any) {
-        console.error("Error creating offline game:", err);
-        toast({ title: t("error.generic"), description: err.message || t("error.failedToStart"), variant: "destructive" });
-      }
+      await startOfflineBots({ name, botCount, botDifficulty, setLocation, toast, t });
       return;
     }
-
     const mode: NetworkMode = networkChoice || "server";
-
-    if (mode === "lan") {
-      if (!isLikelyLocalHost()) {
-        toast({
-          title: t("create.lanNeedLocalHost"),
-          description: t("create.lanNeedLocalHostDesc"),
-          variant: "destructive",
-        });
-        return;
-      }
-      try {
-        const lan = await fetchLanInfo();
-        // Host continua same-origin (evita CORS); convidados usam o IP publicado
-        const preferred =
-          lan.joinBaseUrls.find((u) => u.includes(window.location.hostname)) ||
-          lan.joinBaseUrls[0] ||
-          window.location.origin;
-        clearServerBase();
-        setLanJoinUrl(preferred);
-        setNetworkMode("lan");
-      } catch (err: any) {
-        toast({
-          title: t("error.generic"),
-          description: err.message || t("create.lanInfoFailed"),
-          variant: "destructive",
-        });
-        return;
-      }
-    } else {
-      clearServerBase();
-      setLanJoinUrl(null);
-      setNetworkMode("server");
-    }
-    
-    // Modo multiplayer - cria sala online
+    const ready = await prepareCreateNetwork(mode, toast, t);
+    if (!ready) return;
     try {
-      const result = await createRoom.mutateAsync({ 
+      const result = await createRoom.mutateAsync({
         name,
         gameMode: "multiplayer",
-        maxPlayers: maxPlayers,
+        maxPlayers,
         botCount: includeBots ? botCount : 0,
-        botDifficulty: includeBots ? botDifficulty : undefined
+        botDifficulty: includeBots ? botDifficulty : undefined,
       });
       sessionStorage.setItem(`player_${result.code}`, result.playerId);
       sessionStorage.setItem(`playerName_${result.code}`, name);
-      // Salva o hostId (o criador da sala é sempre o host)
       sessionStorage.setItem(`hostId_${result.code}`, result.playerId);
       setCreateDialogOpen(false);
       setLocation(`/game/${result.code}?player=${result.playerId}`);
@@ -210,7 +234,11 @@ export default function Home() {
       setLanJoinUrl(normalized);
       setNetworkMode("lan");
     } else {
-      clearServerBase();
+      if (isNativeApp()) {
+        setServerBase(DEFAULT_CLOUD_SERVER);
+      } else {
+        clearServerBase();
+      }
       setLanJoinUrl(null);
       setNetworkMode("server");
     }
@@ -229,11 +257,15 @@ export default function Home() {
     <div
       className={cn(
         "flex items-center justify-center relative overflow-hidden",
-        isLandscapeMenu ? "h-[100dvh] min-h-0 p-2 pt-10 pb-2" : "min-h-screen p-4"
+        fit(isLandscapeMenu, "h-[100dvh] min-h-0 p-2 pt-10 pb-2", "min-h-[100dvh] px-4 pt-20 pb-8")
       )}
     >
-      {/* Language Selector - Top Left */}
-      <div className={cn("absolute z-20", isLandscapeMenu ? "top-2 left-2" : "top-4 left-4")}>
+      <div
+        className={cn(
+          "absolute inset-x-0 top-0 z-20 flex items-center justify-between",
+          fit(isLandscapeMenu, "gap-1.5 p-2", "gap-2 p-3 sm:p-4")
+        )}
+      >
         <Select
           value={language}
           onValueChange={(value: Language) => {
@@ -245,12 +277,18 @@ export default function Home() {
         >
           <SelectTrigger
             className={cn(
-              "bg-white/90 text-indigo-900 border-indigo-200 hover:bg-white shadow-md",
-              isLandscapeMenu ? "w-[118px] h-8 text-xs" : "w-[140px]"
+              "shrink-0 bg-white/90 text-indigo-900 border-indigo-200 hover:bg-white shadow-md",
+              fit(isLandscapeMenu, "w-[118px] h-8 text-xs", "h-10 w-[140px] max-[440px]:w-auto max-[440px]:gap-1 max-[440px]:px-2.5")
             )}
+            aria-label={t(`lang.${language}`)}
           >
-            <Languages className={cn("mr-2", isLandscapeMenu ? "h-3.5 w-3.5" : "h-4 w-4")} />
-            <SelectValue />
+            <Languages className={cn("mr-2 max-[440px]:mr-0", fit(isLandscapeMenu, "h-3.5 w-3.5", "h-4 w-4"))} />
+            <span className={cn(!isLandscapeMenu && "max-[440px]:!hidden")}>
+              <SelectValue />
+            </span>
+            {!isLandscapeMenu && (
+              <span className="!hidden max-[440px]:!inline font-semibold uppercase">{language}</span>
+            )}
           </SelectTrigger>
           <SelectContent position="popper" className="z-[100] bg-white" sideOffset={5}>
             <SelectItem value="pt">{t("lang.pt")}</SelectItem>
@@ -258,26 +296,44 @@ export default function Home() {
             <SelectItem value="en">{t("lang.en")}</SelectItem>
           </SelectContent>
         </Select>
-      </div>
 
-      {/* Volume + perfil + instalar app - Top Right */}
-      <div className={cn("absolute z-20 flex items-center gap-2", isLandscapeMenu ? "top-2 right-2" : "top-4 right-4")}>
+      <div
+        className={cn(
+          "flex min-w-0 items-center justify-end",
+          fit(isLandscapeMenu, "gap-1.5", "gap-2 max-[440px]:gap-1.5")
+        )}
+      >
         <InstallAppButton compact={isLandscapeMenu} />
-        <ProfileDialog
-          compact={isLandscapeMenu}
-          onSaved={(p) => {
-            if (!name.trim() && p.displayName) setName(p.displayName);
-            else if (p.displayName) setName(p.displayName);
-          }}
-        />
+        <LeaderboardDialog compact={isLandscapeMenu} />
+        <div className="relative shrink-0">
+          {showNameHint && (
+            <div className="absolute left-1/2 top-full z-30 mt-2 -translate-x-1/2 flex flex-col items-center pointer-events-none w-36">
+              <ArrowUp className="h-7 w-7 text-amber-500 animate-bounce drop-shadow" />
+              <span className="mt-1 rounded-lg bg-amber-500 px-2 py-1 text-center text-xs font-semibold text-amber-950 shadow-md">
+                {t("queue.nameHint")}
+              </span>
+            </div>
+          )}
+          <ProfileDialog
+            compact={isLandscapeMenu}
+            highlight={showNameHint}
+            onSaved={(p) => {
+              if (!name.trim() && p.displayName) setName(p.displayName);
+              else if (p.displayName) setName(p.displayName);
+              if (p.displayName.trim()) setShowNameHint(false);
+            }}
+          />
+        </div>
         <div
           className={cn(
-            "[&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md",
-            isLandscapeMenu && "[&_button]:h-8 [&_button]:w-8 [&_button]:p-0 scale-90 origin-top-right"
+            "flex shrink-0 items-center [&_button]:bg-white/90 [&_button]:text-indigo-900 [&_button]:border-indigo-200 [&_button]:hover:bg-white [&_button]:shadow-md",
+            fit(isLandscapeMenu, "gap-1.5 [&_button]:h-8 [&_button]:w-8 [&_button]:p-0", "gap-2 max-[400px]:gap-1.5")
           )}
         >
           <VolumeControl />
+          <TableThemeButton />
         </div>
+      </div>
       </div>
 
       {/* Decorative Background Elements */}
@@ -295,12 +351,10 @@ export default function Home() {
         animate={{ opacity: 1, y: 0 }}
         className={cn(
           "w-full relative z-10",
-          isLandscapeMenu
-            ? "max-w-3xl flex flex-row items-center gap-5 px-1"
-            : "max-w-md"
+          fit(isLandscapeMenu, "max-w-3xl flex flex-row items-center gap-5 px-1", "max-w-md")
         )}
       >
-        <div className={cn("text-center", isLandscapeMenu ? "mb-0 shrink-0 text-left w-[38%] max-w-[14rem]" : "mb-12")}>
+        <div className={cn("text-center", fit(isLandscapeMenu, "mb-0 shrink-0 text-left w-[38%] max-w-[14rem]", "mb-8 sm:mb-12"))}>
           <motion.div
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
@@ -310,25 +364,25 @@ export default function Home() {
             <h1
               className={cn(
                 "font-black text-indigo-900 tracking-tighter",
-                isLandscapeMenu ? "text-4xl mb-1" : "text-6xl md:text-8xl mb-2"
+                fit(isLandscapeMenu, "text-4xl mb-1", "text-6xl md:text-8xl mb-2")
               )}
               style={{ fontFamily: 'Noto Serif JP' }}
             >
               {t("menu.title")}
             </h1>
-            <div className={cn("bg-red-600 w-full rounded-full", isLandscapeMenu ? "h-1" : "h-2")} />
+            <div className={cn("bg-red-600 w-full rounded-full", fit(isLandscapeMenu, "h-1", "h-2"))} />
           </motion.div>
           <p
             className={cn(
               "text-gray-600 font-medium",
-              isLandscapeMenu ? "mt-1.5 text-xs leading-snug" : "mt-4 text-xl"
+              fit(isLandscapeMenu, "mt-1.5 text-xs leading-snug", "mt-4 text-xl")
             )}
           >
             {t("menu.subtitle")}
           </p>
         </div>
 
-        <div className={cn("flex-1 min-w-0", isLandscapeMenu ? "grid grid-cols-2 gap-2" : "grid gap-6")}>
+        <div className={cn("flex-1 min-w-0", fit(isLandscapeMenu, "grid grid-cols-2 gap-2", "grid gap-4 sm:gap-6"))}>
           <Dialog
             open={createDialogOpen}
             onOpenChange={(open) => {
@@ -347,7 +401,7 @@ export default function Home() {
             </DialogTrigger>
             <DialogContent className={dialogContentClass}>
               <DialogHeader className={dialogHeaderClass}>
-                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-lg" : "text-2xl")}>
+                <DialogTitle className={cn("font-display text-indigo-900", fit(isLandscapeMenu, "text-lg", "text-2xl"))}>
                   {createStep === "network" ? t("create.networkTitle") : t("create.title")}
                 </DialogTitle>
                 <DialogDescription className={dialogDescClass}>
@@ -361,20 +415,20 @@ export default function Home() {
                     type="button"
                     className={cn(
                       "w-full text-left rounded-xl border-2 border-indigo-200 hover:border-indigo-500 bg-white transition-colors",
-                      isLandscapeMenu ? "p-2.5" : "p-4"
+                      fit(isLandscapeMenu, "p-2.5", "p-4")
                     )}
                     onClick={() => {
                       setNetworkChoice("lan");
                       setCreateStep("form");
                     }}
                   >
-                    <div className={cn("flex items-start", isLandscapeMenu ? "gap-2" : "gap-3")}>
-                      <div className={cn("rounded-lg bg-indigo-100 text-indigo-800", isLandscapeMenu ? "p-1.5" : "p-2")}>
-                        <Wifi className={isLandscapeMenu ? "w-4 h-4" : "w-5 h-5"} />
+                    <div className={cn("flex items-start", fit(isLandscapeMenu, "gap-2", "gap-3"))}>
+                      <div className={cn("rounded-lg bg-indigo-100 text-indigo-800", fit(isLandscapeMenu, "p-1.5", "p-2"))}>
+                        <Wifi className={fit(isLandscapeMenu, "w-4 h-4", "w-5 h-5")} />
                       </div>
                       <div>
                         <div className={cn("font-bold text-indigo-900", isLandscapeMenu && "text-sm")}>{t("create.networkLan")}</div>
-                        <p className={cn("text-gray-600", isLandscapeMenu ? "text-[11px] mt-0.5 leading-snug" : "text-sm mt-1")}>
+                        <p className={cn("text-gray-600", fit(isLandscapeMenu, "text-[11px] mt-0.5 leading-snug", "text-sm mt-1"))}>
                           {t("create.networkLanDesc")}
                         </p>
                       </div>
@@ -384,20 +438,20 @@ export default function Home() {
                     type="button"
                     className={cn(
                       "w-full text-left rounded-xl border-2 border-red-200 hover:border-red-500 bg-white transition-colors",
-                      isLandscapeMenu ? "p-2.5" : "p-4"
+                      fit(isLandscapeMenu, "p-2.5", "p-4")
                     )}
                     onClick={() => {
                       setNetworkChoice("server");
                       setCreateStep("form");
                     }}
                   >
-                    <div className={cn("flex items-start", isLandscapeMenu ? "gap-2" : "gap-3")}>
-                      <div className={cn("rounded-lg bg-red-100 text-red-700", isLandscapeMenu ? "p-1.5" : "p-2")}>
-                        <Cloud className={isLandscapeMenu ? "w-4 h-4" : "w-5 h-5"} />
+                    <div className={cn("flex items-start", fit(isLandscapeMenu, "gap-2", "gap-3"))}>
+                      <div className={cn("rounded-lg bg-red-100 text-red-700", fit(isLandscapeMenu, "p-1.5", "p-2"))}>
+                        <Cloud className={fit(isLandscapeMenu, "w-4 h-4", "w-5 h-5")} />
                       </div>
                       <div>
                         <div className={cn("font-bold text-indigo-900", isLandscapeMenu && "text-sm")}>{t("create.networkServer")}</div>
-                        <p className={cn("text-gray-600", isLandscapeMenu ? "text-[11px] mt-0.5 leading-snug" : "text-sm mt-1")}>
+                        <p className={cn("text-gray-600", fit(isLandscapeMenu, "text-[11px] mt-0.5 leading-snug", "text-sm mt-1"))}>
                           {t("create.networkServerDesc")}
                         </p>
                       </div>
@@ -417,12 +471,12 @@ export default function Home() {
                 {networkChoice === "lan" && (
                   <div className={cn(
                     "rounded-lg bg-amber-50 border border-amber-200 text-amber-800",
-                    isLandscapeMenu ? "px-2 py-1 text-xs" : "px-3 py-2 text-sm"
+                    fit(isLandscapeMenu, "px-2 py-1 text-xs", "px-3 py-2 text-sm")
                   )}>
                     {t("create.lanHint")}
                   </div>
                 )}
-                <div className={cn(isLandscapeMenu ? "grid grid-cols-2 gap-2" : "space-y-4")}>
+                <div className={cn(fit(isLandscapeMenu, "grid grid-cols-2 gap-2", "space-y-4"))}>
                   <div className="space-y-1.5">
                     <Label htmlFor="hostName">{t("create.yourName")}</Label>
                     <Input 
@@ -439,7 +493,7 @@ export default function Home() {
                     <Select 
                       value={maxPlayers.toString()} 
                       onValueChange={(value) => {
-                        const newMax = parseInt(value);
+                        const newMax = Number.parseInt(value);
                         setMaxPlayers(newMax);
                         // Ajusta botCount se necessário
                         if (botCount > newMax - 1) {
@@ -490,7 +544,7 @@ export default function Home() {
                 </div>
 
                 {includeBots && (
-                  <div className={cn(isLandscapeMenu ? "grid grid-cols-2 gap-2" : "space-y-4")}>
+                  <div className={cn(fit(isLandscapeMenu, "grid grid-cols-2 gap-2", "space-y-4"))}>
                     <div className="space-y-1.5">
                       <Label htmlFor="createBotCount">
                         {t("create.botCount").replace("{max}", (maxPlayers - 1).toString())}
@@ -498,7 +552,7 @@ export default function Home() {
                       <Select 
                         value={Math.min(botCount, maxPlayers - 1).toString()} 
                         onValueChange={(value) => {
-                          const newCount = parseInt(value);
+                          const newCount = Number.parseInt(value);
                           setBotCount(Math.min(newCount, maxPlayers - 1));
                           setBotCountOpen(false);
                         }}
@@ -587,6 +641,13 @@ export default function Home() {
             </DialogContent>
           </Dialog>
 
+          <HomeFeatures
+            name={name}
+            menuBtnClass={menuBtnClass}
+            menuIconClass={menuIconClass}
+            onNeedName={() => setShowNameHint(true)}
+          />
+
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="secondary" size="lg" className={menuBtnClass} onClick={() => { setMode("bots"); setGameMode("vs_bots"); }}>
@@ -595,7 +656,7 @@ export default function Home() {
             </DialogTrigger>
             <DialogContent className={dialogContentClass}>
               <DialogHeader className={dialogHeaderClass}>
-                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-lg" : "text-2xl")}>{t("bots.title")}</DialogTitle>
+                <DialogTitle className={cn("font-display text-indigo-900", fit(isLandscapeMenu, "text-lg", "text-2xl"))}>{t("bots.title")}</DialogTitle>
                 <DialogDescription className={dialogDescClass}>{t("bots.description")}</DialogDescription>
               </DialogHeader>
               <div className={dialogBodyClass}>
@@ -609,13 +670,13 @@ export default function Home() {
                     className={dialogInputClass}
                   />
                 </div>
-                <div className={cn(isLandscapeMenu ? "grid grid-cols-2 gap-2" : "contents")}>
+                <div className={cn(fit(isLandscapeMenu, "grid grid-cols-2 gap-2", "contents"))}>
                   <div className="space-y-1.5">
                     <Label htmlFor="botCount">{t("bots.botCount")}</Label>
                     <Select 
                       value={botCount.toString()} 
                       onValueChange={(value) => {
-                        setBotCount(parseInt(value));
+                        setBotCount(Number.parseInt(value));
                         setBotCountOpen(false);
                       }}
                       open={botCountOpen}
@@ -691,11 +752,11 @@ export default function Home() {
             </DialogTrigger>
             <DialogContent className={dialogContentClass}>
               <DialogHeader className={dialogHeaderClass}>
-                <DialogTitle className={cn("font-display text-indigo-900", isLandscapeMenu ? "text-lg" : "text-2xl")}>{t("join.title")}</DialogTitle>
+                <DialogTitle className={cn("font-display text-indigo-900", fit(isLandscapeMenu, "text-lg", "text-2xl"))}>{t("join.title")}</DialogTitle>
                 <DialogDescription className={dialogDescClass}>{t("join.description")}</DialogDescription>
               </DialogHeader>
               <div className={dialogBodyClass}>
-                <div className={cn(isLandscapeMenu ? "grid grid-cols-2 gap-2" : "space-y-4")}>
+                <div className={cn(fit(isLandscapeMenu, "grid grid-cols-2 gap-2", "space-y-4"))}>
                   <div className="space-y-1.5">
                     <Label htmlFor="joinName">{t("join.yourName")}</Label>
                     <Input 
@@ -757,8 +818,6 @@ export default function Home() {
               compact={isLandscapeMenu}
               triggerClassName={isLandscapeMenu ? menuBtnClass : "w-full text-base py-6 h-auto"}
               iconClassName={isLandscapeMenu ? menuIconClass : "mr-2 w-5 h-5"}
-              name={name}
-              onNameChange={setName}
             />
             <LeagueDialog
               compact={isLandscapeMenu}
@@ -771,7 +830,7 @@ export default function Home() {
         </div>
 
         {!isLandscapeMenu && (
-          <div className="mt-12 text-center text-sm text-gray-500">
+          <div className="mt-8 sm:mt-12 text-center text-sm text-gray-500">
             <p>{t("menu.copyright")}</p>
           </div>
         )}

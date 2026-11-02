@@ -17,7 +17,6 @@ const isRailway = dbUrl.includes('railway') || dbUrl.includes('postgres.railway'
 
 console.log("Database URL detected:", {
   hasUrl: !!process.env.DATABASE_URL,
-  urlPreview: process.env.DATABASE_URL ? `${process.env.DATABASE_URL.substring(0, 50)}...` : 'none',
   isNeon: isNeonDatabase,
   isRailway: isRailway,
   willUseNeon: isNeonDatabase && !isRailway,
@@ -34,7 +33,7 @@ async function initDatabase() {
   if (initPromise) return initPromise;
   
   if (!process.env.DATABASE_URL) {
-    return Promise.resolve();
+    return;
   }
   
   initPromise = (async () => {
@@ -74,7 +73,7 @@ async function initDatabase() {
         name: err.name,
         code: err.code,
         isNeon: isNeonDatabase,
-        urlPreview: process.env.DATABASE_URL ? `${process.env.DATABASE_URL.substring(0, 50)}...` : 'none'
+        hasUrl: !!process.env.DATABASE_URL,
       });
       throw new Error(`Failed to initialize database: ${err.message}`);
     }
@@ -94,5 +93,3 @@ export async function getPool() {
   return pool;
 }
 
-// For backward compatibility, export sync versions (will be null until initialized)
-export { pool, db };
