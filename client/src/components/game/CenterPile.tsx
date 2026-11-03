@@ -34,6 +34,10 @@ export function CenterPile({
 
   const cardClass = fit(isCompact, "w-12 h-[4.25rem]", "w-20 h-28 md:w-24 md:h-36");
   const canDraw = isMyTurn && phase === "draw";
+  const labelClass = cn(
+    "absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-center font-bold uppercase",
+    fit(isCompact, "-top-3.5 text-[8px] tracking-wide", "-top-6 text-[10px] tracking-widest md:text-xs")
+  );
 
   return (
     <div className={cn("flex items-center", fit(isCompact, "gap-2.5", "gap-10"))}>
@@ -49,32 +53,17 @@ export function CenterPile({
               fit(canDraw, "cursor-pointer", "cursor-default")
             )}
           >
-            {canDraw && !isCompact && (
-              <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-center whitespace-nowrap z-10">
-                <div className="text-[10px] md:text-xs text-yellow-400 font-bold animate-pulse">
-                  {t("game.clickToDraw")}
-                </div>
-              </div>
-            )}
+            <div className={cn(labelClass, "z-10", fit(canDraw, "text-yellow-400 animate-pulse", "text-white/50"))}>
+              {t("game.deck")}
+            </div>
             <PlayingCard
               hidden
               className={cn(
                 "transition-all",
                 cardClass,
-                fit(canDraw, "cursor-pointer hover:ring-4 ring-white/50 hover:scale-105", "opacity-80")
+                fit(canDraw, "cursor-pointer ring-2 ring-yellow-400/80 hover:ring-4 hover:scale-105", "opacity-80")
               )}
             />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span
-                className={cn(
-                  "font-bold transition-all drop-shadow-md",
-                  fit(isCompact, "text-[8px]", "text-sm"),
-                  fit(canDraw, "text-white", "text-white/80")
-                )}
-              >
-                {t("game.deck")}
-              </span>
-            </div>
           </button>
         ) : (
           <div
@@ -166,11 +155,7 @@ export function CenterPile({
       <div className="relative" ref={discardRef}>
         {gameState.discardPile.length > 0 ? (
           <div className="relative">
-            {!isCompact && (
-              <div className="absolute -top-7 left-0 right-0 text-center text-[10px] md:text-xs font-bold text-white/50 uppercase tracking-widest whitespace-nowrap">
-                {t("game.discardPile")}
-              </div>
-            )}
+            <div className={cn(labelClass, "text-white/50")}>{isCompact ? t("game.discardPileShort") : t("game.discardPile")}</div>
             <PlayingCard
               card={gameState.discardPile[gameState.discardPile.length - 1]}
               className={cn("brightness-90", cardClass)}

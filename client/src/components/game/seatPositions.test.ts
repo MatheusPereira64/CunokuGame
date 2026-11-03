@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSeatPositions, opponentsInTurnOrder } from "./seatPositions";
+import { getSeatPositions, opponentsInTurnOrder, seatStyle } from "./seatPositions";
 
 describe("getSeatPositions", () => {
   it("retorna layout exato para 1–5 oponentes", () => {
@@ -27,6 +27,14 @@ describe("getSeatPositions", () => {
         expect(seat.top).toBeLessThan(50);
       }
     }
+  });
+});
+
+describe("seatStyle", () => {
+  it("prende cada assento à borda do seu lado, para a mão crescer para dentro da mesa", () => {
+    expect(seatStyle({ left: 1.5, top: 38, side: "left" })).toEqual({ left: "1.5%", top: "38%", transform: "translateY(-50%)" });
+    expect(seatStyle({ left: 98.5, top: 38, side: "right" })).toEqual({ right: "1.5%", top: "38%", transform: "translateY(-50%)" });
+    expect(seatStyle({ left: 50, top: 3, side: "top" })).toEqual({ left: "50%", top: "3%", transform: "translateX(-50%)" });
   });
 });
 

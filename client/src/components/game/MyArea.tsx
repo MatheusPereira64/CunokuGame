@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameState, Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
@@ -6,6 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { EmoteBubble } from "./EmotePicker";
 import { swapCardStyle, useSwapHighlights } from "./swapHighlight";
 import { SwapBadge } from "./SwapBadge";
+import { handSizeDetail } from "./helpers";
 import { Button } from "@/components/Button";
 import { cn, fit } from "@/lib/utils";
 import { useIsCompactGame } from "@/hooks/use-landscape";
@@ -46,25 +47,17 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
     return { canMatch: matchingCards.length > 0, matchingCards };
   };
 
-  // Descarte direto no meu turno: qualquer carta conhecida pode ser tentada (com risco de punição)
-  const getDiscardInfo = (): { canDiscard: boolean; matchingCards: number[]; allKnownCards: number[] } => {
-    if (!isMyTurn || phase !== "draw" || gameState.discardPile.length === 0) {
-      return { canDiscard: false, matchingCards: [], allKnownCards: [] };
-    }
+  // Na fase de compra, a carta igual ao topo pode ser descartada sem risco
+  const getSafeDiscards = (): number[] => {
+    if (!isMyTurn || phase !== "draw" || gameState.discardPile.length === 0) return [];
     const topDiscard = gameState.discardPile[gameState.discardPile.length - 1];
-    const matchingCards: number[] = [];
-    const allKnownCards: number[] = [];
-    me.hand.forEach((card, index) => {
-      if (me.knownCards[index.toString()]) {
-        allKnownCards.push(index);
-        if (card.rank === topDiscard.rank) matchingCards.push(index);
-      }
-    });
-    return { canDiscard: allKnownCards.length > 0, matchingCards, allKnownCards };
+    return me.hand.flatMap((card, index) =>
+      me.knownCards[index.toString()] && card.rank === topDiscard.rank ? [index] : []
+    );
   };
 
   const matchInfo = getMatchInfo();
-  const discardInfo = getDiscardInfo();
+  const safeDiscards = getSafeDiscards();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Pode trocar a carta comprada por qualquer carta da mão
@@ -83,12 +76,6 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
       return;
     }
 
-    // Descarte direto da mão durante a fase de compra
-    if (phase === "draw" && discardInfo.canDiscard && discardInfo.allKnownCards.includes(cardIndex)) {
-      sendAction({ type: "discard_from_hand", cardIndex });
-      return;
-    }
-
     // Substituição pela carta comprada
     if (phase === "action" && gameState.drawnCard && !gameState.jokerRevealed) {
       sendAction({ type: "replace_card", handIndex: cardIndex });
@@ -98,7 +85,12 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
     setSelectedHandIndex(cardIndex === selectedHandIndex ? null : cardIndex);
   };
 
-  // Leque quando mão grande; botões de descarte sempre compactos para não subir a mão
+  // A seleção só vale para o turno em que foi feita
+  useEffect(() => {
+    if (!isMyTurn || phase !== "draw") setSelectedHandIndex(null);
+  }, [isMyTurn, phase]);
+
+  // Leque quando mão grande
   const useFanOverlap = !isCompact && me.hand.length > 5;
   const showDiscardButtons = isMyTurn && phase === "draw" && gameState.discardPile.length > 0;
 
@@ -109,14 +101,23 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
         fit(isCompact, "bottom-0.5", "bottom-3")
       )}
     >
-      {/* Minha mão — faixa inferior reservada, sem invadir o centro */}
+      {/* Minha mão centralizada sob a pilha; ícone e botão Cunoku ficam colados nas pontas */}
+      <div
+        className={cn(
+          "relative rounded-2xl ring-1 transition-all max-w-[78%]",
+          fit(isCompact, "px-1 pt-1", "px-2 pt-1.5 pb-0.5"),
+          isMyTurn
+            ? "bg-yellow-400/10 ring-yellow-400/60 shadow-[0_0_24px_rgba(250,204,21,0.3)]"
+            : "ring-transparent"
+        )}
+      >
       <div
         className={cn(
           "flex items-end justify-center",
           isCompact
-            ? "gap-1 overflow-x-auto pb-0.5 w-full px-1 max-w-[92%]"
+            ? "gap-1 overflow-x-auto pb-0.5"
             : useFanOverlap
-              ? "gap-0 max-w-[85%]"
+              ? "gap-0"
               : "gap-3"
         )}
       >
@@ -126,7 +127,8 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
           const sealed = isCardSealed(card.id);
           const canQuickDiscard = showDiscardButtons && !sealed;
           const revealedFace = revealedCards[`${me.id}_${card.id}`];
-          const isSafeDiscard = canQuickDiscard && discardInfo.matchingCards.includes(i);
+          const isSafeDiscard = canQuickDiscard && safeDiscards.includes(i);
+          const showDiscardButton = canQuickDiscard && (isSafeDiscard || selectedHandIndex === i);
 
           return (
             <motion.div
@@ -213,45 +215,66 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                 </div>
               </button>
 
-              {isKnownCard && !showDiscardButtons && !isCompact && (
-                <div className="text-center mt-0.5 font-bold text-yellow-400 uppercase tracking-wider text-[10px]">
-                  {t("game.known")}
-                </div>
-              )}
               {canMatchThisCard && (
                 <div
                   className={cn(
-                    "text-center mt-0.5 font-bold text-orange-400 uppercase tracking-wider animate-pulse",
-                    fit(isCompact, "text-[8px]", "text-[10px]")
+                    "absolute left-1/2 -translate-x-1/2 z-20 whitespace-nowrap font-bold text-orange-400 uppercase tracking-wider animate-pulse",
+                    fit(isCompact, "-top-3 text-[8px]", "-top-4 text-[10px]")
                   )}
                 >
                   {t("game.match")}
                 </div>
               )}
 
-              {canQuickDiscard && (
+              {/* Dentro da carta: aparecer não pode empurrar a mão para cima */}
+              {showDiscardButton && (
                 <motion.div
-                  initial={{ opacity: 0, y: 6 }}
+                  initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-0.5 w-full px-0.5"
+                  className="absolute inset-x-1 bottom-1 z-20"
                 >
                   <Button
                     size="sm"
-                    variant="primary"
+                    variant="ghost"
                     title={isSafeDiscard ? t("game.discardSafe") : t("game.punishmentRisk")}
-                    className="w-full h-auto rounded-md font-bold bg-red-600 hover:bg-red-700 text-white border-red-800 shadow text-[9px] px-0.5 py-0.5"
+                    className={cn(
+                      "w-full h-auto rounded-md font-bold text-white shadow px-0.5 py-0.5",
+                      fit(isCompact, "text-[8px]", "text-[10px]"),
+                      isSafeDiscard ? "bg-emerald-700 hover:bg-emerald-800" : "bg-black/80 hover:bg-black"
+                    )}
                     onClick={(e) => {
                       e.stopPropagation();
                       sendAction({ type: "discard_from_hand", cardIndex: i });
                     }}
                   >
-                    {isSafeDiscard ? "✓" : "⚠"}
+                    {isSafeDiscard ? "✓" : "⚠"} {t("game.discard")}
                   </Button>
                 </motion.div>
               )}
             </motion.div>
           );
         })}
+      </div>
+
+      <div className={cn("absolute right-full bottom-0", fit(isCompact, "mr-1", "mr-3"))}>
+        <Avatar name={me.name} detail={handSizeDetail(me.hand.length, t)} isActive={isMyTurn} position="left" compact={isCompact} iconId={profile.iconId} accent={profile.accent} />
+        <EmoteBubble emoteId={emoteId} className="right-full top-0 mr-1" />
+      </div>
+
+      {isMyTurn && phase === "draw" && gameState.round >= 5 && !gameState.isFinalRound && (
+        <div className={cn("absolute left-full bottom-1", fit(isCompact, "ml-1", "ml-3"))}>
+          <Button
+            variant="destructive"
+            className={cn(
+              "rounded-full shadow-xl shadow-red-900/50 font-black border-4 border-red-400",
+              fit(isCompact, "w-11 h-11 text-[10px] border-2", "w-20 h-20 text-lg")
+            )}
+            onClick={() => sendAction({ type: "declare_finish" })}
+          >
+            {isCompact ? t("game.cunokuShort") : t("game.cunoku")}
+          </Button>
+        </div>
+      )}
       </div>
 
       {/* Indicador de descarte reativo */}
@@ -270,32 +293,6 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
         </motion.div>
       )}
 
-      {/* Meu avatar — canto, fora da mão */}
-      <div
-        className={cn(
-          "absolute origin-bottom-right",
-          fit(isCompact, "right-1 bottom-0 scale-[0.72]", "-bottom-1 right-4 hidden md:block scale-90")
-        )}
-      >
-        <Avatar name={me.name} score={me.score} isActive={isMyTurn} position="left" compact={isCompact} iconId={profile.iconId} accent={profile.accent} />
-        <EmoteBubble emoteId={emoteId} className="right-full top-0 mr-1" />
-      </div>
-
-      {/* Botão Cunoku */}
-      {isMyTurn && phase === "draw" && gameState.round >= 5 && !gameState.isFinalRound && (
-        <div className={cn("absolute", fit(isCompact, "right-1 bottom-14", "right-4 bottom-28"))}>
-          <Button
-            variant="destructive"
-            className={cn(
-              "rounded-full shadow-xl shadow-red-900/50 font-black border-4 border-red-400",
-              fit(isCompact, "w-11 h-11 text-[10px] border-2", "w-20 h-20 text-lg")
-            )}
-            onClick={() => sendAction({ type: "declare_finish" })}
-          >
-            {isCompact ? t("game.cunokuShort") : t("game.cunoku")}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

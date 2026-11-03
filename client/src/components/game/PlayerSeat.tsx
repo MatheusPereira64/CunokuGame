@@ -5,11 +5,14 @@ import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
 import { cn } from "@/lib/utils";
 import { Eye, Lock } from "lucide-react";
+import { useI18n } from "@/contexts/i18n-context";
+import type { ProfileAccent, ProfileIconId } from "@/lib/playerProfile";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import type { SeatSide } from "./seatPositions";
 import { EmoteBubble } from "./EmotePicker";
 import { swapCardStyle, useSwapHighlights } from "./swapHighlight";
 import { SwapBadge } from "./SwapBadge";
+import { handSizeDetail } from "./helpers";
 
 /** initial sempre é um objeto: trocar para `false` muda a quantidade de hooks do Framer Motion. */
 function FlippableCard({ flip, children }: { flip: boolean; children: ReactNode }) {
@@ -33,8 +36,8 @@ function seatCardSize(compact: boolean, isCompact: boolean) {
   return "w-12 h-16 md:w-14 md:h-20";
 }
 
-function seatOverlap(compact: boolean, isCompact: boolean) {
-  if (compact && isCompact) return "-ml-4";
+function seatOverlap(compact: boolean, isCompact: boolean, handSize: number) {
+  if (compact && isCompact) return handSize > 4 ? "-ml-5" : "-ml-4";
   if (compact) return "-ml-6 md:-ml-7";
   if (isCompact) return "-ml-3";
   return "-ml-5 md:-ml-6";
@@ -51,10 +54,10 @@ function revealedCardSize(cardSize: string, isCompact: boolean) {
   return isCompact ? "w-11 h-16" : cardSize;
 }
 
+/** Avatar ao lado das cartas também no topo: em pé, o assento ocuparia o centro da mesa. */
 function seatLayout(side: SeatSide) {
   if (side === "left") return "flex-row-reverse items-center gap-1";
-  if (side === "right") return "flex-row items-center gap-1";
-  return "flex-col items-center gap-0.5";
+  return "flex-row items-center gap-1";
 }
 
 interface PlayerSeatProps {
@@ -97,12 +100,13 @@ export function PlayerSeat({
   className,
 }: PlayerSeatProps) {
   const isCompact = useIsCompactGame();
+  const { t } = useI18n();
   const swapHighlights = useSwapHighlights();
   const previousRevealedState = useRef<Map<string, boolean>>(new Map());
 
   const compact = compactProp ?? (opponentCount >= 4 || isCompact);
   const cardSize = seatCardSize(compact, isCompact);
-  const overlapClass = seatOverlap(compact, isCompact);
+  const overlapClass = seatOverlap(compact, isCompact, player.hand.length);
 
   // Abre o leque enquanto há carta revelada: ela não fica coberta e continua na sua posição na mão
   const spreadHand = player.hand.some((card) => revealedCardKeys.includes(`${player.id}_${card.id}`));
@@ -179,9 +183,11 @@ export function PlayerSeat({
       <Avatar
         name={player.name}
         isBot={player.isBot}
-        score={player.score}
+        detail={handSizeDetail(player.hand.length, t)}
         isActive={isActive}
         compact={compact || isCompact}
+        iconId={player.iconId as ProfileIconId | undefined}
+        accent={player.accent as ProfileAccent | undefined}
         className={isCompact ? "scale-[0.85] origin-center" : undefined}
       />
       {/* Sempre ao lado do ícone; no lado direito da mesa abre para dentro, sem sair da tela */}
@@ -196,18 +202,20 @@ export function PlayerSeat({
     <div
       style={style}
       className={cn(
-        "flex rounded-xl transition-all pointer-events-none",
+        "flex rounded-2xl transition-all pointer-events-none",
         !player.isConnected && !player.isBot && "opacity-50",
+        isActive && "bg-yellow-400/10 ring-2 ring-yellow-400/70 shadow-[0_0_24px_rgba(250,204,21,0.35)]",
         layoutClass,
-        isCompact ? "p-0" : "p-1",
-        className
+        isCompact ? "p-0.5" : "p-1",
+        className,
+        // Aberta para mostrar carta, a mão pode encostar no vizinho: fica por cima dele
+        spreadHand && "z-30"
       )}
     >
-      {/* No topo: avatar acima das cartas (fora da mesa) */}
       {side === "top" && avatar}
       {hand}
       {/* Nas laterais: avatar já está no lado de fora via flex-row / flex-row-reverse */}
-      {(side === "left" || side === "right") && avatar}
+      {side !== "top" && avatar}
     </div>
   );
 }

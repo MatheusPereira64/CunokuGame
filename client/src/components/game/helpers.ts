@@ -85,6 +85,11 @@ export function abilityConfirmDisabled(input: AbilityConfirmInput): boolean {
   return false;
 }
 
+/** Só avisa quando a mão fugiu do normal: as 4 cartas iniciais não precisam de legenda. */
+export function handSizeDetail(cardCount: number, t: (key: string, vars?: Record<string, string>) => string): string | null {
+  return cardCount > 4 ? t("game.cardCount", { count: String(cardCount) }) : null;
+}
+
 const DEFAULT_MAX_PLAYERS = 4;
 
 /** Assentos vazios da sala de espera; salas antigas não informam o limite. */

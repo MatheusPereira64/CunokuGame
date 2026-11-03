@@ -484,6 +484,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.cunokuAfterRound5": "Cunoku disponível após rodada 5",
       "game.cunokuAfterRound5Short": "Cunoku após R5",
       "game.turn": "Vez",
+      "game.cardCount": "{count} cartas",
       "game.exit": "Sair",
       "game.roomCode": "CÓDIGO DA SALA",
       "game.copied": "Copiado!",
@@ -494,16 +495,15 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.rotateDevice": "Gire o celular",
       "game.rotateDeviceDesc": "A mesa de Cunoku é jogada na horizontal para melhor visualização.",
       "game.deck": "BARALHO",
-      "game.clickToDraw": "Clique para Comprar",
       "game.empty": "VAZIO",
       "game.drawnCard": "CARTA COMPRADA",
       "game.useAbility": "Usar Habilidade",
       "game.ability": "Habilidade",
       "game.discard": "Descartar",
       "game.discardPile": "Pilha de Descarte",
+      "game.discardPileShort": "Descarte",
       "game.fromDiscardNoAbility": "Carta da pilha de descarte - não pode usar habilidade",
       "game.fromDiscardNoAbilityShort": "Carta do descarte - sem habilidade",
-      "game.known": "Conhecida",
       "game.match": "Corresponde!",
       "game.swapHint": "Trocar",
       "game.discardSafe": "✓ Descartar",
@@ -520,8 +520,6 @@ function getTranslations(lang: Language): Record<string, string> {
       
       // Game - Habilidades
       "game.abilityTitle": "Usar Habilidade",
-      "game.abilityCard": "Habilidade da Carta",
-      "game.abilityClickToUse": "Clique no botão \"Usar Habilidade\" para ativar",
       "game.abilityPeekOpponent": "Ver carta de um oponente",
       "game.abilityPeekOwn": "Ver uma de suas cartas",
       "game.abilitySwap": "Trocar cartas entre 2 jogadores",
@@ -577,9 +575,6 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.confirm": "Confirmar",
       
       // Game - Dicas
-      "game.hintTitle": "Dica de Jogada",
-      "game.hintReplace": "Clique em uma carta da sua mão para substituir pela carta puxada",
-      "game.hintHighlighted": "As cartas da sua mão estão destacadas em verde",
       
       // Game - Carta Revelada
       "game.cardRevealed": "Carta Revelada!",
@@ -950,6 +945,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.cunokuAfterRound5": "Cunoku disponible después de la ronda 5",
       "game.cunokuAfterRound5Short": "Cunoku después de R5",
       "game.turn": "Turno",
+      "game.cardCount": "{count} cartas",
       "game.exit": "Salir",
       "game.roomCode": "CÓDIGO DE SALA",
       "game.copied": "¡Copiado!",
@@ -960,16 +956,15 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.rotateDevice": "Gira el teléfono",
       "game.rotateDeviceDesc": "La mesa de Cunoku se juega en horizontal para mejor visualización.",
       "game.deck": "MAZO",
-      "game.clickToDraw": "Clic para Robar",
       "game.empty": "VACÍO",
       "game.drawnCard": "CARTA ROBADA",
       "game.useAbility": "Usar Habilidad",
       "game.ability": "Habilidad",
       "game.discard": "Descartar",
       "game.discardPile": "Pila de Descarte",
+      "game.discardPileShort": "Descarte",
       "game.fromDiscardNoAbility": "Carta de la pila de descarte - no se puede usar habilidad",
       "game.fromDiscardNoAbilityShort": "Carta del descarte - sin habilidad",
-      "game.known": "Conocida",
       "game.match": "¡Coincide!",
       "game.swapHint": "Cambiar",
       "game.discardSafe": "✓ Descartar",
@@ -986,8 +981,6 @@ function getTranslations(lang: Language): Record<string, string> {
       
       // Game - Habilidades
       "game.abilityTitle": "Usar Habilidad",
-      "game.abilityCard": "Habilidad de la Carta",
-      "game.abilityClickToUse": "Haz clic en el botón \"Usar Habilidad\" para activar",
       "game.abilityPeekOpponent": "Ver carta de un oponente",
       "game.abilityPeekOwn": "Ver una de tus cartas",
       "game.abilitySwap": "Intercambiar cartas entre 2 jugadores",
@@ -1043,9 +1036,6 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.confirm": "Confirmar",
       
       // Game - Dicas
-      "game.hintTitle": "Consejo de Jugada",
-      "game.hintReplace": "Haz clic en una carta de tu mano para reemplazarla por la carta robada",
-      "game.hintHighlighted": "Las cartas de tu mano están resaltadas en verde",
       
       // Game - Carta Revelada
       "game.cardRevealed": "¡Carta Revelada!",
@@ -1416,6 +1406,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.cunokuAfterRound5": "Cunoku available after round 5",
       "game.cunokuAfterRound5Short": "Cunoku after R5",
       "game.turn": "Turn",
+      "game.cardCount": "{count} cards",
       "game.exit": "Exit",
       "game.roomCode": "ROOM CODE",
       "game.copied": "Copied!",
@@ -1426,16 +1417,15 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.rotateDevice": "Rotate your phone",
       "game.rotateDeviceDesc": "The Cunoku table is played in landscape for the best view.",
       "game.deck": "DECK",
-      "game.clickToDraw": "Click to Draw",
       "game.empty": "EMPTY",
       "game.drawnCard": "DRAWN CARD",
       "game.useAbility": "Use Ability",
       "game.ability": "Ability",
       "game.discard": "Discard",
       "game.discardPile": "Discard Pile",
+      "game.discardPileShort": "Discard",
       "game.fromDiscardNoAbility": "Card from discard pile - cannot use ability",
       "game.fromDiscardNoAbilityShort": "Card from discard - no ability",
-      "game.known": "Known",
       "game.match": "Match!",
       "game.swapHint": "Swap",
       "game.discardSafe": "✓ Discard",
@@ -1452,8 +1442,6 @@ function getTranslations(lang: Language): Record<string, string> {
       
       // Game - Abilities
       "game.abilityTitle": "Use Ability",
-      "game.abilityCard": "Card Ability",
-      "game.abilityClickToUse": "Click the \"Use Ability\" button to activate",
       "game.abilityPeekOpponent": "See an opponent's card",
       "game.abilityPeekOwn": "See one of your cards",
       "game.abilitySwap": "Swap cards between 2 players",
@@ -1509,9 +1497,6 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.confirm": "Confirm",
       
       // Game - Hints
-      "game.hintTitle": "Play Hint",
-      "game.hintReplace": "Click on a card from your hand to replace it with the drawn card",
-      "game.hintHighlighted": "Your hand cards are highlighted in green",
       
       // Game - Revealed Card
       "game.cardRevealed": "Card Revealed!",

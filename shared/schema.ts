@@ -32,7 +32,7 @@ export interface Player {
   hand: Card[]; // 4 cards usually
   score: number; // Total score across rounds
   knownCards: Record<string, boolean>; // Indices of own cards known to player
-  /** Ícone e cor do perfil, enviados no join; só aparecem na sala de espera. */
+  /** Ícone e cor do perfil, enviados no join. */
   iconId?: string;
   accent?: string;
 }

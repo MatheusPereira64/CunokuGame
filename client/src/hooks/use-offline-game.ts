@@ -55,13 +55,6 @@ export function useOfflineGame(
       // Processa turno do bot
       const bot = bots.get(currentPlayer.id);
       if (bot) {
-        // Mostra mensagem "Bot está pensando"
-        toast({
-          title: `${currentPlayer.name} está pensando...`,
-          description: "O bot está analisando sua jogada",
-          duration: 3000,
-        });
-        
         // Espera 3 segundos antes de executar a ação
         setTimeout(() => {
           const logsBefore = [...state.logs];

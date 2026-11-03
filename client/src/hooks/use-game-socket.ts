@@ -123,12 +123,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
             });
             break;
           case "bot_thinking":
-            // Notificação quando um bot está pensando
-            toastRef.current({
-              title: `${(message as any).botName} está pensando...`,
-              description: "O bot está analisando sua jogada",
-              duration: 3000,
-            });
+            // A linha de status já mostra de quem é a vez
             break;
           case "bot_action":
             // Notificação quando um bot executa uma ação

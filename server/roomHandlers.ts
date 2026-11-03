@@ -27,7 +27,7 @@ function cleanLookId(value: unknown): string | undefined {
 
 export type RoomSessionData = {
   playerNames: Map<string, string>;
-  /** Ícone e cor do perfil de cada jogador, para a sala de espera. */
+  /** Ícone e cor do perfil de cada jogador. */
   playerLooks: Map<string, PlayerLook>;
   bots: BotPlayer[];
   /** playerId da sala → conta do ranking, validada pelo token no join. */
@@ -217,6 +217,7 @@ export async function handleStartGame(
     hand: [],
     score: 0,
     knownCards: {},
+    ...session.playerLooks.get(id),
   }));
 
   const maxPlayers = (room as { maxPlayers?: number }).maxPlayers || 4;

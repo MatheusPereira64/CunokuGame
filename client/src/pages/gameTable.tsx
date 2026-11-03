@@ -1,4 +1,4 @@
-import { RefObject } from "react";
+import { ReactNode, RefObject } from "react";
 import { GameState, Card, Player, GameAction, MatchReward } from "@shared/schema";
 import type { EmoteId } from "@shared/emotes";
 import { PlayingCard } from "@/components/PlayingCard";
@@ -17,7 +17,7 @@ import { EmotePicker } from "@/components/game/EmotePicker";
 import { RulesCheatSheet } from "@/components/game/RulesCheatSheet";
 import { AbilityModal } from "@/components/game/AbilityModal";
 import { AbilityAction, hasSpecialAbility, getAbilityDescription } from "@/components/game/helpers";
-import { getSeatPositions, opponentsInTurnOrder } from "@/components/game/seatPositions";
+import { getSeatPositions, opponentsInTurnOrder, seatStyle } from "@/components/game/seatPositions";
 import { SwapHighlight, SwapHighlightContext } from "@/components/game/swapHighlight";
 import { LandscapePrompt } from "@/components/game/LandscapePrompt";
 import { GameTutorial } from "@/components/game/GameTutorial";
@@ -83,8 +83,10 @@ function GameTopBar({
   onEmote,
   onExit,
   onCopyCode,
+  status,
   t,
 }: {
+  status: ReactNode;
   isCompact: boolean;
   isOffline: boolean;
   connected: boolean;
@@ -99,11 +101,11 @@ function GameTopBar({
   return (
     <div
       className={cn(
-        "absolute top-0 left-0 right-0 z-50 pointer-events-none flex justify-between items-start",
-        cx(isCompact, "p-1.5 gap-1", "p-4"),
+        "relative z-50 shrink-0 flex justify-between items-center",
+        cx(isCompact, "px-1.5 pt-1 gap-1.5", "px-4 pt-2 gap-3"),
       )}
     >
-      <div className="flex items-center gap-1.5 pointer-events-auto">
+      <div className="flex shrink-0 items-center gap-1.5">
         <Button
           variant="outline"
           size="sm"
@@ -129,23 +131,22 @@ function GameTopBar({
         {canEmote ? <EmotePicker compact={isCompact} onSelect={onEmote} /> : null}
         {isOffline || connected ? null : <ReconnectBanner t={t} />}
       </div>
+      <div className="flex min-w-0 flex-1 justify-center">{status}</div>
       {isDaily ? (
-        <div className={cn("bg-black/40 backdrop-blur-md rounded-full border border-white/10 font-bold pointer-events-auto", cx(isCompact, "px-2.5 py-1 text-[11px]", "px-6 py-2 text-lg"))}>
+        <div className={cn("shrink-0 bg-black/40 backdrop-blur-md rounded-full border border-white/10 font-bold", cx(isCompact, "px-2.5 py-1 text-[11px]", "px-4 py-1.5 text-base"))}>
           {t("daily.title")}
         </div>
       ) : (
         <button
           type="button"
           className={cn(
-            "bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center pointer-events-auto cursor-pointer",
-            cx(isCompact, "px-2.5 py-1", "px-6 py-2"),
+            "shrink-0 bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center cursor-pointer",
+            cx(isCompact, "px-2.5 py-1", "px-4 py-1"),
           )}
           onClick={onCopyCode}
         >
-          <div className={cn("text-white/60 font-mono", cx(isCompact, "text-[8px] leading-tight", "text-xs"))}>
-            {t("game.roomCode")}
-          </div>
-          <div className={cn("font-bold tracking-widest font-mono flex items-center gap-1", cx(isCompact, "text-[11px]", "text-xl"))}>
+          {isCompact ? null : <div className="text-white/60 font-mono text-[10px] leading-tight">{t("game.roomCode")}</div>}
+          <div className={cn("font-bold tracking-widest font-mono flex items-center gap-1", cx(isCompact, "text-[11px]", "text-base leading-tight"))}>
             {roomCode} <Copy className={cn(cx(isCompact, "w-2.5 h-2.5", "w-3 h-3"))} />
           </div>
         </button>
@@ -162,50 +163,39 @@ function ReconnectBanner({ t }: { t: Translate }) {
   );
 }
 
-function GraceBanner({ isCompact, text }: { isCompact: boolean; text: string }) {
+function RoundStatus({ isCompact, gameState, t }: { isCompact: boolean; gameState: GameState; t: Translate }) {
+  const left = gameState.finalRoundsLeft ?? 1;
+  const inFinalRounds = gameState.isFinalRound && !gameState.winnerId;
   return (
-    <div className={cn("absolute z-40 pointer-events-none left-1/2 -translate-x-1/2", cx(isCompact, "top-8 max-w-[min(92vw,22rem)]", "top-20 max-w-xl"))}>
-      <div className="rounded-full border-2 border-amber-300 bg-amber-500/95 px-4 py-2 text-center text-amber-950 shadow-xl">
-        <span className={cn("font-bold", cx(isCompact, "text-[10px]", "text-sm"))}>{text}</span>
+    <div className="shrink-0 text-center leading-tight">
+      <div className={cn("font-bold text-yellow-400", cx(isCompact, "text-[10px]", "text-sm"))}>
+        {t("game.round")} {gameState.round}
+        {gameState.round < 5 ? "/5" : ""}
       </div>
+      {inFinalRounds ? (
+        <div className={cn("font-bold text-red-300", cx(isCompact, "text-[9px]", "text-[11px]"))}>
+          {left <= 1 ? t("game.lastRound") : t("game.finalRoundsLeft", { count: String(left) })}
+        </div>
+      ) : gameState.round < 5 && !isCompact ? (
+        <div className="text-[10px] text-white/60">{t("game.cunokuAfterRound5")}</div>
+      ) : null}
     </div>
   );
 }
 
-function PhaseHint({ isCompact, phase, t }: { isCompact: boolean; phase: string | undefined; t: Translate }) {
-  if (phase !== "draw" && phase !== "action") return null;
-  const short = phase === "draw" ? t("game.drawFromDeckShort") : t("game.replaceOrDiscardShort");
-  const full = phase === "draw" ? t("game.drawFromDeck") : t("game.replaceOrDiscard");
-  return (
-    <span className={cn("text-yellow-100 text-center", cx(isCompact, "text-[9px] truncate", "text-sm"))}>
-      {cx(isCompact, short, full)}
-    </span>
-  );
+function myTurnHint(gameState: GameState, phase: string | undefined, isCompact: boolean, t: Translate) {
+  const card = gameState.drawnCard;
+  const canUsePower = phase === "action" && card && !gameState.drawnFromDiscard && !gameState.forcedReplace && !gameState.jokerRevealed && hasSpecialAbility(card);
+  if (canUsePower && !isCompact) return getAbilityDescription(card.rank, t);
+  if (phase === "draw") return cx(isCompact, t("game.drawFromDeckShort"), t("game.drawFromDeck"));
+  if (phase === "action") return cx(isCompact, t("game.replaceOrDiscardShort"), t("game.replaceOrDiscard"));
+  return "";
 }
 
-function YourTurnBanner({ isCompact, phase, t }: { isCompact: boolean; phase: string | undefined; t: Translate }) {
-  return (
-    <div className={cn("absolute z-40 pointer-events-none left-1/2 -translate-x-1/2", cx(isCompact, "top-8 max-w-[min(58vw,16rem)]", "top-20"))}>
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: -20, opacity: 0 }}
-        className={cn(
-          "bg-gradient-to-r from-yellow-500/90 to-yellow-600/90 backdrop-blur-md rounded-full border-2 border-yellow-400 shadow-xl flex items-center justify-center",
-          cx(isCompact, "px-3 py-1 gap-1.5", "px-8 py-3 gap-4"),
-        )}
-      >
-        <span className={cn("text-yellow-900 font-bold whitespace-nowrap", cx(isCompact, "text-[10px]", "text-lg"))}>
-          {t("game.yourTurn")}
-        </span>
-        <PhaseHint isCompact={isCompact} phase={phase} t={t} />
-      </motion.div>
-    </div>
-  );
-}
-
-function TurnBanner({
+/** Linha única de avisos: rodada, de quem é a vez e o que fazer. Fica sempre no mesmo lugar. */
+function StatusLine({
   isCompact,
+  gameState,
   graceSeconds,
   graceName,
   isMyTurn,
@@ -213,151 +203,42 @@ function TurnBanner({
   t,
 }: {
   isCompact: boolean;
+  gameState: GameState;
   graceSeconds: number | null;
   graceName: string;
   isMyTurn: boolean;
   phase: string | undefined;
   t: Translate;
 }) {
-  if (graceSeconds != null && graceName) {
-    return <GraceBanner isCompact={isCompact} text={t("reconnect.turn", { name: graceName, seconds: String(graceSeconds) })} />;
-  }
-  if (!isMyTurn) return null;
-  return <YourTurnBanner isCompact={isCompact} phase={phase} t={t} />;
-}
-
-function RoundDetail({ gameState, t }: { gameState: GameState; t: Translate }) {
-  if (gameState.round < 5) return <div className="text-white/80 text-xs">{t("game.cunokuAfterRound5")}</div>;
-  const name = gameState.players[gameState.currentPlayerIndex]?.name || "Unknown";
+  const currentName = gameState.players[gameState.currentPlayerIndex]?.name ?? "";
+  const textSize = cx(isCompact, "text-[10px]", "text-sm");
+  const message =
+    graceSeconds != null && graceName ? (
+      <span className={cn("truncate font-bold text-amber-300", textSize)}>
+        {t("reconnect.turn", { name: graceName, seconds: String(graceSeconds) })}
+      </span>
+    ) : isMyTurn ? (
+      <>
+        <span className={cn("shrink-0 rounded-full bg-yellow-400 px-2 py-0.5 font-bold text-yellow-950", textSize)}>{t("game.yourTurn")}</span>
+        <span className={cn("truncate text-yellow-100", textSize)}>{myTurnHint(gameState, phase, isCompact, t)}</span>
+      </>
+    ) : (
+      <span className={cn("truncate text-white/80", textSize)}>
+        {t("game.turn")}: <strong className="text-white">{currentName}</strong>
+      </span>
+    );
   return (
-    <div className="text-white/80 text-xs">
-      {t("game.turn")}: {name}
+    <div
+      className={cn(
+        "flex min-w-0 items-center rounded-full border border-yellow-500/40 bg-black/50",
+        cx(isCompact, "gap-1.5 px-2 py-0.5", "gap-3 px-4 py-1")
+      )}
+    >
+      <RoundStatus isCompact={isCompact} gameState={gameState} t={t} />
+      <span className="h-4 w-px shrink-0 bg-white/20" />
+      {message}
     </div>
   );
-}
-
-function RoundBadge({ isCompact, gameState, t }: { isCompact: boolean; gameState: GameState; t: Translate }) {
-  return (
-    <div className={cn("absolute z-40 pointer-events-none", cx(isCompact, "top-9 left-1.5", "top-20 left-8"))}>
-      <motion.div
-        initial={{ x: -20, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        className={cn("bg-black/60 backdrop-blur-md rounded-lg border border-yellow-500/50 shadow-lg", cx(isCompact, "px-2 py-1", "px-6 py-3 border-2 rounded-xl"))}
-      >
-        <div className="text-center">
-          <div className={cn("font-bold text-yellow-400", cx(isCompact, "text-[10px] leading-tight", "text-lg mb-1"))}>
-            {t("game.round")} {gameState.round}
-            {roundSuffix(gameState.round)}
-          </div>
-          {finalRoundsNotice(isCompact, gameState, t)}
-          {desktopRoundDetail(isCompact, gameState, t)}
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-function finalRoundsNotice(isCompact: boolean, gameState: GameState, t: Translate) {
-  if (!gameState.isFinalRound || gameState.winnerId) return null;
-  const left = gameState.finalRoundsLeft ?? 1;
-  return (
-    <div className={cn("font-bold text-red-300", cx(isCompact, "text-[9px] leading-tight", "text-xs mb-1"))}>
-      {left <= 1 ? t("game.lastRound") : t("game.finalRoundsLeft", { count: String(left) })}
-    </div>
-  );
-}
-
-function roundSuffix(round: number) {
-  return round < 5 ? "/5" : "";
-}
-
-function desktopRoundDetail(isCompact: boolean, gameState: GameState, t: Translate) {
-  if (isCompact) return null;
-  return <RoundDetail gameState={gameState} t={t} />;
-}
-
-function abilityHintVisible(isMyTurn: boolean, phase: string | undefined, card: Card | null, fromDiscard: boolean, isCompact: boolean, forced: boolean) {
-  if (forced) return false;
-  if (!isMyTurn || phase !== "action" || !card || fromDiscard || isCompact) return false;
-  return hasSpecialAbility(card);
-}
-
-function AbilityHint({ card, t }: { card: Card; t: Translate }) {
-  return (
-    <div className="absolute left-8 bottom-32 z-40 pointer-events-none">
-      <motion.div
-        initial={{ x: -20, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        exit={{ x: -20, opacity: 0 }}
-        className="bg-gradient-to-br from-yellow-500/95 to-yellow-600/95 backdrop-blur-md px-6 py-4 rounded-2xl border-2 border-yellow-400 shadow-2xl max-w-[280px]"
-      >
-        <div className="flex items-start gap-3">
-          <div className="text-2xl">⚡</div>
-          <div className="flex-1">
-            <div className="text-yellow-900 font-bold text-sm mb-1">{t("game.abilityCard")}</div>
-            <div className="text-yellow-950 font-semibold text-base leading-tight">{getAbilityDescription(card.rank, t)}</div>
-          </div>
-        </div>
-        <div className="mt-3 pt-3 border-t border-yellow-400/30">
-          <div className="text-yellow-900 text-xs font-medium">{t("game.abilityClickToUse")}</div>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-function ReplaceHint({ t }: { t: Translate }) {
-  return (
-    <div className="absolute right-8 bottom-32 z-40 pointer-events-none">
-      <motion.div
-        initial={{ x: 20, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        exit={{ x: 20, opacity: 0 }}
-        className="bg-gradient-to-br from-green-600/95 to-green-700/95 backdrop-blur-md px-6 py-4 rounded-2xl border-2 border-green-400 shadow-2xl max-w-[280px]"
-      >
-        <div className="flex items-start gap-3">
-          <div className="text-2xl">✨</div>
-          <div className="flex-1">
-            <div className="text-green-100 font-bold text-sm mb-1">{t("game.hintTitle")}</div>
-            <div className="text-white font-semibold text-base leading-tight">{t("game.hintReplace")}</div>
-          </div>
-        </div>
-        <div className="mt-3 pt-3 border-t border-green-400/30">
-          <div className="text-green-200 text-xs">{t("game.hintHighlighted")}</div>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-function SideHints({
-  isMyTurn,
-  phase,
-  card,
-  fromDiscard,
-  isCompact,
-  forced,
-  t,
-}: {
-  isMyTurn: boolean;
-  phase: string | undefined;
-  card: Card | null;
-  fromDiscard: boolean;
-  isCompact: boolean;
-  forced: boolean;
-  t: Translate;
-}) {
-  return (
-    <>
-      {abilityHintVisible(isMyTurn, phase, card, fromDiscard, isCompact, forced) ? <AbilityHint card={card as Card} t={t} /> : null}
-      {replaceHintVisible(isMyTurn, phase, card, isCompact) ? <ReplaceHint t={t} /> : null}
-    </>
-  );
-}
-
-function replaceHintVisible(isMyTurn: boolean, phase: string | undefined, card: Card | null, isCompact: boolean) {
-  if (!isMyTurn || phase !== "action" || !card || isCompact) return false;
-  return true;
 }
 
 function ArcSeats({
@@ -437,7 +318,7 @@ function ArcSeat({
       emoteId={emoteId}
       sealedCardIds={sealedIds(gameState)}
       className="absolute z-20"
-      style={{ left: `${pos.left}%`, top: `${pos.top}%`, transform: "translate(-50%, -50%)" }}
+      style={seatStyle(pos)}
     />
   );
 }
@@ -513,16 +394,16 @@ function FeltTable({
 }) {
   const seats = { opponents, gameState, currentTurnPlayerId, revealed, activeEmotes, registerCardPosition };
   return (
-    <div className={cn("flex-1 flex items-center justify-center relative min-h-0", cx(isCompact, "p-1", "p-4 md:p-6"))}>
+    <div className={cn("flex-1 flex items-center justify-center relative min-h-0", cx(isCompact, "p-1", "p-3 md:p-4"))}>
       <div
         className={cn(
           "w-full relative felt-table shadow-2xl",
           `felt-${mat}`,
-          cx(isCompact, "max-w-none max-h-[calc(100dvh-0.5rem)] h-[calc(100dvh-0.5rem)] aspect-auto rounded-xl", "max-w-6xl max-h-[min(100%,calc(100dvh-1rem))] aspect-[16/9] rounded-[100px]"),
+          cx(isCompact, "max-w-none h-full rounded-xl", "max-w-6xl max-h-full aspect-[16/9] rounded-[100px]"),
         )}
       >
         {useArcSeats ? <ArcSeats {...seats} isCompact={isCompact} /> : <RowSeats {...seats} />}
-        <div className={cn("absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto", cx(isCompact, "top-[44%]", "top-[48%]"))}>
+        <div className={cn("absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto", cx(isCompact, "top-[47%]", "top-1/2"))}>
           <CenterPile
             gameState={gameState}
             isMyTurn={isMyTurn}
@@ -659,10 +540,19 @@ export function ActiveTable(props: {
       {props.opponentNotice ? (
         <OpponentActionNotification playerName={props.opponentNotice.playerName} actionType={props.opponentNotice.actionType} onComplete={props.onNoticeDone} duration={2000} />
       ) : null}
-      <GameTopBar isDaily={!!gameState.dailyDay} canEmote={!gameState.winnerId} onEmote={props.onEmote} isCompact={isCompact} isOffline={props.isOffline} connected={props.connected} roomCode={props.roomCode} onExit={props.onExit} onCopyCode={props.onCopyCode} t={t} />
-      <TurnBanner isCompact={isCompact} graceSeconds={graceSeconds} graceName={graceName} isMyTurn={props.isMyTurn} phase={props.phase} t={t} />
-      <RoundBadge isCompact={isCompact} gameState={gameState} t={t} />
-      <SideHints forced={!!gameState.forcedReplace || !!gameState.jokerRevealed} isMyTurn={props.isMyTurn} phase={props.phase} card={gameState.jokerRevealed ? null : gameState.drawnCard} fromDiscard={gameState.drawnFromDiscard} isCompact={isCompact} t={t} />
+      <GameTopBar
+        isDaily={!!gameState.dailyDay}
+        canEmote={!gameState.winnerId}
+        onEmote={props.onEmote}
+        isCompact={isCompact}
+        isOffline={props.isOffline}
+        connected={props.connected}
+        roomCode={props.roomCode}
+        onExit={props.onExit}
+        onCopyCode={props.onCopyCode}
+        status={<StatusLine isCompact={isCompact} gameState={gameState} graceSeconds={graceSeconds} graceName={graceName} isMyTurn={props.isMyTurn} phase={props.phase} t={t} />}
+        t={t}
+      />
       <SwapHighlightContext.Provider value={props.swapHighlights}>
       <FeltTable
         isCompact={isCompact}

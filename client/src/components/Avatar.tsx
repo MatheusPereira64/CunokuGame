@@ -6,6 +6,7 @@ import {
   type ProfileIconId,
 } from "@/lib/playerProfile";
 import { FRAME_STYLES, type FrameId } from "@shared/cosmetics";
+import { useI18n } from "@/contexts/i18n-context";
 
 interface AvatarProps {
   name: string;
@@ -21,6 +22,8 @@ interface AvatarProps {
   accent?: ProfileAccent;
   frameId?: string;
   titleLabel?: string;
+  /** Troca a pontuação por outra legenda; null deixa só o nome */
+  detail?: string | null;
   /** Só o círculo, para quem mostra o nome por conta própria */
   hideLabel?: boolean;
 }
@@ -61,7 +64,9 @@ export function Avatar({
   frameId,
   titleLabel,
   hideLabel,
+  detail,
 }: AvatarProps) {
+  const { t } = useI18n();
   const initials = name.slice(0, 2).toUpperCase();
   const accentStyle = accent ? getProfileAccent(accent) : null;
   const Icon = iconId ? getProfileIcon(iconId) : null;
@@ -82,7 +87,7 @@ export function Avatar({
               fit(compact, "-bottom-1.5 px-1.5 py-0 text-[9px]", "-bottom-2 px-2 py-0.5 text-xs")
             )}
           >
-            TURN
+            {t("game.turn")}
           </span>
         )}
       </div>
@@ -97,8 +102,14 @@ export function Avatar({
         {titleLabel && !compact && (
           <div className="text-[10px] text-amber-200/90 truncate max-w-[100px]">{titleLabel}</div>
         )}
-        {!compact && <div className="text-xs text-yellow-400 font-mono">Score: {score}</div>}
-        {compact && <div className="text-[9px] text-yellow-400 font-mono leading-tight">{score} pts</div>}
+        {detail === undefined ? (
+          <>
+            {!compact && <div className="text-xs text-yellow-400 font-mono">Score: {score}</div>}
+            {compact && <div className="text-[9px] text-yellow-400 font-mono leading-tight">{score} pts</div>}
+          </>
+        ) : (
+          detail && <div className={cn("whitespace-nowrap text-yellow-400", fit(compact, "text-[9px] leading-tight", "text-xs"))}>{detail}</div>
+        )}
       </div>}
     </div>
   );
