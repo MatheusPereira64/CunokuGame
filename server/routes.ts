@@ -330,7 +330,7 @@ export async function registerRoutes(
         const msg = JSON.parse(data.toString());
 
         if (msg.type === "join") {
-          const { code, playerId, name, rankToken } = msg;
+          const { code, playerId, name, rankToken, iconId, accent } = msg;
           currentRoom = code;
           currentPlayer = playerId;
           const live = getOrCreateLive(code);
@@ -340,7 +340,7 @@ export async function registerRoutes(
             storage,
             live.session,
             messenger,
-            { code, playerId, name, rankToken },
+            { code, playerId, name, rankToken, iconId, accent },
             (id) => {
               live.sockets.set(id, ws);
             },

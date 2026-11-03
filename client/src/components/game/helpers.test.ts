@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hasSpecialAbility, getAbilityDescription, abilityConfirmDisabled } from "./helpers";
+import { hasSpecialAbility, getAbilityDescription, abilityConfirmDisabled, emptySeatCount } from "./helpers";
 import type { Card } from "@shared/schema";
 
 function card(rank: Card["rank"]): Card {
@@ -88,5 +88,20 @@ describe("getAbilityDescription", () => {
     expect(getAbilityDescription("9", t)).toBe("game.abilitySwap");
     expect(getAbilityDescription("10", t)).toBe("game.abilitySwap");
     expect(getAbilityDescription("K", t)).toBe("game.abilityKing");
+  });
+});
+
+describe("emptySeatCount", () => {
+  it("completa até o limite da sala", () => {
+    expect(emptySeatCount(1, 6)).toBe(5);
+    expect(emptySeatCount(2, 2)).toBe(0);
+  });
+
+  it("assume 4 lugares quando o servidor não informa o limite", () => {
+    expect(emptySeatCount(1, null)).toBe(3);
+  });
+
+  it("nunca fica negativo", () => {
+    expect(emptySeatCount(5, 4)).toBe(0);
   });
 });

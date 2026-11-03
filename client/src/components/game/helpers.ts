@@ -84,3 +84,10 @@ export function abilityConfirmDisabled(input: AbilityConfirmInput): boolean {
   }
   return false;
 }
+
+const DEFAULT_MAX_PLAYERS = 4;
+
+/** Assentos vazios da sala de espera; salas antigas não informam o limite. */
+export function emptySeatCount(playerCount: number, maxPlayers?: number | null): number {
+  return Math.max(0, (maxPlayers || DEFAULT_MAX_PLAYERS) - playerCount);
+}

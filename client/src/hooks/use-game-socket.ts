@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/contexts/i18n-context";
 import { wsUrl } from "@/lib/gameServer";
 import { getRankToken } from "@/lib/rankAuth";
+import { loadProfile } from "@/lib/playerProfile";
 
 export function useGameSocket(roomCode: string, playerId: string) {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -41,12 +42,15 @@ export function useGameSocket(roomCode: string, playerId: string) {
         if (stopped) return;
         attempt = 0;
         setConnected(true);
+        const { iconId, accent } = loadProfile();
         ws?.send(JSON.stringify({
           type: "join",
           code: roomCode,
           playerId,
           name: playerName,
           rankToken: getRankToken(),
+          iconId,
+          accent,
         }));
       };
 
@@ -70,6 +74,9 @@ export function useGameSocket(roomCode: string, playerId: string) {
               console.log("Lobby state received - hostId:", (message as any).hostId, "players:", (message as any).players?.length || 0);
             } else {
               console.log("Lobby state received - no hostId, players:", (message as any).players?.length || 0);
+            }
+            if ((message as any).maxPlayers) {
+              sessionStorage.setItem(`maxPlayers_${roomCode}`, String((message as any).maxPlayers));
             }
             const lobbyState: GameState = {
               players: (message as any).players || [],

@@ -21,6 +21,8 @@ interface AvatarProps {
   accent?: ProfileAccent;
   frameId?: string;
   titleLabel?: string;
+  /** Só o círculo, para quem mostra o nome por conta própria */
+  hideLabel?: boolean;
 }
 
 function avatarFace(isBot: boolean | undefined, Icon: ReturnType<typeof getProfileIcon> | null, initials: string, compact?: boolean) {
@@ -58,6 +60,7 @@ export function Avatar({
   accent,
   frameId,
   titleLabel,
+  hideLabel,
 }: AvatarProps) {
   const initials = name.slice(0, 2).toUpperCase();
   const accentStyle = accent ? getProfileAccent(accent) : null;
@@ -84,7 +87,7 @@ export function Avatar({
         )}
       </div>
 
-      <div
+      {!hideLabel && <div
         className={cn(
           "bg-black/60 backdrop-blur-sm rounded-full text-white font-medium border border-white/10 text-center",
           fit(compact, "px-2 py-0.5 text-[10px] max-w-[72px]", "px-3 py-1 text-sm min-w-[80px]")
@@ -96,7 +99,7 @@ export function Avatar({
         )}
         {!compact && <div className="text-xs text-yellow-400 font-mono">Score: {score}</div>}
         {compact && <div className="text-[9px] text-yellow-400 font-mono leading-tight">{score} pts</div>}
-      </div>
+      </div>}
     </div>
   );
 }

@@ -18,8 +18,17 @@ export type RoomMessenger = {
   connectionCount(): number;
 };
 
+export type PlayerLook = { iconId?: string; accent?: string };
+
+/** O valor vem do cliente e é reenviado aos outros: aceita só o formato de um id. */
+function cleanLookId(value: unknown): string | undefined {
+  return typeof value === "string" && /^[a-zA-Z0-9_-]{1,32}$/.test(value) ? value : undefined;
+}
+
 export type RoomSessionData = {
   playerNames: Map<string, string>;
+  /** Ícone e cor do perfil de cada jogador, para a sala de espera. */
+  playerLooks: Map<string, PlayerLook>;
   bots: BotPlayer[];
   /** playerId da sala → conta do ranking, validada pelo token no join. */
   rankPlayerIds: Map<string, string>;
@@ -27,7 +36,7 @@ export type RoomSessionData = {
 };
 
 export function createEmptySession(): RoomSessionData {
-  return { playerNames: new Map(), bots: [], rankPlayerIds: new Map(), lastEmoteAt: new Map() };
+  return { playerNames: new Map(), playerLooks: new Map(), bots: [], rankPlayerIds: new Map(), lastEmoteAt: new Map() };
 }
 
 export function serializeBots(bots: BotPlayer[]): { id: string; name: string; difficulty: BotDifficulty }[] {
@@ -49,6 +58,7 @@ export function buildLobbyPlayers(session: RoomSessionData, connectedIds: string
     hand: [],
     score: 0,
     knownCards: {},
+    ...session.playerLooks.get(id),
   }));
 }
 
@@ -56,7 +66,7 @@ export async function handleJoinMessage(
   storage: IStorage,
   session: RoomSessionData,
   messenger: RoomMessenger,
-  msg: { code: string; playerId: string; name: string; rankToken?: unknown },
+  msg: { code: string; playerId: string; name: string; rankToken?: unknown; iconId?: unknown; accent?: unknown },
   registerConnection: (playerId: string) => void,
   /** Envio direto no socket que está entrando (antes de estar no mapa). */
   reply: (msg: unknown) => void,
@@ -107,6 +117,7 @@ export async function handleJoinMessage(
 
   registerConnection(playerId);
   session.playerNames.set(playerId, name);
+  session.playerLooks.set(playerId, { iconId: cleanLookId(msg.iconId), accent: cleanLookId(msg.accent) });
 
   const lobbyPlayers = buildLobbyPlayers(session, messenger.getConnectedPlayerIds());
   messenger.broadcast(
@@ -114,6 +125,7 @@ export async function handleJoinMessage(
       type: "lobby_state",
       players: lobbyPlayers,
       hostId: room.hostId,
+      maxPlayers,
     },
     null,
   );

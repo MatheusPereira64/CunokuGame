@@ -32,6 +32,9 @@ export interface Player {
   hand: Card[]; // 4 cards usually
   score: number; // Total score across rounds
   knownCards: Record<string, boolean>; // Indices of own cards known to player
+  /** Ícone e cor do perfil, enviados no join; só aparecem na sala de espera. */
+  iconId?: string;
+  accent?: string;
 }
 
 export interface GameState {
@@ -170,7 +173,7 @@ export type RoomResponse = Room & { playerCount: number };
 export type WsMessage =
   | { type: "connect"; playerId: string; roomCode: string }
   | { type: "game_state"; state: GameState }
-  | { type: "lobby_state"; players: Player[]; hostId?: string }
+  | { type: "lobby_state"; players: Player[]; hostId?: string; maxPlayers?: number }
   | { type: "player_joined"; playerId: string; name: string }
   | { type: "player_action"; action: GameAction }
   | { type: "error"; message: string }

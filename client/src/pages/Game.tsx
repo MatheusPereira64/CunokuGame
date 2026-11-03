@@ -656,6 +656,8 @@ export default function Game() {
     fromQueue,
     queueCountdown,
     isHost: storedHostId === playerId,
+    hostId: storedHostId,
+    maxPlayers: Number(sessionStorage.getItem(`maxPlayers_${roomCode}`)) || null,
     onCopyCode: handleCopyCode,
     onShareInvite: handleShareInvite,
     onCopyLanUrl: handleCopyLanUrl,

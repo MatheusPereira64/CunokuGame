@@ -165,3 +165,39 @@ describe("reentrada na partida", () => {
     expect(replies).toEqual([{ type: "error", message: "Game has already started" }]);
   });
 });
+
+describe("aparência na sala de espera", () => {
+  const waitingRoom = { hostId: "p1", gameState: null, maxPlayers: 6 } as unknown as Room;
+  const storage = { getRoom: async () => waitingRoom } as unknown as IStorage;
+
+  async function join(iconId: unknown, accent: unknown) {
+    const session = createEmptySession();
+    const sent: { type: string; players?: { iconId?: string; accent?: string }[]; maxPlayers?: number }[] = [];
+    const ids: string[] = [];
+    await handleJoinMessage(
+      storage,
+      session,
+      {
+        broadcast: (m: never) => sent.push(m),
+        getConnectedPlayerIds: () => ids,
+        connectionCount: () => ids.length,
+      } as never,
+      { code: "ABCD", playerId: "p1", name: "Ana", iconId, accent },
+      (id) => ids.push(id),
+      () => {},
+    );
+    return sent.find((m) => m.type === "lobby_state")!;
+  }
+
+  it("repassa ícone, cor e limite da sala aos outros jogadores", async () => {
+    const lobby = await join("samurai", "red");
+    expect(lobby.players?.[0]).toMatchObject({ iconId: "samurai", accent: "red" });
+    expect(lobby.maxPlayers).toBe(6);
+  });
+
+  it("descarta valores que não são um id", async () => {
+    const lobby = await join("<img src=x>", { evil: true });
+    expect(lobby.players?.[0].iconId).toBeUndefined();
+    expect(lobby.players?.[0].accent).toBeUndefined();
+  });
+});

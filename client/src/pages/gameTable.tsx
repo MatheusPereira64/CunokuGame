@@ -745,6 +745,8 @@ export function renderPregame(args: {
   fromQueue: boolean;
   queueCountdown: number | null;
   isHost: boolean;
+  hostId: string | null;
+  maxPlayers: number | null;
   onCopyCode: () => void;
   onShareInvite: () => void;
   onCopyLanUrl: () => void;
@@ -765,6 +767,8 @@ export function renderPregame(args: {
       players={args.gameState.players}
       playerId={args.playerId}
       isHost={args.isHost}
+      hostId={args.hostId}
+      maxPlayers={args.maxPlayers}
       onCopyCode={args.onCopyCode}
       onShareInvite={args.onShareInvite}
       onCopyLanUrl={args.onCopyLanUrl}

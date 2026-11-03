@@ -13,6 +13,7 @@ import {
   handleStartGame,
   resolveDisconnectedTurn,
   serializeBots,
+  type PlayerLook,
   type RoomSessionData,
 } from "../../server/roomHandlers";
 import { createCompetitionStore, createStorage } from "./storage";
@@ -84,11 +85,13 @@ export class RoomDurableObject extends DurableObject<Env> {
       bots: { id: string; name: string; difficulty: "easy" | "medium" | "hard" }[];
       roomCode?: string;
       rankPlayerIds?: [string, string][];
+      looks?: [string, PlayerLook][];
     }>("session");
     if (stored) {
       this.session = {
         ...createEmptySession(),
         playerNames: new Map(stored.names),
+        playerLooks: new Map(stored.looks || []),
         bots: deserializeBots(stored.bots || []),
         rankPlayerIds: new Map(stored.rankPlayerIds || []),
       };
@@ -100,6 +103,7 @@ export class RoomDurableObject extends DurableObject<Env> {
   private async saveSession(): Promise<void> {
     await this.ctx.storage.put("session", {
       names: Array.from(this.session.playerNames.entries()),
+      looks: Array.from(this.session.playerLooks.entries()),
       bots: serializeBots(this.session.bots),
       roomCode: this.roomCode,
       rankPlayerIds: Array.from(this.session.rankPlayerIds.entries()),
@@ -224,13 +228,13 @@ export class RoomDurableObject extends DurableObject<Env> {
       const messenger = this.makeMessenger();
 
       if (msg.type === "join") {
-        const { code, playerId, name, rankToken } = msg;
+        const { code, playerId, name, rankToken, iconId, accent } = msg;
         this.roomCode = String(code).toUpperCase();
         await handleJoinMessage(
           storage,
           this.session,
           messenger,
-          { code: this.roomCode, playerId, name, rankToken },
+          { code: this.roomCode, playerId, name, rankToken, iconId, accent },
           (id) => {
             this.setAttachment(ws, { playerId: id, roomCode: this.roomCode });
           },
