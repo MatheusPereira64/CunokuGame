@@ -13,7 +13,8 @@ import { PlayerSeat } from "@/components/game/PlayerSeat";
 import { CenterPile } from "@/components/game/CenterPile";
 import { MyArea } from "@/components/game/MyArea";
 import { GameOverModal } from "@/components/game/GameOverModal";
-import { EmoteBubble, EmotePicker } from "@/components/game/EmotePicker";
+import { EmotePicker } from "@/components/game/EmotePicker";
+import { RulesCheatSheet } from "@/components/game/RulesCheatSheet";
 import { AbilityModal } from "@/components/game/AbilityModal";
 import { AbilityAction, hasSpecialAbility, getAbilityDescription } from "@/components/game/helpers";
 import { getSeatPositions } from "@/components/game/seatPositions";
@@ -123,6 +124,7 @@ function GameTopBar({
           <VolumeControl />
           <TableThemeButton />
         </div>
+        <RulesCheatSheet compact={isCompact} />
         {canEmote ? <EmotePicker compact={isCompact} onSelect={onEmote} /> : null}
         {isOffline || connected ? null : <ReconnectBanner t={t} />}
       </div>
@@ -520,9 +522,8 @@ function FeltTable({
             onUseAbility={onUseAbility}
           />
         </div>
-        <EmoteBubble emoteId={activeEmotes[playerId]} className={cn("left-1/2 -translate-x-1/2", cx(isCompact, "bottom-[34%]", "bottom-[30%]"))} />
         {me ? (
-          <MyArea revealedCards={revealed} gameState={gameState} me={me} isMyTurn={isMyTurn} phase={phase} sendAction={sendAction} registerCardPosition={registerCardPosition} />
+          <MyArea emoteId={activeEmotes[playerId]} revealedCards={revealed} gameState={gameState} me={me} isMyTurn={isMyTurn} phase={phase} sendAction={sendAction} registerCardPosition={registerCardPosition} />
         ) : null}
       </div>
     </div>

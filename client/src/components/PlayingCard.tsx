@@ -15,7 +15,7 @@ interface PlayingCardProps {
 }
 
 // Ícone da habilidade especial da carta (regras do Cunoku)
-function getAbilityIcon(rank?: string) {
+export function getAbilityIcon(rank?: string) {
   switch (rank) {
     case "A":
     case "2":

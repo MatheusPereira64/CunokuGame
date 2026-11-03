@@ -168,7 +168,8 @@ export function PlayerSeat({
         compact={compact || isCompact}
         className={isCompact ? "scale-[0.85] origin-center" : undefined}
       />
-      <EmoteBubble emoteId={emoteId} className="left-1/2 top-0 -translate-x-1/2" />
+      {/* Sempre ao lado do ícone; no lado direito da mesa abre para dentro, sem sair da tela */}
+      <EmoteBubble emoteId={emoteId} className={side === "right" ? "right-full top-0 mr-1" : "left-full top-0 ml-1"} />
     </div>
   );
 

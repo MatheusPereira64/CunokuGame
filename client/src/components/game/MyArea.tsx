@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { GameState, Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
+import { EmoteBubble } from "./EmotePicker";
 import { Button } from "@/components/Button";
 import { cn, fit } from "@/lib/utils";
 import { useIsCompactGame } from "@/hooks/use-landscape";
@@ -19,9 +20,11 @@ interface MyAreaProps {
   registerCardPosition: (key: string, el: HTMLElement | null, card?: Card) => void;
   /** Faces reveladas por Rei ou Coringa, por `${playerId}_${cardId}` */
   revealedCards?: Record<string, Card>;
+  /** Emote ativo do jogador local */
+  emoteId?: string;
 }
 
-export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCardPosition, revealedCards = {} }: MyAreaProps) {
+export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCardPosition, revealedCards = {}, emoteId }: MyAreaProps) {
   const isCompact = useIsCompactGame();
   const { t } = useI18n();
   const [selectedHandIndex, setSelectedHandIndex] = useState<number | null>(null);
@@ -263,6 +266,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
         )}
       >
         <Avatar name={me.name} score={me.score} isActive={isMyTurn} position="left" compact={isCompact} iconId={profile.iconId} accent={profile.accent} />
+        <EmoteBubble emoteId={emoteId} className="right-full top-0 mr-1" />
       </div>
 
       {/* Botão Cunoku */}
