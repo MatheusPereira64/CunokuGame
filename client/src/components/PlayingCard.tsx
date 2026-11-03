@@ -2,7 +2,7 @@ import { useId, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { type Card } from "@shared/schema";
 import { cn } from "@/lib/utils";
-import { Club, Diamond, Heart, Spade, Eye, Glasses, ArrowLeftRight } from "lucide-react";
+import { Club, Diamond, Heart, Spade, Eye, Glasses, ArrowLeftRight, Wind } from "lucide-react";
 import { loadTableTheme, subscribeTableTheme, type CardBackId } from "@/lib/tableTheme";
 
 interface PlayingCardProps {
@@ -17,6 +17,9 @@ interface PlayingCardProps {
 // Ícone da habilidade especial da carta (regras do Cunoku)
 function getAbilityIcon(rank?: string) {
   switch (rank) {
+    case "A":
+    case "2":
+      return Wind; // Embaralhar a mão de um oponente
     case "5":
     case "6":
       return Eye; // Ver carta de oponente

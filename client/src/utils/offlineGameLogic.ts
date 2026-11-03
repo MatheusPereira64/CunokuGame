@@ -125,6 +125,7 @@ function useDrawnAbility(newState: GameState, player: Player, action: AbilityAct
   if (rank === "7" || rank === "8") peekOwnCard(player, action, playerId);
   if (rank === "5" || rank === "6") peekOpponentCard(newState, action, playerId);
   if (rank === "9" || rank === "10") swapWithOpponent(newState, player, action, playerId);
+  if (rank === "A" || rank === "2") windOnOpponent(newState, player, action, playerId);
   newState.discardPile.push(newState.drawnCard);
   newState.drawnCard = null;
   newState.drawnFromDiscard = false;
@@ -161,6 +162,18 @@ function swapWithOpponent(newState: GameState, player: Player, action: AbilityAc
   targetPlayer.hand[targetCardIdx] = sourceCard;
   delete player.knownCards[sourceCardIdx.toString()];
   delete targetPlayer.knownCards[targetCardIdx.toString()];
+}
+
+/** Vento: novos ids para a carta espiada não seguir revelada na nova posição. */
+function windOnOpponent(newState: GameState, player: Player, action: AbilityAction, playerId: string) {
+  if (!action.targetPlayerId || action.targetPlayerId === playerId) return;
+  const target = newState.players.find(p => p.id === action.targetPlayerId);
+  if (!target) return;
+  const count = (newState.lastWind?.count ?? 0) + 1;
+  target.hand = shuffleInPlace(target.hand.map((card, i) => ({ ...card, id: `${card.id}-w${count}-${i}` })));
+  target.knownCards = {};
+  newState.lastWind = { count, byId: playerId, targetId: target.id };
+  newState.logs.push(`${player.name} usou o Vento nas cartas de ${target.name}`);
 }
 
 function cardInHand(player: Player, index: number) {

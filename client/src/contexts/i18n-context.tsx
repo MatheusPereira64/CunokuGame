@@ -42,6 +42,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     const translations = getTranslations(language);
     
     // Padrões de mensagens dos bots e suas traduções
+    const windMatch = message.match(/usou o Vento nas cartas de (.+?)$/);
+    if (windMatch) {
+      return translations["bot.usedWind"].replace("{player}", windMatch[1]);
+    }
+
     // Troca de cartas: "trocou a carta X de Y com a carta Z de W"
     const swapMatch = message.match(/trocou a carta (\d+) de (.+?) com a carta (\d+) de (.+?)$/);
     if (swapMatch) {
@@ -418,6 +423,8 @@ function getTranslations(lang: Language): Record<string, string> {
       "rules.nineAndTen": "9 e 10",
       "rules.sevenAndEight": "7 e 8",
       "rules.fiveAndSix": "5 e 6",
+      "rules.aceAndTwo": "Ás e 2",
+      "rules.aceTwo": "Ás e Dois: Vento (風). Embaralha as cartas da mão de um oponente, que esquece o que sabia sobre elas. Todos veem quem foi atingido. A soma dele não muda",
       "rules.nineTen": "Nove e Dez: Faça 2 jogadores trocarem 1 carta (Pode ser entre o próprio jogador e outro player, ou entre dois jogadores que aquele player escolher)",
       "rules.sevenEight": "Sete e Oito: Permitem que você veja 1 carta sua (Fica visível para o jogador por 20 segundos depois é virada novamente)",
       "rules.fiveSix": "Cinco e Seis: Permitem ver a carta de um oponente (popup por 3 segundos; a carta fica revelada na mesa por 20 segundos, só para quem usou a habilidade)",
@@ -489,6 +496,10 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.abilityPeekOpponent": "Ver carta de um oponente",
       "game.abilityPeekOwn": "Ver uma de suas cartas",
       "game.abilitySwap": "Trocar cartas entre 2 jogadores",
+      "game.abilityWind": "Vento: embaralhar a mão de um oponente",
+      "game.windTitle": "Vento 風",
+      "game.windOnYou": "{player} embaralhou as suas cartas",
+      "game.windOnPlayer": "{player} embaralhou as cartas de {target}",
       "game.selectCard": "Selecione uma carta",
       "game.selectCardDesc": "Selecione uma carta da sua mão para ver",
       "game.selectTarget": "Selecione alvo",
@@ -537,6 +548,7 @@ function getTranslations(lang: Language): Record<string, string> {
       
       // Bot Actions - Notificações
       "bot.swappedCard": "trocou a carta {card1} de {player1} com a carta {card2} de {player2}",
+      "bot.usedWind": "usou o Vento nas cartas de {player}",
       "bot.discardedCard": "descartou a carta {rank} de {suit}",
       "bot.discardedFromHand": "descartou a carta {rank} de {suit} da mão",
       "bot.replacedCard": "substituiu a carta {index} da mão",
@@ -831,6 +843,8 @@ function getTranslations(lang: Language): Record<string, string> {
       "rules.nineAndTen": "9 y 10",
       "rules.sevenAndEight": "7 y 8",
       "rules.fiveAndSix": "5 y 6",
+      "rules.aceAndTwo": "As y 2",
+      "rules.aceTwo": "As y Dos: Viento (風). Baraja las cartas de la mano de un oponente, que olvida lo que sabía de ellas. Todos ven quién fue afectado. Su suma no cambia",
       "rules.nineTen": "Nueve y Diez: Haz que 2 jugadores intercambien 1 carta (Puede ser entre el propio jugador y otro player, o entre dos jugadores que ese player elija)",
       "rules.sevenEight": "Siete y Ocho: Te permiten ver 1 carta tuya (Queda visible para el jugador por 20 segundos y luego se voltea nuevamente)",
       "rules.fiveSix": "Cinco y Seis: Permiten ver la carta de un oponente (popup 3 segundos; la carta queda revelada en la mesa 20 segundos, solo para quien usó la habilidad)",
@@ -902,6 +916,10 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.abilityPeekOpponent": "Ver carta de un oponente",
       "game.abilityPeekOwn": "Ver una de tus cartas",
       "game.abilitySwap": "Intercambiar cartas entre 2 jugadores",
+      "game.abilityWind": "Viento: barajar la mano de un oponente",
+      "game.windTitle": "Viento 風",
+      "game.windOnYou": "{player} barajó tus cartas",
+      "game.windOnPlayer": "{player} barajó las cartas de {target}",
       "game.selectCard": "Selecciona una carta",
       "game.selectCardDesc": "Selecciona una carta de tu mano para ver",
       "game.selectTarget": "Selecciona objetivo",
@@ -950,6 +968,7 @@ function getTranslations(lang: Language): Record<string, string> {
       
       // Bot Actions - Notificaciones
       "bot.swappedCard": "intercambió la carta {card1} de {player1} con la carta {card2} de {player2}",
+      "bot.usedWind": "usó el Viento en las cartas de {player}",
       "bot.discardedCard": "descartó la carta {rank} de {suit}",
       "bot.discardedFromHand": "descartó la carta {rank} de {suit} de la mano",
       "bot.replacedCard": "reemplazó la carta {index} de la mano",
@@ -1244,6 +1263,8 @@ function getTranslations(lang: Language): Record<string, string> {
       "rules.nineAndTen": "9 and 10",
       "rules.sevenAndEight": "7 and 8",
       "rules.fiveAndSix": "5 and 6",
+      "rules.aceAndTwo": "Ace and 2",
+      "rules.aceTwo": "Ace and Two: Wind (風). Shuffles the cards in an opponent's hand, who forgets what they knew about them. Everyone sees who was hit. Their total doesn't change",
       "rules.nineTen": "Nine and Ten: Make 2 players swap 1 card (Can be between the player themselves and another player, or between two players that the player chooses)",
       "rules.sevenEight": "Seven and Eight: Allow you to see 1 of your cards (Visible to the player for 20 seconds then flipped again)",
       "rules.fiveSix": "Five and Six: Allow seeing an opponent's card (3s popup; the card stays face-up on the table for 20 seconds, only for the player who used the ability)",
@@ -1315,6 +1336,10 @@ function getTranslations(lang: Language): Record<string, string> {
       "game.abilityPeekOpponent": "See an opponent's card",
       "game.abilityPeekOwn": "See one of your cards",
       "game.abilitySwap": "Swap cards between 2 players",
+      "game.abilityWind": "Wind: shuffle an opponent's hand",
+      "game.windTitle": "Wind 風",
+      "game.windOnYou": "{player} shuffled your cards",
+      "game.windOnPlayer": "{player} shuffled {target}'s cards",
       "game.selectCard": "Select a card",
       "game.selectCardDesc": "Select a card from your hand to see",
       "game.selectTarget": "Select target",
@@ -1363,6 +1388,7 @@ function getTranslations(lang: Language): Record<string, string> {
       
       // Bot Actions - Notifications
       "bot.swappedCard": "swapped card {card1} of {player1} with card {card2} of {player2}",
+      "bot.usedWind": "used Wind on {player}'s cards",
       "bot.discardedCard": "discarded card {rank} of {suit}",
       "bot.discardedFromHand": "discarded card {rank} of {suit} from hand",
       "bot.replacedCard": "replaced card {index} from hand",

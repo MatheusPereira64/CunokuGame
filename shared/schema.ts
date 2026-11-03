@@ -49,6 +49,8 @@ export interface GameState {
   isFinalRound?: boolean; // Se está na rodada final
   seed?: string | null; // Seed do desafio diário (nunca enviada aos clientes)
   dailyDay?: string | null; // Dia (UTC) do desafio diário; ausente em partidas comuns
+  /** Último uso do Vento, público para todos verem; count identifica cada uso. */
+  lastWind?: { count: number; byId: string; targetId: string } | null;
   /** Epoch ms: jogador offline tem até esse instante para voltar no turno dele */
   reconnectDeadline?: number | null;
   reconnectPlayerId?: string | null;

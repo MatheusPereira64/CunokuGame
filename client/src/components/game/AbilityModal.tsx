@@ -107,10 +107,12 @@ export function AbilityModal({
   const isPeekOpponent = rank === "5" || rank === "6";
   const isPeekOwn = rank === "7" || rank === "8";
   const isSwap = rank === "9" || rank === "10";
+  const isWind = rank === "A" || rank === "2";
 
   const otherPlayers = players.filter((p) => p.id !== playerId);
 
   const confirmDisabled = abilityConfirmDisabled({
+    isWind,
     isPeekOpponent,
     isPeekOwn,
     isSwap,
@@ -142,7 +144,9 @@ export function AbilityModal({
 
     let action: AbilityAction | null = null;
 
-    if (isPeekOwn && myCardIndex !== null) {
+    if (isWind && targetPlayer) {
+      action = { kind: "wind", targetPlayerId: targetPlayer };
+    } else if (isPeekOwn && myCardIndex !== null) {
       action = { kind: "peek_own", cardIndex: myCardIndex };
     } else if (isPeekOpponent && targetPlayer && targetCard !== null) {
       action = { kind: "peek_opponent", targetPlayerId: targetPlayer, targetCardIndex: targetCard };
@@ -198,6 +202,25 @@ export function AbilityModal({
             fit(isCompact, "min-h-0 flex-1 overflow-y-auto overscroll-contain py-1 pr-0.5", "space-y-4 py-4"),
           )}
         >
+          {/* Ás e 2: embaralhar a mão de um oponente */}
+          {isWind && (
+            <div className="space-y-2">
+              <label className={labelClass}>{t("game.selectPlayer")}</label>
+              <div className={playerGridClass}>
+                {otherPlayers.map((p) => (
+                  <PlayerPickButton
+                    key={p.id}
+                    player={p}
+                    selected={targetPlayer === p.id}
+                    onSelect={() => setTargetPlayer(p.id)}
+                    playerBtnClass={playerBtnClass}
+                    isCompact={isCompact}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Cartas 5 e 6: ver carta de oponente */}
           {isPeekOpponent && (
             <>

@@ -3,7 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useGameSocket } from "@/hooks/use-game-socket";
 import { useOfflineGame } from "@/hooks/use-offline-game";
 import { GameState, Card } from "@shared/schema";
-import type { EmoteId } from "@shared/emotes";
+import { WIND_EFFECT_ID, type EmoteId } from "@shared/emotes";
 import { START_COUNTDOWN_MS } from "@shared/matchQueue";
 import { useGameAnimations, OpponentActionType } from "@/components/animations";
 import { useToast } from "@/hooks/use-toast";
@@ -396,6 +396,30 @@ export default function Game() {
     };
   }, [isMatchInProgress]);
 
+  // Vento: todos veem quem foi atingido. O anúncio de bots já vem pelo aviso da jogada deles.
+  const lastWindCount = useRef<number | null>(null);
+  useEffect(() => {
+    if (!gameState) return;
+    const wind = gameState.lastWind;
+    const count = wind?.count ?? 0;
+    const previous = lastWindCount.current;
+    lastWindCount.current = count;
+    if (previous === null || !wind || count === previous) return;
+    showEmote(wind.targetId, WIND_EFFECT_ID);
+    const by = gameState.players.find((p) => p.id === wind.byId);
+    const target = gameState.players.find((p) => p.id === wind.targetId);
+    if (by && target && !by.isBot) {
+      toast({
+        title: t("game.windTitle"),
+        description:
+          wind.targetId === playerId
+            ? t("game.windOnYou", { player: by.name })
+            : t("game.windOnPlayer", { player: by.name, target: target.name }),
+        duration: 4000,
+      });
+    }
+  }, [gameState, playerId, showEmote, toast, t]);
+
   // Detecta declaração de Cunoku (offline)
   const prevFinalRound = useRef(false);
   useEffect(() => {
@@ -548,6 +572,11 @@ export default function Game() {
         targetPlayerId2: action.targetPlayerId,
         targetCardIndex3: action.targetCardIndex,
       });
+      audioManager.playSwap();
+    }
+
+    if (action.kind === "wind") {
+      sendAction({ type: "use_ability", ability: "wind", targetPlayerId: action.targetPlayerId });
       audioManager.playSwap();
     }
 

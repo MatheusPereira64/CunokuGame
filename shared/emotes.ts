@@ -18,6 +18,10 @@ export function isEmoteId(value: unknown): value is EmoteId {
   return EMOTES.some((e) => e.id === value);
 }
 
+/** Efeito mostrado no balão do jogador atingido pelo Vento; não é um emote que se possa enviar. */
+export const WIND_EFFECT_ID = "wind_effect";
+
 export function getEmoteEmoji(id: string): string | undefined {
+  if (id === WIND_EFFECT_ID) return "🌪️";
   return EMOTES.find((e) => e.id === id)?.emoji;
 }

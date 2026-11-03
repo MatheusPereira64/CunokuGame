@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/Button";
 import { useI18n } from "@/contexts/i18n-context";
-import { BookOpen, Eye, Glasses, ArrowLeftRight, type LucideIcon } from "lucide-react";
+import { BookOpen, Eye, Glasses, ArrowLeftRight, Wind, type LucideIcon } from "lucide-react";
 import { cn, fit } from "@/lib/utils";
 
 /** Mesmos ícones usados no selo das cartas (PlayingCard) */
@@ -11,6 +11,12 @@ const ABILITY_RULES: {
   shortKey: string;
   Icon: LucideIcon;
 }[] = [
+  {
+    ranksKey: "rules.aceAndTwo",
+    descKey: "rules.aceTwo",
+    shortKey: "game.abilityWind",
+    Icon: Wind,
+  },
   {
     ranksKey: "rules.fiveAndSix",
     descKey: "rules.fiveSix",

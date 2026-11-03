@@ -1,13 +1,16 @@
 import { Card } from "@shared/schema";
 
-/** Cartas 5-10 possuem habilidades especiais */
+/** Ás, 2 e cartas 5-10 possuem habilidades especiais; 3 e 4 ainda não têm */
 export function hasSpecialAbility(card: Card | null | undefined): boolean {
   if (!card) return false;
-  return ["5", "6", "7", "8", "9", "10"].includes(card.rank);
+  return ["A", "2", "5", "6", "7", "8", "9", "10"].includes(card.rank);
 }
 
 export function getAbilityDescription(rank: string, t: (key: string) => string): string {
   switch (rank) {
+    case "A":
+    case "2":
+      return t("game.abilityWind");
     case "5":
     case "6":
       return t("game.abilityPeekOpponent");
@@ -24,12 +27,14 @@ export function getAbilityDescription(rank: string, t: (key: string) => string):
 
 /** Ação escolhida no modal de habilidade, resolvida pelo Game */
 export type AbilityAction =
+  | { kind: "wind"; targetPlayerId: string }
   | { kind: "peek_own"; cardIndex: number }
   | { kind: "peek_opponent"; targetPlayerId: string; targetCardIndex: number }
   | { kind: "swap_me"; myCardIndex: number; targetPlayerId: string; targetCardIndex: number }
   | { kind: "swap_others"; player1Id: string; card1Index: number; player2Id: string; card2Index: number };
 
 export type AbilityConfirmInput = {
+  isWind?: boolean;
   isPeekOpponent: boolean;
   isPeekOwn: boolean;
   isSwap: boolean;
@@ -45,6 +50,7 @@ export type AbilityConfirmInput = {
 
 /** Quando o botão Confirmar do modal de habilidade deve ficar desabilitado */
 export function abilityConfirmDisabled(input: AbilityConfirmInput): boolean {
+  if (input.isWind && !input.targetPlayer) return true;
   if (input.isPeekOpponent && (!input.targetPlayer || input.targetCard === null)) return true;
   if (input.isPeekOwn && input.myCardIndex === null) return true;
   if (input.isSwap && input.swapMode === "me_and_other") {

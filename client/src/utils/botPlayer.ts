@@ -15,6 +15,17 @@ function randomUUID(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+/** Vento vale a pena contra quem mais conhece a própria mão. */
+function pickWindTarget(state: GameState, playerIndex: number): string | null {
+  let best: { id: string; known: number } | null = null;
+  state.players.forEach((p, i) => {
+    if (i === playerIndex) return;
+    const known = Object.values(p.knownCards).filter(Boolean).length;
+    if (known > 0 && (!best || known > best.known)) best = { id: p.id, known };
+  });
+  return (best as { id: string; known: number } | null)?.id ?? null;
+}
+
 export class BotPlayer {
   id: string;
   name: string;
@@ -97,6 +108,12 @@ export class BotPlayer {
         }
       }
 
+      // Sem carta melhor para trocar: Ás e 2 atrapalham a memória de um oponente
+      if ((drawnCard.rank === "A" || drawnCard.rank === "2") && !state.drawnFromDiscard) {
+        const windTarget = pickWindTarget(state, playerIndex);
+        if (windTarget) return { type: "use_ability", ability: "wind", targetPlayerId: windTarget };
+      }
+
       return { type: "discard_drawn" };
     }
 
@@ -115,6 +132,12 @@ export class BotPlayer {
       if (player.hand[worstIdx].value - drawnCard.value > 1) {
         return { type: "replace_card", handIndex: worstIdx };
       }
+    }
+
+    // Sem carta melhor para trocar: Ás e 2 atrapalham a memória de um oponente
+    if ((drawnCard.rank === "A" || drawnCard.rank === "2") && !state.drawnFromDiscard) {
+      const windTarget = pickWindTarget(state, playerIndex);
+      if (windTarget) return { type: "use_ability", ability: "wind", targetPlayerId: windTarget };
     }
 
     // Otherwise, try to peek unknown cards (use ability 7/8)

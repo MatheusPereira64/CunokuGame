@@ -62,14 +62,14 @@ describe("hasSpecialAbility", () => {
     expect(hasSpecialAbility(undefined)).toBe(false);
   });
 
-  it("reconhece cartas 5–10", () => {
-    for (const rank of ["5", "6", "7", "8", "9", "10"] as const) {
+  it("reconhece Ás, 2 e cartas 5–10", () => {
+    for (const rank of ["A", "2", "5", "6", "7", "8", "9", "10"] as const) {
       expect(hasSpecialAbility(card(rank))).toBe(true);
     }
   });
 
   it("não marca cartas sem habilidade", () => {
-    for (const rank of ["A", "2", "3", "4", "J", "Q", "K", "Joker"] as const) {
+    for (const rank of ["3", "4", "J", "Q", "K", "Joker"] as const) {
       expect(hasSpecialAbility(card(rank))).toBe(false);
     }
   });
@@ -79,6 +79,10 @@ describe("getAbilityDescription", () => {
   const t = (key: string) => key;
 
   it("mapeia descrições por rank", () => {
+    expect(getAbilityDescription("A", t)).toBe("game.abilityWind");
+    expect(getAbilityDescription("2", t)).toBe("game.abilityWind");
+    expect(getAbilityDescription("3", t)).toBe("");
+    expect(getAbilityDescription("4", t)).toBe("");
     expect(getAbilityDescription("5", t)).toBe("game.abilityPeekOpponent");
     expect(getAbilityDescription("6", t)).toBe("game.abilityPeekOpponent");
     expect(getAbilityDescription("7", t)).toBe("game.abilityPeekOwn");

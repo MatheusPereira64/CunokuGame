@@ -114,6 +114,7 @@ export class GameLogic {
     if (!sourcePlayer) return { success: false, message: "Source player not found" };
     if (rank === "7" || rank === "8") return this.peekOwnCard(sourcePlayer, sourceId, targetId, cardIdx);
     if (rank === "5" || rank === "6") return this.peekOpponentCard(state, sourceId, targetId, cardIdx);
+    if (rank === "A" || rank === "2") return this.windOnOpponent(state, sourceId, targetId);
     if (rank === "9" || rank === "10") {
       return this.swapByRank(state, sourcePlayer, sourceId, targetId, cardIdx, targetCardIdx, targetPlayerId2, targetCardIdx2);
     }
@@ -146,6 +147,20 @@ export class GameLogic {
       message: `You peeked at ${targetPlayer.name}'s card`,
       privateInfo: { card: targetPlayer.hand[cardIdx], playerName: targetPlayer.name },
     };
+  }
+
+  /**
+   * Vento: embaralha a mão de um oponente, que esquece o que sabia sobre ela.
+   * Os ids mudam porque cartas mascaradas mantêm o id, que entregaria a nova posição de cada uma.
+   */
+  private static windOnOpponent(state: GameState, sourceId: string, targetId?: string): AbilityResult {
+    if (!targetId || targetId === sourceId) return { success: false, message: "Invalid target for wind" };
+    const target = state.players.find(p => p.id === targetId);
+    if (!target) return { success: false, message: "Target player not found" };
+    target.hand = shuffleInPlace(target.hand.map(withNewId), stateRandom(state, "wind"));
+    target.knownCards = {};
+    state.lastWind = { count: (state.lastWind?.count ?? 0) + 1, byId: sourceId, targetId };
+    return { success: true, message: `Wind on ${target.name}` };
   }
 
   private static swapByRank(
@@ -383,6 +398,11 @@ export class GameLogic {
     }
     if (abilityRank === "7" || abilityRank === "8") {
       newState.logs.push(`${actor} usou habilidade para ver uma de suas cartas`);
+      return;
+    }
+    if (abilityRank === "A" || abilityRank === "2") {
+      const targetPlayer = newState.players.find((p: Player) => p.id === targetPlayerId);
+      if (targetPlayer) newState.logs.push(`${actor} usou o Vento nas cartas de ${targetPlayer.name}`);
       return;
     }
     if (abilityRank === "5" || abilityRank === "6") {
