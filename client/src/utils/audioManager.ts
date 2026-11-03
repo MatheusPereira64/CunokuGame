@@ -7,13 +7,18 @@ import { randomFloat } from "@shared/secureRandom";
 
 type MusicTrack = "menu" | "game";
 
+/** Cada partida sorteia uma destas faixas, com a mesma chance. */
+const GAME_TRACK_FILES = ["/audio/soundtrack/match-frenzy.mp3", "/audio/soundtrack/match-pai-de-familia.mp3"];
+
 function isAbortError(err: unknown): boolean {
   return (err as { name?: string } | null)?.name === "AbortError";
 }
 
 class AudioManager {
   private menuMusic: HTMLAudioElement | null = null;
+  /** Faixa sorteada para a partida atual */
   private gameMusic: HTMLAudioElement | null = null;
+  private gameTracks: HTMLAudioElement[] = [];
   private currentMusic: HTMLAudioElement | null = null;
   /** Faixa que deveria estar tocando (sobrevive a mute/pause). */
   private desiredTrack: MusicTrack | null = null;
@@ -45,7 +50,8 @@ class AudioManager {
     }
 
     this.menuMusic = this.createLoopingTrack("/audio/soundtrack/menu.mp3");
-    this.gameMusic = this.createLoopingTrack("/audio/soundtrack/match-frenzy.mp3");
+    this.gameTracks = GAME_TRACK_FILES.map((src) => this.createLoopingTrack(src));
+    this.gameMusic = this.gameTracks[0] ?? null;
 
     this.setupUserInteraction();
     this.setupAutoplayRetries();
@@ -96,16 +102,12 @@ class AudioManager {
    * seria bloqueada mesmo com a do menu tocando.
    */
   private primeIdleTracks(): void {
-    const tracks: [MusicTrack, HTMLAudioElement | null][] = [
-      ["menu", this.menuMusic],
-      ["game", this.gameMusic],
-    ];
-    for (const [name, el] of tracks) {
-      if (!el || name === this.desiredTrack || !el.paused) continue;
+    for (const el of this.allTracks()) {
+      if (el === this.desiredElement() || !el.paused) continue;
       el.muted = true;
       const restore = () => {
         // A faixa pode ter passado a ser a desejada enquanto era liberada
-        if (this.desiredTrack === name) return;
+        if (el === this.desiredElement()) return;
         el.pause();
         el.currentTime = 0;
         el.muted = false;
@@ -155,10 +157,18 @@ class AudioManager {
     window.addEventListener("pageshow", retry);
     window.addEventListener("focus", retry);
 
-    for (const track of [this.menuMusic, this.gameMusic]) {
-      track?.addEventListener("canplaythrough", retry);
-      track?.addEventListener("loadeddata", retry);
+    for (const track of this.allTracks()) {
+      track.addEventListener("canplaythrough", retry);
+      track.addEventListener("loadeddata", retry);
     }
+  }
+
+  private allTracks(): HTMLAudioElement[] {
+    return [this.menuMusic, ...this.gameTracks].filter((t): t is HTMLAudioElement => !!t);
+  }
+
+  private desiredElement(): HTMLAudioElement | null {
+    return this.desiredTrack ? this.getTrackElement(this.desiredTrack) : null;
   }
 
   private getTrackElement(track: MusicTrack): HTMLAudioElement | null {
@@ -208,8 +218,7 @@ class AudioManager {
 
   private pauseAllMusic(resetTime: boolean): void {
     this.playAttempt += 1;
-    for (const track of [this.menuMusic, this.gameMusic]) {
-      if (!track) continue;
+    for (const track of this.allTracks()) {
       track.pause();
       if (resetTime) track.currentTime = 0;
     }
@@ -244,6 +253,10 @@ class AudioManager {
    * Toca a música da partida
    */
   playGameMusic(): void {
+    // Sorteia só ao começar: chamadas repetidas na mesma partida mantêm a faixa
+    if (this.desiredTrack !== "game") {
+      this.gameMusic = this.gameTracks[Math.floor(randomFloat() * this.gameTracks.length)] ?? null;
+    }
     this.desiredTrack = "game";
     if (
       this.gameMusic &&

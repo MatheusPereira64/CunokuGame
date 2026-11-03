@@ -144,3 +144,18 @@ describe("ícones do perfil", () => {
     expect(getProfileIconGroup("astronaut")).toBe("explorers");
   });
 });
+
+describe("ícone de brutamontes e cores", () => {
+  it("salva o ícone com as cores novas", () => {
+    for (const accent of ["blue", "brown", "emerald"]) {
+      const profile = normalizeProfile({ iconId: "brute", accent });
+      expect(profile.iconId).toBe("brute");
+      expect(profile.accent).toBe(accent);
+    }
+    expect(getProfileIconGroup("brute")).toBe("fantasy");
+  });
+
+  it("recusa cor desconhecida", () => {
+    expect(normalizeProfile({ accent: "roxo-neon" }).accent).toBe("indigo");
+  });
+});

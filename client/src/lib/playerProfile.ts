@@ -11,6 +11,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { BruteIcon } from "@/components/icons/BruteIcon";
 import {
   GiSamuraiHelmet,
   GiNinjaHead,
@@ -77,6 +78,7 @@ export type ProfileIconId =
   | "dwarf"
   | "vampire"
   | "jester"
+  | "brute"
   | "robot"
   | "cyborg"
   | "alien"
@@ -91,7 +93,7 @@ export type ProfileIconId =
 /** Aceita os ícones do lucide e os de personagem do react-icons. */
 export type ProfileIconComponent = ComponentType<{ className?: string; strokeWidth?: string | number }>;
 
-export type ProfileAccent = "indigo" | "red" | "amber" | "emerald" | "slate";
+export type ProfileAccent = "indigo" | "blue" | "red" | "amber" | "brown" | "emerald" | "slate";
 
 /** Quantos dias de histórico ficam guardados no aparelho. */
 const HISTORY_RETENTION_DAYS = 60;
@@ -148,6 +150,7 @@ export const PROFILE_ICONS: { id: ProfileIconId; group: ProfileIconGroup; Icon: 
   { id: "dwarf", group: "fantasy", Icon: GiDwarfFace },
   { id: "vampire", group: "fantasy", Icon: GiVampireDracula },
   { id: "jester", group: "fantasy", Icon: GiJesterHat },
+  { id: "brute", group: "fantasy", Icon: BruteIcon },
   { id: "robot", group: "future", Icon: GiRobotHelmet },
   { id: "cyborg", group: "future", Icon: GiCyborgFace },
   { id: "alien", group: "future", Icon: GiAlienStare },
@@ -168,6 +171,8 @@ export const PROFILE_ACCENTS: {
   soft: string;
 }[] = [
   { id: "indigo", ring: "border-indigo-500", bg: "bg-indigo-100", text: "text-indigo-800", soft: "bg-indigo-500" },
+  { id: "blue", ring: "border-sky-500", bg: "bg-sky-100", text: "text-sky-800", soft: "bg-sky-500" },
+  { id: "brown", ring: "border-amber-900", bg: "bg-orange-200", text: "text-amber-950", soft: "bg-amber-900" },
   { id: "red", ring: "border-red-500", bg: "bg-red-100", text: "text-red-800", soft: "bg-red-500" },
   { id: "amber", ring: "border-amber-500", bg: "bg-amber-100", text: "text-amber-800", soft: "bg-amber-500" },
   { id: "emerald", ring: "border-emerald-500", bg: "bg-emerald-100", text: "text-emerald-800", soft: "bg-emerald-500" },

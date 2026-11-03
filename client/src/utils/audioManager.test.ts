@@ -47,8 +47,13 @@ const flush = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve();
 };
 
+/** Valor do sorteio da música; abaixo de 0,5 escolhe a primeira faixa da partida. */
+let nextRandom = 0;
+
 async function setup() {
   vi.resetModules();
+  nextRandom = 0;
+  vi.doMock("@shared/secureRandom", () => ({ randomFloat: () => nextRandom }));
   FakeAudio.instances = [];
   FakeAudio.slow = false;
   inGesture = false;
@@ -82,6 +87,51 @@ async function setup() {
   };
   return { audioManager, menu, game, tap };
 }
+
+describe("sorteio da música da partida", () => {
+  beforeEach(() => vi.unstubAllGlobals());
+
+  const start = async (random: number) => {
+    const ctx = await setup();
+    await ctx.tap();
+    nextRandom = random;
+    ctx.audioManager.playGameMusic();
+    await flush();
+    const [, first, second] = FakeAudio.instances as [FakeAudio, FakeAudio, FakeAudio];
+    return { ...ctx, first, second };
+  };
+
+  it("tem as duas faixas com a mesma chance", async () => {
+    expect((await start(0.49)).first.paused).toBe(false);
+    expect((await start(0.49)).second.paused).toBe(true);
+    const other = await start(0.5);
+    expect(other.first.paused).toBe(true);
+    expect(other.second.paused).toBe(false);
+    expect(other.second.src).toContain("match-pai-de-familia.mp3");
+  });
+
+  it("mantém a faixa na mesma partida e sorteia de novo na seguinte", async () => {
+    const { audioManager, first, second } = await start(0.9);
+    nextRandom = 0;
+    audioManager.playGameMusic();
+    await flush();
+    expect(second.paused).toBe(false);
+    expect(first.paused).toBe(true);
+
+    audioManager.stopAllMusic();
+    audioManager.playGameMusic();
+    await flush();
+    expect(first.paused).toBe(false);
+    expect(second.paused).toBe(true);
+  });
+
+  it("toca só uma música por vez", async () => {
+    const { audioManager, menu } = await start(0.9);
+    audioManager.playMenuMusic();
+    await flush();
+    expect(FakeAudio.instances.filter((a) => !a.paused)).toEqual([menu]);
+  });
+});
 
 describe("música da partida", () => {
   beforeEach(() => vi.unstubAllGlobals());
