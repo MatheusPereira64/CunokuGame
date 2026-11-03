@@ -10,6 +10,7 @@ export { CardFlipAnimation } from './CardFlipAnimation';
 export { CardPeekAnimation } from './CardPeekAnimation';
 export { CardPenaltyAnimation } from './CardPenaltyAnimation';
 export { CardDealAnimation } from './CardDealAnimation';
+export { CunokuCallOverlay } from './CunokuCallOverlay';
 
 // Exporta orquestrador e hooks
 export { AnimationOrchestrator } from './AnimationOrchestrator';

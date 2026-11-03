@@ -4,7 +4,7 @@ import type { EmoteId } from "@shared/emotes";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Button } from "@/components/Button";
 import { motion, AnimatePresence } from "framer-motion";
-import { AnimationRenderer, OpponentActionNotification, OpponentActionType } from "@/components/animations";
+import { AnimationRenderer, CunokuCallOverlay, OpponentActionNotification, OpponentActionType } from "@/components/animations";
 import { ArrowLeft, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VolumeControl } from "@/components/VolumeControl";
@@ -627,6 +627,8 @@ export function ActiveTable(props: {
   onAnimationComplete: () => void;
   opponentNotice: { playerName: string; actionType: OpponentActionType } | null;
   onNoticeDone: () => void;
+  cunokuCaller: string | null;
+  onCunokuCallDone: () => void;
   revealedCards: Record<string, Card>;
   registerCardPosition: RegisterCard;
   deckRef: RefObject<HTMLDivElement>;
@@ -650,8 +652,9 @@ export function ActiveTable(props: {
   const graceName = gameState.players.find((p) => p.id === gameState.reconnectPlayerId)?.name ?? "";
   const currentTurnPlayerId = gameState.players[gameState.currentPlayerIndex]?.id;
   return (
-    <div className="min-h-[100dvh] bg-neutral-900 text-white relative overflow-hidden flex flex-col pwa-safe game-landscape">
+    <div className={cn("min-h-[100dvh] bg-neutral-900 text-white relative overflow-hidden flex flex-col pwa-safe game-landscape", props.cunokuCaller && "cunoku-shake")}>
       {props.isPortrait ? <LandscapePrompt /> : null}
+      {props.cunokuCaller ? <CunokuCallOverlay playerName={props.cunokuCaller} onComplete={props.onCunokuCallDone} /> : null}
       <AnimationRenderer currentAnimation={props.currentAnimation} onComplete={props.onAnimationComplete} playerId={props.playerId} />
       {props.opponentNotice ? (
         <OpponentActionNotification playerName={props.opponentNotice.playerName} actionType={props.opponentNotice.actionType} onComplete={props.onNoticeDone} duration={2000} />

@@ -41,6 +41,21 @@
   --font-body: 'Zen Maru Gothic', sans-serif;
 }
 
+@keyframes cunoku-shake {
+  0%, 100% { transform: translate(0, 0); }
+  15% { transform: translate(-10px, 6px); }
+  30% { transform: translate(9px, -7px); }
+  45% { transform: translate(-7px, -4px); }
+  60% { transform: translate(5px, 5px); }
+  80% { transform: translate(-2px, 2px); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cunoku-shake {
+    animation: cunoku-shake 0.5s ease-out 0.35s;
+  }
+}
+
 @layer base {
   body {
     @apply bg-[#FDFBF7] text-foreground antialiased;

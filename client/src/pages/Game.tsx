@@ -421,23 +421,21 @@ export default function Game() {
     }
   }, [gameState, playerId, showEmote, toast, t]);
 
-  // Detecta declaração de Cunoku (offline)
-  const prevFinalRound = useRef(false);
+  // Detecta declaração de Cunoku; null até o primeiro estado, para não repetir o anúncio ao reconectar
+  const prevFinalRound = useRef<boolean | null>(null);
+  const [cunokuCaller, setCunokuCaller] = useState<string | null>(null);
+  const finishCunokuCall = useCallback(() => setCunokuCaller(null), []);
   useEffect(() => {
-    if (isOffline && gameState) {
-      if (gameState.isFinalRound && !prevFinalRound.current) {
-        const declarer = gameState.players.find((p) => p.id === gameState.finalRoundDeclarerId);
-        if (declarer) {
-          toast({
-            title: t("game.cunokuDeclared"),
-            description: t("game.cunokuDeclaredDesc").replace("{player}", declarer.name),
-            duration: 5000,
-          });
-        }
+    if (!gameState) return;
+    if (gameState.isFinalRound && prevFinalRound.current === false) {
+      const declarer = gameState.players.find((p) => p.id === gameState.finalRoundDeclarerId);
+      if (declarer) {
+        setCunokuCaller(declarer.name);
+        audioManager.playCunokuCall();
       }
-      prevFinalRound.current = gameState.isFinalRound || false;
     }
-  }, [gameState?.isFinalRound, gameState?.finalRoundDeclarerId, isOffline, toast]);
+    prevFinalRound.current = gameState.isFinalRound || false;
+  }, [gameState?.isFinalRound, gameState?.finalRoundDeclarerId]);
 
   const me = gameState?.players.find((p) => p.id === playerId);
   const isMyTurn = gameState?.players[gameState.currentPlayerIndex]?.id === playerId;
@@ -693,6 +691,8 @@ export default function Game() {
       onAnimationComplete={completeCurrentAnimation}
       opponentNotice={opponentActionNotification}
       onNoticeDone={() => setOpponentActionNotification(null)}
+      cunokuCaller={cunokuCaller}
+      onCunokuCallDone={finishCunokuCall}
       revealedCards={revealedOpponentCardsInHand}
       registerCardPosition={registerCardRef}
       deckRef={deckRef}

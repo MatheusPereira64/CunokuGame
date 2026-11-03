@@ -47,12 +47,12 @@ const flush = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve();
 };
 
-/** Valor do sorteio da música; abaixo de 0,5 escolhe a primeira faixa da partida. */
-let nextRandom = 0;
+/** Valor do sorteio da música; a partir de 0,2 escolhe a primeira faixa da partida. */
+let nextRandom = 0.9;
 
 async function setup() {
   vi.resetModules();
-  nextRandom = 0;
+  nextRandom = 0.9;
   vi.doMock("@shared/secureRandom", () => ({ randomFloat: () => nextRandom }));
   FakeAudio.instances = [];
   FakeAudio.slow = false;
@@ -101,18 +101,19 @@ describe("sorteio da música da partida", () => {
     return { ...ctx, first, second };
   };
 
-  it("tem as duas faixas com a mesma chance", async () => {
-    expect((await start(0.49)).first.paused).toBe(false);
-    expect((await start(0.49)).second.paused).toBe(true);
-    const other = await start(0.5);
+  it("toca a segunda faixa em 20% das partidas", async () => {
+    const usual = await start(0.2);
+    expect(usual.first.paused).toBe(false);
+    expect(usual.second.paused).toBe(true);
+    const other = await start(0.19);
     expect(other.first.paused).toBe(true);
     expect(other.second.paused).toBe(false);
     expect(other.second.src).toContain("match-pai-de-familia.mp3");
   });
 
   it("mantém a faixa na mesma partida e sorteia de novo na seguinte", async () => {
-    const { audioManager, first, second } = await start(0.9);
-    nextRandom = 0;
+    const { audioManager, first, second } = await start(0);
+    nextRandom = 0.9;
     audioManager.playGameMusic();
     await flush();
     expect(second.paused).toBe(false);

@@ -7,8 +7,9 @@ import { randomFloat } from "@shared/secureRandom";
 
 type MusicTrack = "menu" | "game";
 
-/** Cada partida sorteia uma destas faixas, com a mesma chance. */
+/** Cada partida sorteia uma destas faixas: a segunda toca com SECOND_GAME_TRACK_CHANCE. */
 const GAME_TRACK_FILES = ["/audio/soundtrack/match-frenzy.mp3", "/audio/soundtrack/match-pai-de-familia.mp3"];
+const SECOND_GAME_TRACK_CHANCE = 0.2;
 
 function isAbortError(err: unknown): boolean {
   return (err as { name?: string } | null)?.name === "AbortError";
@@ -255,7 +256,7 @@ class AudioManager {
   playGameMusic(): void {
     // Sorteia só ao começar: chamadas repetidas na mesma partida mantêm a faixa
     if (this.desiredTrack !== "game") {
-      this.gameMusic = this.gameTracks[Math.floor(randomFloat() * this.gameTracks.length)] ?? null;
+      this.gameMusic = this.gameTracks[randomFloat() < SECOND_GAME_TRACK_CHANCE ? 1 : 0] ?? null;
     }
     this.desiredTrack = "game";
     if (
@@ -393,6 +394,32 @@ class AudioManager {
     osc.connect(gain).connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.4);
+  }
+
+  /** Dois golpes de taiko; o segundo cai no impacto do anúncio de Cunoku. */
+  playCunokuCall(): void {
+    if (!this.canPlaySfx()) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const hit = (startOffset: number, volume: number) => {
+      const start = ctx.currentTime + startOffset;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(150, start);
+      osc.frequency.exponentialRampToValueAtTime(45, start + 0.5);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(this.sfxVolume * volume, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.8);
+
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.85);
+    };
+
+    hit(0.12, 0.35);
+    hit(0.35, 0.8);
   }
 
   playYourTurn(): void {
