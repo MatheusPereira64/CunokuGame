@@ -1,4 +1,5 @@
 import { GameState, GameAction, Player } from "@shared/schema";
+import { HAND_LIMIT, isSealed, replaceableIndexes } from "@shared/cardPowers";
 import { stateRandom } from "@shared/seededRandom";
 
 export type BotDifficulty = "easy" | "medium" | "hard";
@@ -12,6 +13,24 @@ function pickWindTarget(state: GameState, playerIndex: number): string | null {
     if (known > 0 && (!best || known > best.known)) best = { id: p.id, known };
   });
   return (best as { id: string; known: number } | null)?.id ?? null;
+}
+
+/** Rainha: mira quem tem menos cartas, porque quem chegou ao limite não compra mais. */
+function pickQueenTarget(state: GameState, playerIndex: number): string | null {
+  const others = state.players.filter((p, i) => i !== playerIndex && p.hand.length < HAND_LIMIT);
+  if (others.length === 0) return null;
+  return others.reduce((fewest, p) => (p.hand.length < fewest.hand.length ? p : fewest)).id;
+}
+
+/** Valete obriga a substituir: escolhe a pior carta conhecida ou a primeira livre. */
+function forcedReplaceAction(state: GameState, playerIndex: number): GameAction {
+  const player = state.players[playerIndex];
+  const free = replaceableIndexes(state, player);
+  if (free.length === 0) return { type: "discard_drawn" };
+  const known = free.filter((i) => player.knownCards[i.toString()]);
+  const pool = known.length > 0 ? known : free;
+  const worst = pool.reduce((a, b) => ((player.hand[b]?.value ?? 0) > (player.hand[a]?.value ?? 0) ? b : a), pool[0]);
+  return { type: "replace_card", handIndex: worst };
 }
 
 export class BotPlayer {
@@ -69,21 +88,26 @@ export class BotPlayer {
     const drawnCard = state.drawnCard!;
     const player = state.players[playerIndex];
 
+    if (state.forcedReplace) return forcedReplaceAction(state, playerIndex);
+    if (state.jokerRevealed) return { type: "discard_drawn" };
+
     if (this.difficulty === "easy") {
       // Easy: 50% discard, 50% swap random card
       const random = stateRandom(state, "action");
       if (random() < 0.5) {
         return { type: "discard_drawn" };
       }
-      const randomIdx = Math.floor(random() * 4);
-      return { type: "replace_card", handIndex: randomIdx };
+      const free = replaceableIndexes(state, player);
+      if (free.length === 0) return { type: "discard_drawn" };
+      return { type: "replace_card", handIndex: free[Math.floor(random() * free.length)] };
     }
 
     if (this.difficulty === "medium") {
       // Medium: compare values
       const knownIndices = Object.entries(player.knownCards)
         .filter(([_, known]) => known)
-        .map(([idx]) => Number.parseInt(idx));
+        .map(([idx]) => Number.parseInt(idx))
+        .filter((idx) => !isSealed(state, player.hand[idx]?.id));
 
       if (knownIndices.length > 0) {
         // Check if any known card is worse than drawn
@@ -98,6 +122,11 @@ export class BotPlayer {
         }
       }
 
+      if (drawnCard.rank === "Q" && !state.drawnFromDiscard) {
+        const queenTarget = pickQueenTarget(state, playerIndex);
+        if (queenTarget) return { type: "use_ability", ability: "queen", targetPlayerId: queenTarget };
+      }
+
       // Sem carta melhor para trocar: Ás e 2 atrapalham a memória de um oponente
       if ((drawnCard.rank === "A" || drawnCard.rank === "2") && !state.drawnFromDiscard) {
         const windTarget = pickWindTarget(state, playerIndex);
@@ -110,7 +139,8 @@ export class BotPlayer {
     // Hard: intelligent strategy
     const knownCards = Object.entries(player.knownCards)
       .filter(([_, known]) => known)
-      .map(([idx]) => ({ idx: Number.parseInt(idx), card: player.hand[Number.parseInt(idx)] }));
+      .map(([idx]) => ({ idx: Number.parseInt(idx), card: player.hand[Number.parseInt(idx)] }))
+      .filter(({ card }) => card && !isSealed(state, card.id));
 
     if (knownCards.length > 0) {
       // Find the worst known card
@@ -121,6 +151,17 @@ export class BotPlayer {
       // If drawn card is significantly better, swap
       if (player.hand[worstIdx].value - drawnCard.value > 1) {
         return { type: "replace_card", handIndex: worstIdx };
+      }
+    }
+
+    if (!state.drawnFromDiscard) {
+      if (drawnCard.rank === "Q") {
+        const queenTarget = pickQueenTarget(state, playerIndex);
+        if (queenTarget) return { type: "use_ability", ability: "queen", targetPlayerId: queenTarget };
+      }
+      // Valete só compensa com uma carta alta conhecida para trocar
+      if (drawnCard.rank === "J" && knownCards.some(({ card }) => card.value >= 8)) {
+        return { type: "use_ability", ability: "jack" };
       }
     }
 

@@ -1,6 +1,17 @@
 import { GameState, GameAction, Player } from "@shared/schema";
 import { BotPlayer } from "@/utils/botPlayer";
-import { randomInt, shuffleInPlace } from "@shared/secureRandom";
+import { randomFloat, randomInt, shuffleInPlace } from "@shared/secureRandom";
+import {
+  abilityTouchesSealedCard,
+  applyForcedTrade,
+  applyQueen,
+  applySeal,
+  applyWind,
+  drawForPower,
+  expireSeals,
+  isSealed,
+  replaceableIndexes,
+} from "@shared/cardPowers";
 
 /**
  * Processa uma ação do jogador no jogo offline
@@ -23,7 +34,7 @@ export function processOfflineAction(
     case "discard_drawn":
       return discardDrawn(newState, player, playerId);
     case "replace_card":
-      return replaceDrawn(newState, player, action.handIndex);
+      return replaceDrawn(newState, player, action.handIndex, playerId);
     case "use_ability":
       return useDrawnAbility(newState, player, action, playerId);
     case "matched_discard":
@@ -84,26 +95,28 @@ function advanceTurn(newState: GameState, playerId: string) {
     return;
   }
   newState.currentPlayerIndex = nextPlayerIndex;
-}
-
-function stepToNextPlayer(newState: GameState) {
-  newState.currentPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
+  expireSeals(newState);
 }
 
 function discardDrawn(newState: GameState, player: Player, playerId: string): GameState {
   if (!newState.drawnCard) return newState;
+  if (newState.forcedReplace && replaceableIndexes(newState, player).length > 0) return newState;
   const discardedCard = newState.drawnCard;
   newState.discardPile.push(discardedCard);
   newState.drawnCard = null;
   newState.drawnFromDiscard = false;
+  newState.forcedReplace = false;
+  newState.jokerRevealed = false;
   newState.turnPhase = "draw";
   newState.logs.push(`${player.name} discarded ${discardedCard.rank}`);
   advanceTurn(newState, playerId);
   return newState;
 }
 
-function replaceDrawn(newState: GameState, player: Player, handIndex: number | undefined): GameState {
+function replaceDrawn(newState: GameState, player: Player, handIndex: number | undefined, playerId: string): GameState {
   if (!(newState.drawnCard && handIndex !== undefined)) return newState;
+  if (newState.jokerRevealed || isSealed(newState, player.hand[handIndex]?.id)) return newState;
+  newState.forcedReplace = false;
   const oldCard = player.hand[handIndex];
   player.hand[handIndex] = newState.drawnCard;
   if (oldCard) {
@@ -113,24 +126,75 @@ function replaceDrawn(newState: GameState, player: Player, handIndex: number | u
   newState.drawnCard = null;
   newState.drawnFromDiscard = false;
   newState.turnPhase = "draw";
-  stepToNextPlayer(newState);
+  advanceTurn(newState, playerId);
   return newState;
 }
 
 type AbilityAction = Extract<GameAction, { type: "use_ability" }>;
 
 function useDrawnAbility(newState: GameState, player: Player, action: AbilityAction, playerId: string): GameState {
-  if (!newState.drawnCard || newState.drawnFromDiscard) return newState;
+  if (!newState.drawnCard || newState.drawnFromDiscard || newState.forcedReplace) return newState;
   const rank = newState.drawnCard.rank;
+  if (rank === "J") return useJack(newState, player, playerId);
+  if (rank === "Joker") return useJoker(newState, player, action, playerId);
+  if (abilityTouchesSealedCard(newState, rank, playerId, action)) return newState;
+  const target = newState.players.find((p) => p.id === action.targetPlayerId);
+  if (rank === "3" || rank === "4") {
+    if (!applySeal(newState, playerId, action.targetPlayerId, action.targetCardIndex)) return newState;
+    newState.logs.push(`${player.name} selou uma carta de ${target?.name}`);
+  }
+  if (rank === "Q") {
+    if (!target || target.id === playerId) return newState;
+    applyQueen(newState, player, target, randomFloat);
+    newState.logs.push(`${player.name} usou a Rainha em ${target.name}`);
+  }
+  if (rank === "K") {
+    if (!target) return newState;
+    newState.logs.push(`${player.name} usou o Rei para ver as cartas de ${target.name}`);
+  }
   if (rank === "7" || rank === "8") peekOwnCard(player, action, playerId);
   if (rank === "5" || rank === "6") peekOpponentCard(newState, action, playerId);
-  if (rank === "9" || rank === "10") swapWithOpponent(newState, player, action, playerId);
+  if (rank === "9" || rank === "10") swapCards(newState, player, action, playerId);
   if (rank === "A" || rank === "2") windOnOpponent(newState, player, action, playerId);
   newState.discardPile.push(newState.drawnCard);
   newState.drawnCard = null;
   newState.drawnFromDiscard = false;
   newState.turnPhase = "draw";
-  stepToNextPlayer(newState);
+  advanceTurn(newState, playerId);
+  return newState;
+}
+
+/** Valete: vai para o descarte e a nova carta precisa substituir uma da mão. */
+function useJack(newState: GameState, player: Player, playerId: string): GameState {
+  const jack = newState.drawnCard!;
+  const next = drawForPower(newState, randomFloat);
+  newState.discardPile.push(jack);
+  newState.logs.push(`${player.name} usou o Valete e comprou mais uma carta`);
+  newState.drawnCard = next;
+  if (next) {
+    newState.forcedReplace = true;
+    return newState;
+  }
+  newState.turnPhase = "draw";
+  advanceTurn(newState, playerId);
+  return newState;
+}
+
+/** Coringa em duas etapas: revela primeiro; a tela mostra as faces a partir do estado local. */
+function useJoker(newState: GameState, player: Player, action: AbilityAction, playerId: string): GameState {
+  if (!newState.jokerRevealed) {
+    newState.jokerRevealed = true;
+    newState.logs.push(`${player.name} usou o Coringa para ver as cartas de todos`);
+    return newState;
+  }
+  if (!applyForcedTrade(newState, playerId, action.targetPlayerId, action.targetCardIndex, randomFloat)) return newState;
+  const target = newState.players.find((p) => p.id === action.targetPlayerId);
+  newState.logs.push(`${player.name} forçou ${target?.name} a trocar uma carta`);
+  newState.discardPile.push(newState.drawnCard!);
+  newState.drawnCard = null;
+  newState.jokerRevealed = false;
+  newState.turnPhase = "draw";
+  advanceTurn(newState, playerId);
   return newState;
 }
 
@@ -149,30 +213,25 @@ function peekOpponentCard(newState: GameState, action: AbilityAction, playerId: 
   if (cardIdx < 0 || cardIdx >= targetPlayer.hand.length) return;
 }
 
-function swapWithOpponent(newState: GameState, player: Player, action: AbilityAction, playerId: string) {
-  if (!action.targetPlayerId || action.targetPlayerId === playerId) return;
-  const targetPlayer = newState.players.find(p => p.id === action.targetPlayerId);
-  if (!targetPlayer) return;
-  const sourceCardIdx = action.targetCardIndex !== undefined ? action.targetCardIndex : randomInt(player.hand.length);
-  const targetCardIdx = action.targetCardIndex2 !== undefined ? action.targetCardIndex2 : randomInt(targetPlayer.hand.length);
-  if (!cardInHand(player, sourceCardIdx) || !cardInHand(targetPlayer, targetCardIdx)) return;
-  const sourceCard = player.hand[sourceCardIdx];
-  const targetCard = targetPlayer.hand[targetCardIdx];
-  player.hand[sourceCardIdx] = targetCard;
-  targetPlayer.hand[targetCardIdx] = sourceCard;
-  delete player.knownCards[sourceCardIdx.toString()];
-  delete targetPlayer.knownCards[targetCardIdx.toString()];
+function swapCards(newState: GameState, player: Player, action: AbilityAction, playerId: string) {
+  const first = action.targetPlayerId2 ? newState.players.find(p => p.id === action.targetPlayerId) : player;
+  const second = newState.players.find(p => p.id === (action.targetPlayerId2 ?? action.targetPlayerId));
+  if (!first || !second || first.id === second.id) return;
+  const firstIndex = action.targetCardIndex ?? randomInt(first.hand.length);
+  const secondIndex = (action.targetPlayerId2 ? action.targetCardIndex3 : action.targetCardIndex2) ?? randomInt(second.hand.length);
+  if (!cardInHand(first, firstIndex) || !cardInHand(second, secondIndex)) return;
+  const firstCard = first.hand[firstIndex];
+  first.hand[firstIndex] = second.hand[secondIndex];
+  second.hand[secondIndex] = firstCard;
+  delete first.knownCards[firstIndex.toString()];
+  delete second.knownCards[secondIndex.toString()];
 }
 
-/** Vento: novos ids para a carta espiada não seguir revelada na nova posição. */
 function windOnOpponent(newState: GameState, player: Player, action: AbilityAction, playerId: string) {
   if (!action.targetPlayerId || action.targetPlayerId === playerId) return;
   const target = newState.players.find(p => p.id === action.targetPlayerId);
   if (!target) return;
-  const count = (newState.lastWind?.count ?? 0) + 1;
-  target.hand = shuffleInPlace(target.hand.map((card, i) => ({ ...card, id: `${card.id}-w${count}-${i}` })));
-  target.knownCards = {};
-  newState.lastWind = { count, byId: playerId, targetId: target.id };
+  applyWind(newState, playerId, target, randomFloat);
   newState.logs.push(`${player.name} usou o Vento nas cartas de ${target.name}`);
 }
 
@@ -194,7 +253,7 @@ function reindexKnownCards(player: Player, removedIndex: number) {
 function matchedDiscard(newState: GameState, player: Player, cardIndex: number | undefined): GameState {
   if (cardIndex === undefined) return newState;
   const cardToDiscard = player.hand[cardIndex];
-  if (!cardToDiscard || !player.knownCards[cardIndex.toString()]) return newState;
+  if (!cardToDiscard || !player.knownCards[cardIndex.toString()] || isSealed(newState, cardToDiscard.id)) return newState;
   const lastDiscarded = newState.discardPile[newState.discardPile.length - 1];
   if (!lastDiscarded || lastDiscarded.rank !== cardToDiscard.rank) return newState;
   player.hand.splice(cardIndex, 1);
@@ -220,7 +279,7 @@ function discardFromHand(newState: GameState, player: Player, cardIndex: number 
   if (cardIndex === undefined || newState.discardPile.length === 0) return newState;
   const cardToDiscard = player.hand[cardIndex];
   const topDiscard = newState.discardPile[newState.discardPile.length - 1];
-  if (!cardToDiscard || !topDiscard) return newState;
+  if (!cardToDiscard || !topDiscard || isSealed(newState, cardToDiscard.id)) return newState;
   if (cardToDiscard.rank !== topDiscard.rank) return punishWrongDiscard(newState, player, playerId);
   player.hand.splice(cardIndex, 1);
   newState.discardPile.push(cardToDiscard);

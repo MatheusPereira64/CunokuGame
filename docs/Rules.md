@@ -10,6 +10,11 @@ Objetivo do jogo: ter a menor soma de cartas ao final da partida
 - *Nove e Dez*: Faça 2 jogadores trocarem 1 carta (Pode ser entre o proprio jogador e outro player, ou entre dois jogadores que aquele player escolher)
 - *Sete e Oito*: Permitem que você veja 1 carta sua (Fica visivel para o jogador por 20 segundos depois é virada novamente )
 - *Ás e Dois*: Vento (風). Embaralham as cartas da mão de um oponente, que esquece o que sabia sobre elas; todos veem quem foi atingido e a soma dele não muda
+- *Três e Quatro*: Selo. Escolha uma carta da mesa: ela continua virada e não pode ser vista, trocada nem descartada até chegar de novo a sua vez
+- *Valete*: Você compra mais uma carta e é obrigado a substituir uma da sua mão por ela
+- *Rainha*: Um oponente compra 2 cartas e você compra 1, respeitando o limite de 6 cartas na mão
+- *Rei*: Revela todas as suas cartas ou as de um jogador por 20 segundos, só para quem usou
+- *Coringa*: Revela as cartas de todos por 40 segundos, só para quem usou, e permite forçar um jogador a trocar uma carta por uma do baralho
 - *Cinco e Seis*: Permitem ver a carta de um oponente 
 - *Regras de descarte*: Um jogador pode descartar uma carta da sua mão se ela for igual ao mesmo valor da carta em cima da pilha de descarte ex: 7=7 ,quando o jogador comprar uma carta ele pode escolher ficar com ela e substituir uma de sua mão ou descartar a carta direto para a pilha de descarte, os jogadores que souberem que possuem a mesma carta podem descartar a mesma (O descarte é possível independente do Naipe, so precisa ser o mesmo numero ou letra na carta)
 - *Regras de compra*: Compre uma carta olhe o valor e decida o que fazer com a habilidade pode ser usada 

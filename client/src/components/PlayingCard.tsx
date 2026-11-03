@@ -2,7 +2,7 @@ import { useId, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { type Card } from "@shared/schema";
 import { cn } from "@/lib/utils";
-import { Club, Diamond, Heart, Spade, Eye, Glasses, ArrowLeftRight, Wind } from "lucide-react";
+import { Club, Crown, Diamond, Heart, Spade, Eye, Glasses, ArrowLeftRight, Lock, Plus, Sparkles, Users, Wind } from "lucide-react";
 import { loadTableTheme, subscribeTableTheme, type CardBackId } from "@/lib/tableTheme";
 
 interface PlayingCardProps {
@@ -20,6 +20,17 @@ function getAbilityIcon(rank?: string) {
     case "A":
     case "2":
       return Wind; // Embaralhar a mão de um oponente
+    case "3":
+    case "4":
+      return Lock; // Selar uma carta da mesa
+    case "J":
+      return Plus; // Comprar mais uma e substituir
+    case "Q":
+      return Users; // Oponente compra 2, você compra 1
+    case "K":
+      return Crown; // Ver todas as cartas de um jogador
+    case "Joker":
+      return Sparkles; // Ver todos e forçar uma troca
     case "5":
     case "6":
       return Eye; // Ver carta de oponente

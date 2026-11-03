@@ -21,6 +21,8 @@ interface AbilityModalProps {
   players: Player[];
   playerId: string;
   myHand: Card[];
+  sealedCardIds?: string[];
+  jokerRevealed?: boolean;
   onConfirm: (action: AbilityAction) => void;
 }
 
@@ -69,6 +71,8 @@ export function AbilityModal({
   players,
   playerId,
   myHand,
+  sealedCardIds = [],
+  jokerRevealed = false,
   onConfirm,
 }: AbilityModalProps) {
   const isCompact = useIsCompactGame();
@@ -108,11 +112,25 @@ export function AbilityModal({
   const isPeekOwn = rank === "7" || rank === "8";
   const isSwap = rank === "9" || rank === "10";
   const isWind = rank === "A" || rank === "2";
+  const isSeal = rank === "3" || rank === "4";
+  const isJack = rank === "J";
+  const isQueen = rank === "Q";
+  const isKing = rank === "K";
+  const isJokerReveal = rank === "Joker" && !jokerRevealed;
+  const isJokerForce = rank === "Joker" && jokerRevealed;
 
   const otherPlayers = players.filter((p) => p.id !== playerId);
 
+  /** Rei e 3/4 também aceitam o próprio jogador */
+  const pickablePlayers = isSeal || isKing ? players : otherPlayers;
+  const needsCardPick = isSeal || isJokerForce;
+  const handOf = (id: string | null) => players.find((p) => p.id === id)?.hand ?? [];
+  const pickedHand = handOf(targetPlayer);
+
   const confirmDisabled = abilityConfirmDisabled({
     isWind,
+    needsPlayerOnly: isQueen || isKing,
+    needsPlayerAndCard: needsCardPick,
     isPeekOpponent,
     isPeekOwn,
     isSwap,
@@ -144,7 +162,19 @@ export function AbilityModal({
 
     let action: AbilityAction | null = null;
 
-    if (isWind && targetPlayer) {
+    if (isJack) {
+      action = { kind: "jack" };
+    } else if (isJokerReveal) {
+      action = { kind: "joker_reveal" };
+    } else if (isQueen && targetPlayer) {
+      action = { kind: "queen", targetPlayerId: targetPlayer };
+    } else if (isKing && targetPlayer) {
+      action = { kind: "king", targetPlayerId: targetPlayer };
+    } else if (isSeal && targetPlayer && targetCard !== null) {
+      action = { kind: "seal", targetPlayerId: targetPlayer, cardIndex: targetCard };
+    } else if (isJokerForce && targetPlayer && targetCard !== null) {
+      action = { kind: "joker_force", targetPlayerId: targetPlayer, cardIndex: targetCard };
+    } else if (isWind && targetPlayer) {
       action = { kind: "wind", targetPlayerId: targetPlayer };
     } else if (isPeekOwn && myCardIndex !== null) {
       action = { kind: "peek_own", cardIndex: myCardIndex };
@@ -192,7 +222,7 @@ export function AbilityModal({
             {t("game.abilityTitle")}
           </DialogTitle>
           <DialogDescription className={cn(isCompact && "text-xs leading-snug")}>
-            {getAbilityDescription(rank, t)}
+            {isJokerForce ? t("game.jokerForceHint") : getAbilityDescription(rank, t)}
           </DialogDescription>
         </DialogHeader>
 
@@ -202,6 +232,54 @@ export function AbilityModal({
             fit(isCompact, "min-h-0 flex-1 overflow-y-auto overscroll-contain py-1 pr-0.5", "space-y-4 py-4"),
           )}
         >
+          {/* Valete e primeira etapa do Coringa: não há o que escolher */}
+          {(isJack || isJokerReveal) && (
+            <p className={labelClass}>{isJack ? t("game.jackHint") : t("game.jokerRevealHint")}</p>
+          )}
+
+          {/* Rainha, Rei, 3 e 4 e troca forçada do Coringa */}
+          {(isQueen || isKing || isSeal || isJokerForce) && (
+            <>
+              <div className="space-y-2">
+                <label className={labelClass}>{t("game.selectPlayer")}</label>
+                <div className={playerGridClass}>
+                  {pickablePlayers.map((p) => (
+                    <PlayerPickButton
+                      key={p.id}
+                      player={p}
+                      selected={targetPlayer === p.id}
+                      onSelect={() => {
+                        setTargetPlayer(p.id);
+                        setTargetCard(null);
+                      }}
+                      playerBtnClass={playerBtnClass}
+                      isCompact={isCompact}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {needsCardPick && targetPlayer && (
+                <div className="space-y-2">
+                  <label className={labelClass}>{t("game.selectCardNumber")}</label>
+                  <div className="grid grid-cols-6 gap-2">
+                    {pickedHand.map((card, idx) => (
+                      <Button
+                        key={card.id}
+                        variant={targetCard === idx ? "primary" : "outline"}
+                        disabled={sealedCardIds.includes(card.id)}
+                        onClick={() => setTargetCard(idx)}
+                        className={cardBtnClass}
+                      >
+                        {idx + 1}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
           {/* Ás e 2: embaralhar a mão de um oponente */}
           {isWind && (
             <div className="space-y-2">
@@ -247,9 +325,10 @@ export function AbilityModal({
                 <div className="space-y-2">
                   <label className={labelClass}>{t("game.selectCardNumber")}</label>
                   <div className="grid grid-cols-4 gap-2">
-                    {[0, 1, 2, 3].map((idx) => (
+                    {handOf(targetPlayer).map((handCard, idx) => (
                       <Button
                         key={idx}
+                        disabled={sealedCardIds.includes(handCard.id)}
                         variant={targetCard === idx ? "primary" : "outline"}
                         onClick={() => setTargetCard(idx)}
                         className={cardBtnClass}
@@ -268,9 +347,10 @@ export function AbilityModal({
             <div className="space-y-2">
               <label className={labelClass}>{t("game.selectYourCard")}</label>
               <div className="flex flex-wrap justify-center gap-2">
-                {myHand.map((_, idx) => (
+                {myHand.map((handCard, idx) => (
                   <Button
                     key={idx}
+                    disabled={sealedCardIds.includes(handCard.id)}
                     variant={myCardIndex === idx ? "primary" : "outline"}
                     onClick={() => setMyCardIndex(idx)}
                     className={myCardBtnClass}
@@ -310,9 +390,10 @@ export function AbilityModal({
                   <div className="space-y-2">
                     <label className={labelClass}>{t("game.yourCard")}</label>
                     <div className="flex flex-wrap justify-center gap-2">
-                      {myHand.map((_, idx) => (
-                        <Button
-                          key={idx}
+                      {myHand.map((handCard, idx) => (
+                  <Button
+                    key={idx}
+                    disabled={sealedCardIds.includes(handCard.id)}
                           variant={myCardIndex === idx ? "primary" : "outline"}
                           onClick={() => setMyCardIndex(idx)}
                           className={myCardBtnClass}
@@ -346,10 +427,11 @@ export function AbilityModal({
                     <div className="space-y-2">
                       <label className={labelClass}>{t("game.otherPlayerCard")}</label>
                       <div className="grid grid-cols-4 gap-2">
-                        {[0, 1, 2, 3].map((idx) => (
-                          <Button
-                            key={idx}
-                            variant={targetCard === idx ? "primary" : "outline"}
+                        {handOf(targetPlayer).map((handCard, idx) => (
+                      <Button
+                        key={idx}
+                        disabled={sealedCardIds.includes(handCard.id)}
+                        variant={targetCard === idx ? "primary" : "outline"}
                             onClick={() => setTargetCard(idx)}
                             className={cardBtnClass}
                           >
@@ -389,10 +471,11 @@ export function AbilityModal({
                         <div className="space-y-2">
                           <label className={labelClass}>{t("game.firstPlayerCard")}</label>
                           <div className="grid grid-cols-4 gap-2">
-                            {[0, 1, 2, 3].map((idx) => (
-                              <Button
-                                key={idx}
-                                variant={targetCard === idx ? "primary" : "outline"}
+                            {handOf(targetPlayer).map((handCard, idx) => (
+                      <Button
+                        key={idx}
+                        disabled={sealedCardIds.includes(handCard.id)}
+                        variant={targetCard === idx ? "primary" : "outline"}
                                 onClick={() => setTargetCard(idx)}
                                 className={cardBtnClass}
                               >
@@ -440,10 +523,11 @@ export function AbilityModal({
                         <div className="space-y-2">
                           <label className={labelClass}>{t("game.secondPlayerCard")}</label>
                           <div className="grid grid-cols-4 gap-2">
-                            {[0, 1, 2, 3].map((idx) => (
-                              <Button
-                                key={idx}
-                                variant={targetCard2 === idx ? "primary" : "outline"}
+                            {handOf(targetPlayer2).map((handCard, idx) => (
+                      <Button
+                        key={idx}
+                        disabled={sealedCardIds.includes(handCard.id)}
+                        variant={targetCard2 === idx ? "primary" : "outline"}
                                 onClick={() => setTargetCard2(idx)}
                                 className={cardBtnClass}
                               >

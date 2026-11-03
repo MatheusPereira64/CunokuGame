@@ -62,17 +62,12 @@ describe("hasSpecialAbility", () => {
     expect(hasSpecialAbility(undefined)).toBe(false);
   });
 
-  it("reconhece Ás, 2 e cartas 5–10", () => {
-    for (const rank of ["A", "2", "5", "6", "7", "8", "9", "10"] as const) {
+  it("reconhece todas as cartas do baralho", () => {
+    for (const rank of ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "Joker"] as const) {
       expect(hasSpecialAbility(card(rank))).toBe(true);
     }
   });
 
-  it("não marca cartas sem habilidade", () => {
-    for (const rank of ["3", "4", "J", "Q", "K", "Joker"] as const) {
-      expect(hasSpecialAbility(card(rank))).toBe(false);
-    }
-  });
 });
 
 describe("getAbilityDescription", () => {
@@ -81,14 +76,17 @@ describe("getAbilityDescription", () => {
   it("mapeia descrições por rank", () => {
     expect(getAbilityDescription("A", t)).toBe("game.abilityWind");
     expect(getAbilityDescription("2", t)).toBe("game.abilityWind");
-    expect(getAbilityDescription("3", t)).toBe("");
-    expect(getAbilityDescription("4", t)).toBe("");
+    expect(getAbilityDescription("3", t)).toBe("game.abilitySeal");
+    expect(getAbilityDescription("4", t)).toBe("game.abilitySeal");
+    expect(getAbilityDescription("J", t)).toBe("game.abilityJack");
+    expect(getAbilityDescription("Q", t)).toBe("game.abilityQueen");
+    expect(getAbilityDescription("Joker", t)).toBe("game.abilityJoker");
     expect(getAbilityDescription("5", t)).toBe("game.abilityPeekOpponent");
     expect(getAbilityDescription("6", t)).toBe("game.abilityPeekOpponent");
     expect(getAbilityDescription("7", t)).toBe("game.abilityPeekOwn");
     expect(getAbilityDescription("8", t)).toBe("game.abilityPeekOwn");
     expect(getAbilityDescription("9", t)).toBe("game.abilitySwap");
     expect(getAbilityDescription("10", t)).toBe("game.abilitySwap");
-    expect(getAbilityDescription("K", t)).toBe("");
+    expect(getAbilityDescription("K", t)).toBe("game.abilityKing");
   });
 });

@@ -294,6 +294,14 @@ export async function handlePlayerAction(
     messenger.broadcast({ type: "card_swap", swapInfo: result.swapInfo });
   }
 
+  if (result.privateReveal) {
+    messenger.send(playerId, {
+      type: "private_reveal",
+      reveals: result.privateReveal.reveals,
+      durationMs: result.privateReveal.durationMs,
+    });
+  }
+
   const next = result.newState.players[result.newState.currentPlayerIndex];
   if (!result.newState.winnerId && (next?.isBot || result.newState.reconnectDeadline)) {
     scheduleBot(roomCode, result.newState);

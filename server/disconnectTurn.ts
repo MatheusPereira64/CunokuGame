@@ -1,5 +1,6 @@
 import type { GameState } from "@shared/schema";
 import { GameLogic } from "./game";
+import { replaceableIndexes } from "@shared/cardPowers";
 
 /** Janela para o jogador desconectado voltar quando chega a vez dele. */
 export const DISCONNECT_TURN_MS = 50_000;
@@ -44,6 +45,12 @@ export function autoPlayDisconnectedTurn(state: GameState, now = Date.now()): Ga
   let current = state;
   if (current.turnPhase === "draw" || !current.drawnCard) {
     current = GameLogic.processAction(current, { type: "draw_deck" }, player.id).newState;
+  }
+
+  // Valete: não pode descartar, então a carta comprada entra no lugar de uma da mão
+  const replaceable = current.forcedReplace ? replaceableIndexes(current, player) : [];
+  if (replaceable.length > 0) {
+    current = GameLogic.processAction(current, { type: "replace_card", handIndex: replaceable[0] }, player.id).newState;
   }
 
   if (

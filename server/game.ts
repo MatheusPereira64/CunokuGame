@@ -1,23 +1,36 @@
 import { Card, GameState, Player, Rank, Suit, RANKS, SUITS } from "@shared/schema";
 import { seededRandom, stateRandom } from "@shared/seededRandom";
 
-/**
- * Carta reciclada do descarte ganha outro id: cartas mascaradas mantêm o id, que não pode
- * ligar uma carta na mão de alguém à face que ela mostrou no descarte.
- */
-function withNewId(card: Card): Card {
-  return { ...card, id: crypto.randomUUID() };
-}
 import { randomFloat, randomInt, shuffleInPlace } from "@shared/secureRandom";
+import {
+  abilityTouchesSealedCard,
+  applyForcedTrade,
+  applyQueen,
+  applySeal,
+  applyWind,
+  drawForPower,
+  expireSeals,
+  isSealed,
+  JOKER_REVEAL_MS,
+  KING_REVEAL_MS,
+  replaceableIndexes,
+  revealCards,
+  withFreshId,
+  type CardReveal,
+} from "@shared/cardPowers";
 
 type AbilityResult = {
   success: boolean;
   message: string;
   privateInfo?: { card: Card; playerName: string };
   swapInfo?: { player1Name: string; player1CardIndex: number; player2Name: string; player2CardIndex: number };
+  reveal?: CardReveal[];
 };
 
+type PrivateReveal = { playerId: string; reveals: CardReveal[]; durationMs: number };
+
 type ActionResult = {
+  privateReveal?: PrivateReveal;
   newState: GameState;
   privateMessage?: { playerId: string; message: string; card?: Card; playerName?: string; targetPlayerId?: string; targetCardIndex?: number };
   swapInfo?: { player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number };
@@ -115,6 +128,21 @@ export class GameLogic {
     if (rank === "7" || rank === "8") return this.peekOwnCard(sourcePlayer, sourceId, targetId, cardIdx);
     if (rank === "5" || rank === "6") return this.peekOpponentCard(state, sourceId, targetId, cardIdx);
     if (rank === "A" || rank === "2") return this.windOnOpponent(state, sourceId, targetId);
+    if (rank === "3" || rank === "4") {
+      return applySeal(state, sourceId, targetId, cardIdx)
+        ? { success: true, message: "Sealed" }
+        : { success: false, message: "Invalid target for seal" };
+    }
+    if (rank === "Q") {
+      const target = state.players.find(p => p.id === targetId);
+      if (!target || target.id === sourceId) return { success: false, message: "Invalid target for queen" };
+      applyQueen(state, sourcePlayer, target, stateRandom(state, "queen"));
+      return { success: true, message: "Queen" };
+    }
+    if (rank === "K") {
+      if (!targetId || !state.players.some(p => p.id === targetId)) return { success: false, message: "Invalid target for king" };
+      return { success: true, message: "King", reveal: revealCards(state, [targetId]) };
+    }
     if (rank === "9" || rank === "10") {
       return this.swapByRank(state, sourcePlayer, sourceId, targetId, cardIdx, targetCardIdx, targetPlayerId2, targetCardIdx2);
     }
@@ -157,9 +185,7 @@ export class GameLogic {
     if (!targetId || targetId === sourceId) return { success: false, message: "Invalid target for wind" };
     const target = state.players.find(p => p.id === targetId);
     if (!target) return { success: false, message: "Target player not found" };
-    target.hand = shuffleInPlace(target.hand.map(withNewId), stateRandom(state, "wind"));
-    target.knownCards = {};
-    state.lastWind = { count: (state.lastWind?.count ?? 0) + 1, byId: sourceId, targetId };
+    applyWind(state, sourceId, target, stateRandom(state, "wind"));
     return { success: true, message: `Wind on ${target.name}` };
   }
 
@@ -261,6 +287,7 @@ export class GameLogic {
       return;
     }
     newState.currentPlayerIndex = nextPlayerIndex;
+    expireSeals(newState);
   }
 
   private static reindexKnownCards(player: Player, removedIndex: number) {
@@ -309,7 +336,7 @@ export class GameLogic {
         return this.finishBecauseDeckEmpty(newState, "Baralho acabou! Jogo finalizado.");
       }
       const topDiscard = newState.discardPile.pop();
-      newState.deck = newState.discardPile.map(withNewId);
+      newState.deck = newState.discardPile.map(withFreshId);
       newState.discardPile = topDiscard ? [topDiscard] : [];
       shuffleInPlace(newState.deck, stateRandom(newState, "reshuffle"));
       newState.logs.push("Baralho reciclado e embaralhado");
@@ -336,10 +363,16 @@ export class GameLogic {
 
   private static discardDrawnCard(newState: GameState, playerIndex: number, playerId: string): ActionResult {
     if (!newState.drawnCard) return { newState };
+    // Valete obriga a substituir, salvo se todas as cartas da mão estiverem seladas
+    if (newState.forcedReplace && replaceableIndexes(newState, newState.players[playerIndex]).length > 0) {
+      return { newState };
+    }
     const discardedCard = newState.drawnCard;
     newState.discardPile.push(discardedCard);
     newState.drawnCard = null;
     newState.drawnFromDiscard = false;
+    newState.forcedReplace = false;
+    newState.jokerRevealed = false;
     newState.turnPhase = "draw";
     newState.logs.push(`${newState.players[playerIndex].name} descartou a carta ${discardedCard.rank} de ${discardedCard.suit}`);
     this.advanceTurn(newState, playerId);
@@ -348,6 +381,8 @@ export class GameLogic {
 
   private static replaceDrawnCard(newState: GameState, player: Player, action: any, playerId: string, playerIndex: number): ActionResult {
     if (!(newState.drawnCard && action.handIndex !== undefined)) return { newState };
+    if (newState.jokerRevealed || isSealed(newState, player.hand[action.handIndex]?.id)) return { newState };
+    newState.forcedReplace = false;
     const oldCard = player.hand[action.handIndex];
     player.hand[action.handIndex] = newState.drawnCard;
     if (oldCard) {
@@ -362,8 +397,13 @@ export class GameLogic {
   }
 
   private static applyDrawnAbility(newState: GameState, action: any, playerId: string, playerIndex: number): ActionResult {
-    if (!newState.drawnCard || newState.drawnFromDiscard) return { newState };
+    if (!newState.drawnCard || newState.drawnFromDiscard || newState.forcedReplace) return { newState };
+    // Só quem está na vez usa a carta comprada
+    if (newState.currentPlayerIndex !== playerIndex) return { newState };
     const abilityRank = newState.drawnCard.rank;
+    if (abilityRank === "J") return this.useJack(newState, playerId, playerIndex);
+    if (abilityRank === "Joker") return this.useJoker(newState, action, playerId, playerIndex);
+    if (abilityTouchesSealedCard(newState, abilityRank, playerId, action)) return { newState };
     const abilityResult = this.handleAbility(
       newState,
       abilityRank,
@@ -384,6 +424,49 @@ export class GameLogic {
     return this.abilityActionResult(newState, playerId, action, abilityResult);
   }
 
+  /** Valete: vai para o descarte e a nova carta precisa substituir uma da mão. */
+  private static useJack(newState: GameState, playerId: string, playerIndex: number): ActionResult {
+    const jack = newState.drawnCard!;
+    const next = drawForPower(newState, stateRandom(newState, "jack"));
+    newState.discardPile.push(jack);
+    newState.logs.push(`${newState.players[playerIndex].name} usou o Valete e comprou mais uma carta`);
+    newState.drawnCard = next;
+    if (next) {
+      newState.forcedReplace = true;
+      return { newState };
+    }
+    newState.turnPhase = "draw";
+    this.advanceTurn(newState, playerId);
+    return { newState };
+  }
+
+  /** Coringa em duas etapas: revela primeiro para o jogador decidir a troca vendo as cartas. */
+  private static useJoker(newState: GameState, action: any, playerId: string, playerIndex: number): ActionResult {
+    const actor = newState.players[playerIndex].name;
+    if (!newState.jokerRevealed) {
+      newState.jokerRevealed = true;
+      newState.logs.push(`${actor} usou o Coringa para ver as cartas de todos`);
+      return {
+        newState,
+        privateReveal: {
+          playerId,
+          reveals: revealCards(newState, newState.players.map((p) => p.id)),
+          durationMs: JOKER_REVEAL_MS,
+        },
+      };
+    }
+    const target = newState.players.find((p) => p.id === action.targetPlayerId);
+    const traded = applyForcedTrade(newState, playerId, action.targetPlayerId, action.targetCardIndex, stateRandom(newState, "joker"));
+    if (!traded) return { newState };
+    newState.logs.push(`${actor} forçou ${target?.name} a trocar uma carta`);
+    newState.discardPile.push(newState.drawnCard!);
+    newState.drawnCard = null;
+    newState.jokerRevealed = false;
+    newState.turnPhase = "draw";
+    this.advanceTurn(newState, playerId);
+    return { newState };
+  }
+
   private static logAbility(
     newState: GameState,
     playerIndex: number,
@@ -398,6 +481,19 @@ export class GameLogic {
     }
     if (abilityRank === "7" || abilityRank === "8") {
       newState.logs.push(`${actor} usou habilidade para ver uma de suas cartas`);
+      return;
+    }
+    const named = newState.players.find((p: Player) => p.id === targetPlayerId)?.name;
+    if (abilityRank === "3" || abilityRank === "4") {
+      newState.logs.push(`${actor} selou uma carta de ${named}`);
+      return;
+    }
+    if (abilityRank === "Q") {
+      newState.logs.push(`${actor} usou a Rainha em ${named}`);
+      return;
+    }
+    if (abilityRank === "K") {
+      newState.logs.push(`${actor} usou o Rei para ver as cartas de ${named}`);
       return;
     }
     if (abilityRank === "A" || abilityRank === "2") {
@@ -419,8 +515,12 @@ export class GameLogic {
       message: string;
       privateInfo?: { card: Card; playerName: string };
       swapInfo?: { player1Name: string; player1CardIndex: number; player2Name: string; player2CardIndex: number };
+      reveal?: CardReveal[];
     },
   ): ActionResult {
+    if (abilityResult.reveal) {
+      return { newState, privateReveal: { playerId, reveals: abilityResult.reveal, durationMs: KING_REVEAL_MS } };
+    }
     if (abilityResult.privateInfo) {
       return {
         newState,
@@ -462,6 +562,7 @@ export class GameLogic {
     if (!cardToDiscard || !player.knownCards[action.cardIndex.toString()] || !lastDiscarded || lastDiscarded.rank !== cardToDiscard.rank) {
       return { newState };
     }
+    if (isSealed(newState, cardToDiscard.id)) return { newState };
     player.hand.splice(action.cardIndex, 1);
     newState.discardPile.push(cardToDiscard);
     this.reindexKnownCards(player, action.cardIndex);
@@ -485,7 +586,7 @@ export class GameLogic {
     if (action.cardIndex === undefined || newState.discardPile.length === 0) return { newState };
     const cardToDiscard = player.hand[action.cardIndex];
     const topDiscard = newState.discardPile[newState.discardPile.length - 1];
-    if (!cardToDiscard || !topDiscard) return { newState };
+    if (!cardToDiscard || !topDiscard || isSealed(newState, cardToDiscard.id)) return { newState };
     if (cardToDiscard.rank !== topDiscard.rank) return this.punishWrongDiscard(newState, player, playerId, playerIndex);
     player.hand.splice(action.cardIndex, 1);
     newState.discardPile.push(cardToDiscard);
@@ -517,7 +618,7 @@ export class GameLogic {
           return { ended: true, count: cardsDrawn };
         }
         const topDiscardCard = newState.discardPile.pop();
-        newState.deck = newState.discardPile.map(withNewId);
+        newState.deck = newState.discardPile.map(withFreshId);
         newState.discardPile = topDiscardCard ? [topDiscardCard] : [];
         shuffleInPlace(newState.deck, stateRandom(newState, `penalty${i}`));
       }

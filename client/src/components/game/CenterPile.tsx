@@ -113,7 +113,17 @@ export function CenterPile({
                   fit(isCompact, "gap-1 min-w-[4.5rem]", "gap-1.5 min-w-[5.5rem]")
                 )}
               >
-                {hasSpecialAbility(gameState.drawnCard) && !gameState.drawnFromDiscard && (
+                {gameState.forcedReplace && (
+                  <div
+                    className={cn(
+                      "text-yellow-300 text-center font-bold leading-tight",
+                      fit(isCompact, "text-[9px] max-w-[5rem]", "text-xs max-w-[7rem]")
+                    )}
+                  >
+                    {t("game.mustReplace")}
+                  </div>
+                )}
+                {!gameState.forcedReplace && hasSpecialAbility(gameState.drawnCard) && !gameState.drawnFromDiscard && (
                   <Button
                     size="sm"
                     variant="primary"
@@ -123,17 +133,19 @@ export function CenterPile({
                       fit(isCompact, "text-[9px] px-1.5 py-0.5", "text-xs px-2 py-1")
                     )}
                   >
-                    {isCompact ? t("game.ability") : t("game.useAbility")}
+                    {gameState.jokerRevealed ? t("game.jokerForce") : isCompact ? t("game.ability") : t("game.useAbility")}
                   </Button>
                 )}
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={onDiscardDrawn}
-                  className={cn("h-auto", fit(isCompact, "text-[9px] px-1.5 py-0.5", "text-xs px-2 py-1"))}
-                >
-                  {t("game.discard")}
-                </Button>
+                {!gameState.forcedReplace && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={onDiscardDrawn}
+                    className={cn("h-auto", fit(isCompact, "text-[9px] px-1.5 py-0.5", "text-xs px-2 py-1"))}
+                  >
+                    {gameState.jokerRevealed ? t("game.jokerSkip") : t("game.discard")}
+                  </Button>
+                )}
                 {gameState.drawnFromDiscard && (
                   <div
                     className={cn(

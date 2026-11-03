@@ -4,7 +4,7 @@ import { Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
 import { cn } from "@/lib/utils";
-import { Eye } from "lucide-react";
+import { Eye, Lock } from "lucide-react";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import type { SeatSide } from "./seatPositions";
 import { EmoteBubble } from "./EmotePicker";
@@ -66,6 +66,8 @@ interface PlayerSeatProps {
   side?: SeatSide;
   /** Força modo compacto (cartas/avatar menores) */
   compact?: boolean;
+  /** Cartas seladas pelos poderes de 3 e 4 */
+  sealedCardIds?: string[];
   /** Emote ativo deste jogador */
   emoteId?: string;
   style?: React.CSSProperties;
@@ -83,6 +85,7 @@ export function PlayerSeat({
   side = "top",
   compact: compactProp,
   emoteId,
+  sealedCardIds = [],
   style,
   className,
 }: PlayerSeatProps) {
@@ -131,6 +134,12 @@ export function PlayerSeat({
               </FlippableCard>
             ) : (
               <PlayingCard card={card} hidden className={cardSize} animate={false} />
+            )}
+
+            {sealedCardIds.includes(card.id) && (
+              <div className={cn("absolute z-20 rounded-full bg-indigo-700 text-white shadow", isCompact ? "-top-1 -left-1 p-0.5" : "-top-1.5 -left-1.5 p-0.5")}>
+                <Lock className={isCompact ? "w-2 h-2" : "w-2.5 h-2.5"} />
+              </div>
             )}
 
             {isTemporarilyRevealed && (

@@ -262,7 +262,8 @@ function desktopRoundDetail(isCompact: boolean, gameState: GameState, t: Transla
   return <RoundDetail gameState={gameState} t={t} />;
 }
 
-function abilityHintVisible(isMyTurn: boolean, phase: string | undefined, card: Card | null, fromDiscard: boolean, isCompact: boolean) {
+function abilityHintVisible(isMyTurn: boolean, phase: string | undefined, card: Card | null, fromDiscard: boolean, isCompact: boolean, forced: boolean) {
+  if (forced) return false;
   if (!isMyTurn || phase !== "action" || !card || fromDiscard || isCompact) return false;
   return hasSpecialAbility(card);
 }
@@ -321,6 +322,7 @@ function SideHints({
   card,
   fromDiscard,
   isCompact,
+  forced,
   t,
 }: {
   isMyTurn: boolean;
@@ -328,11 +330,12 @@ function SideHints({
   card: Card | null;
   fromDiscard: boolean;
   isCompact: boolean;
+  forced: boolean;
   t: Translate;
 }) {
   return (
     <>
-      {abilityHintVisible(isMyTurn, phase, card, fromDiscard, isCompact) ? <AbilityHint card={card as Card} t={t} /> : null}
+      {abilityHintVisible(isMyTurn, phase, card, fromDiscard, isCompact, forced) ? <AbilityHint card={card as Card} t={t} /> : null}
       {replaceHintVisible(isMyTurn, phase, card, isCompact) ? <ReplaceHint t={t} /> : null}
     </>
   );
@@ -418,6 +421,7 @@ function ArcSeat({
       side={pos.side}
       compact={opponents.length >= 3 || isCompact}
       emoteId={emoteId}
+      sealedCardIds={sealedIds(gameState)}
       className="absolute z-20"
       style={{ left: `${pos.left}%`, top: `${pos.top}%`, transform: "translate(-50%, -50%)" }}
     />
@@ -441,10 +445,15 @@ function RowSeats(props: Omit<Parameters<typeof ArcSeats>[0], "isCompact">) {
           side="top"
           compact
           emoteId={activeEmotes[p.id]}
+          sealedCardIds={sealedIds(gameState)}
         />
       ))}
     </div>
   );
+}
+
+function sealedIds(gameState: GameState) {
+  return gameState.sealedCards?.map((s) => s.cardId) ?? [];
 }
 
 function rowGap(count: number) {
@@ -513,7 +522,7 @@ function FeltTable({
         </div>
         <EmoteBubble emoteId={activeEmotes[playerId]} className={cn("left-1/2 -translate-x-1/2", cx(isCompact, "bottom-[34%]", "bottom-[30%]"))} />
         {me ? (
-          <MyArea gameState={gameState} me={me} isMyTurn={isMyTurn} phase={phase} sendAction={sendAction} registerCardPosition={registerCardPosition} />
+          <MyArea revealedCards={revealed} gameState={gameState} me={me} isMyTurn={isMyTurn} phase={phase} sendAction={sendAction} registerCardPosition={registerCardPosition} />
         ) : null}
       </div>
     </div>
@@ -636,7 +645,7 @@ export function ActiveTable(props: {
       <GameTopBar isDaily={!!gameState.dailyDay} canEmote={!gameState.winnerId} onEmote={props.onEmote} isCompact={isCompact} isOffline={props.isOffline} connected={props.connected} roomCode={props.roomCode} onExit={props.onExit} onCopyCode={props.onCopyCode} t={t} />
       <TurnBanner isCompact={isCompact} graceSeconds={graceSeconds} graceName={graceName} isMyTurn={props.isMyTurn} phase={props.phase} t={t} />
       <RoundBadge isCompact={isCompact} gameState={gameState} t={t} />
-      <SideHints isMyTurn={props.isMyTurn} phase={props.phase} card={gameState.drawnCard} fromDiscard={gameState.drawnFromDiscard} isCompact={isCompact} t={t} />
+      <SideHints forced={!!gameState.forcedReplace || !!gameState.jokerRevealed} isMyTurn={props.isMyTurn} phase={props.phase} card={gameState.jokerRevealed ? null : gameState.drawnCard} fromDiscard={gameState.drawnFromDiscard} isCompact={isCompact} t={t} />
       <FeltTable
         isCompact={isCompact}
         mat={props.tableMat}
@@ -663,6 +672,8 @@ export function ActiveTable(props: {
         players={gameState.players}
         playerId={props.playerId}
         myHand={props.me?.hand ?? []}
+        sealedCardIds={sealedIds(gameState)}
+        jokerRevealed={!!gameState.jokerRevealed}
         onConfirm={props.onConfirmAbility}
       />
       <AnimatePresence>

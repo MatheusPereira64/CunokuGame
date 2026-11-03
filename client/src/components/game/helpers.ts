@@ -1,9 +1,9 @@
 import { Card } from "@shared/schema";
 
-/** Ás, 2 e cartas 5-10 possuem habilidades especiais; 3 e 4 ainda não têm */
+/** Todas as cartas do baralho possuem habilidade especial */
 export function hasSpecialAbility(card: Card | null | undefined): boolean {
   if (!card) return false;
-  return ["A", "2", "5", "6", "7", "8", "9", "10"].includes(card.rank);
+  return ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "Joker"].includes(card.rank);
 }
 
 export function getAbilityDescription(rank: string, t: (key: string) => string): string {
@@ -11,6 +11,17 @@ export function getAbilityDescription(rank: string, t: (key: string) => string):
     case "A":
     case "2":
       return t("game.abilityWind");
+    case "3":
+    case "4":
+      return t("game.abilitySeal");
+    case "J":
+      return t("game.abilityJack");
+    case "Q":
+      return t("game.abilityQueen");
+    case "K":
+      return t("game.abilityKing");
+    case "Joker":
+      return t("game.abilityJoker");
     case "5":
     case "6":
       return t("game.abilityPeekOpponent");
@@ -28,6 +39,12 @@ export function getAbilityDescription(rank: string, t: (key: string) => string):
 /** Ação escolhida no modal de habilidade, resolvida pelo Game */
 export type AbilityAction =
   | { kind: "wind"; targetPlayerId: string }
+  | { kind: "seal"; targetPlayerId: string; cardIndex: number }
+  | { kind: "jack" }
+  | { kind: "queen"; targetPlayerId: string }
+  | { kind: "king"; targetPlayerId: string }
+  | { kind: "joker_reveal" }
+  | { kind: "joker_force"; targetPlayerId: string; cardIndex: number }
   | { kind: "peek_own"; cardIndex: number }
   | { kind: "peek_opponent"; targetPlayerId: string; targetCardIndex: number }
   | { kind: "swap_me"; myCardIndex: number; targetPlayerId: string; targetCardIndex: number }
@@ -35,6 +52,10 @@ export type AbilityAction =
 
 export type AbilityConfirmInput = {
   isWind?: boolean;
+  /** Basta escolher um jogador (Rainha, Rei) */
+  needsPlayerOnly?: boolean;
+  /** Escolhe jogador e carta (3 e 4, troca forçada do Coringa) */
+  needsPlayerAndCard?: boolean;
   isPeekOpponent: boolean;
   isPeekOwn: boolean;
   isSwap: boolean;
@@ -50,7 +71,8 @@ export type AbilityConfirmInput = {
 
 /** Quando o botão Confirmar do modal de habilidade deve ficar desabilitado */
 export function abilityConfirmDisabled(input: AbilityConfirmInput): boolean {
-  if (input.isWind && !input.targetPlayer) return true;
+  if ((input.isWind || input.needsPlayerOnly) && !input.targetPlayer) return true;
+  if (input.needsPlayerAndCard && (!input.targetPlayer || input.targetCard === null)) return true;
   if (input.isPeekOpponent && (!input.targetPlayer || input.targetCard === null)) return true;
   if (input.isPeekOwn && input.myCardIndex === null) return true;
   if (input.isSwap && input.swapMode === "me_and_other") {

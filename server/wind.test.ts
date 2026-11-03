@@ -96,13 +96,6 @@ describe("Vento: regras do servidor", () => {
     expect(after.players[1]!.knownCards).toEqual({ "0": true, "2": true });
   });
 
-  it.each(["3", "4"] as const)("carta %s não tem habilidade", (rank) => {
-    const before = stateWith(card("x", rank, Number(rank)));
-    const after = act(before, wind);
-    expect(after.drawnCard?.id).toBe("x");
-    expect(after.players[1]!.hand.map((c) => c.id)).toEqual(["b1", "b2", "b3", "b4"]);
-  });
-
   it("conta os usos e não revela a nova posição aos outros jogadores", () => {
     const once = act(stateWith(card("x", "A", 1)), wind);
     const seen = filterGameStateForPlayer(once, "ana").players[1]!;

@@ -4,6 +4,7 @@ import { useGameSocket } from "@/hooks/use-game-socket";
 import { useOfflineGame } from "@/hooks/use-offline-game";
 import { GameState, Card } from "@shared/schema";
 import { WIND_EFFECT_ID, type EmoteId } from "@shared/emotes";
+import { JOKER_REVEAL_MS, KING_REVEAL_MS, revealCards, type CardReveal } from "@shared/cardPowers";
 import { START_COUNTDOWN_MS } from "@shared/matchQueue";
 import { useGameAnimations, OpponentActionType } from "@/components/animations";
 import { useToast } from "@/hooks/use-toast";
@@ -82,6 +83,7 @@ export default function Game() {
     sendEmote: sendOnlineEmote,
     incomingEmote,
     matchReward,
+    privateReveal,
   } = useGameSocket(isOffline ? "" : roomCode, isOffline ? "" : playerId);
 
   // Posições das cartas na tela (para animações)
@@ -298,7 +300,7 @@ export default function Game() {
   }, []);
 
   /** Carta do oponente fica virada só para quem espiou, e volta ao verso em 20s. */
-  const revealOpponentCardInHand = useCallback((targetPlayerId: string, targetCard: Card) => {
+  const revealOpponentCardInHand = useCallback((targetPlayerId: string, targetCard: Card, durationMs = 20000) => {
     const cardKey = `${targetPlayerId}_${targetCard.id}`;
     setRevealedOpponentCardsInHand((prev) => ({ ...prev, [cardKey]: targetCard }));
     const previous = opponentRevealTimers.current.get(cardKey);
@@ -311,9 +313,31 @@ export default function Game() {
         delete next[cardKey];
         return next;
       });
-    }, 20000);
+    }, durationMs);
     opponentRevealTimers.current.set(cardKey, timer);
   }, []);
+
+  /** Rei e Coringa: mostra as faces só neste cliente, pelo tempo do poder. */
+  const showReveals = useCallback(
+    (reveals: CardReveal[], durationMs: number) => {
+      reveals.forEach(({ playerId: owner, cards }) => {
+        cards.forEach((card) => revealOpponentCardInHand(owner, card, durationMs));
+      });
+      audioManager.playCardFlip();
+      toast({
+        title: t("game.cardsRevealed"),
+        description: t("game.cardsRevealedDesc", { seconds: String(Math.round(durationMs / 1000)) }),
+        duration: 4000,
+      });
+    },
+    [revealOpponentCardInHand, toast, t],
+  );
+
+  useEffect(() => {
+    if (privateReveal) showReveals(privateReveal.reveals, privateReveal.durationMs);
+    // showReveals muda com o idioma, e isso não pode repetir a revelação
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [privateReveal]);
 
   // Remove revelações locais quando a carta não está mais na mão do oponente
   useEffect(() => {
@@ -575,6 +599,43 @@ export default function Game() {
       audioManager.playSwap();
     }
 
+    if (action.kind === "jack") {
+      sendAction({ type: "use_ability", ability: "jack" });
+    }
+
+    if (action.kind === "queen") {
+      sendAction({ type: "use_ability", ability: "queen", targetPlayerId: action.targetPlayerId });
+    }
+
+    if (action.kind === "seal") {
+      sendAction({
+        type: "use_ability",
+        ability: "seal",
+        targetPlayerId: action.targetPlayerId,
+        targetCardIndex: action.cardIndex,
+      });
+    }
+
+    if (action.kind === "king") {
+      // Offline não há servidor: as faces vêm do estado local
+      if (isOffline) showReveals(revealCards(gameState, [action.targetPlayerId]), KING_REVEAL_MS);
+      sendAction({ type: "use_ability", ability: "king", targetPlayerId: action.targetPlayerId });
+    }
+
+    if (action.kind === "joker_reveal") {
+      if (isOffline) showReveals(revealCards(gameState, gameState.players.map((p) => p.id)), JOKER_REVEAL_MS);
+      sendAction({ type: "use_ability", ability: "joker_reveal" });
+    }
+
+    if (action.kind === "joker_force") {
+      sendAction({
+        type: "use_ability",
+        ability: "joker_force",
+        targetPlayerId: action.targetPlayerId,
+        targetCardIndex: action.cardIndex,
+      });
+    }
+
     if (action.kind === "wind") {
       sendAction({ type: "use_ability", ability: "wind", targetPlayerId: action.targetPlayerId });
       audioManager.playSwap();
@@ -587,7 +648,7 @@ export default function Game() {
         targetPlayerId: action.player1Id,
         targetCardIndex: action.card1Index,
         targetPlayerId2: action.player2Id,
-        targetCardIndex2: action.card2Index,
+        targetCardIndex3: action.card2Index,
       });
       audioManager.playSwap();
     }

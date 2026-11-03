@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/Button";
 import { useI18n } from "@/contexts/i18n-context";
-import { BookOpen, Eye, Glasses, ArrowLeftRight, Wind, type LucideIcon } from "lucide-react";
+import { BookOpen, Crown, Eye, Glasses, ArrowLeftRight, Lock, Plus, Sparkles, Users, Wind, type LucideIcon } from "lucide-react";
 import { cn, fit } from "@/lib/utils";
 
 /** Mesmos ícones usados no selo das cartas (PlayingCard) */
@@ -16,6 +16,12 @@ const ABILITY_RULES: {
     descKey: "rules.aceTwo",
     shortKey: "game.abilityWind",
     Icon: Wind,
+  },
+  {
+    ranksKey: "rules.threeAndFour",
+    descKey: "rules.threeFour",
+    shortKey: "game.abilitySeal",
+    Icon: Lock,
   },
   {
     ranksKey: "rules.fiveAndSix",
@@ -34,6 +40,30 @@ const ABILITY_RULES: {
     descKey: "rules.nineTen",
     shortKey: "game.abilitySwap",
     Icon: ArrowLeftRight,
+  },
+  {
+    ranksKey: "rules.jackName",
+    descKey: "rules.jackPower",
+    shortKey: "game.abilityJack",
+    Icon: Plus,
+  },
+  {
+    ranksKey: "rules.queenName",
+    descKey: "rules.queenPower",
+    shortKey: "game.abilityQueen",
+    Icon: Users,
+  },
+  {
+    ranksKey: "rules.kingName",
+    descKey: "rules.kingPower",
+    shortKey: "game.abilityKing",
+    Icon: Crown,
+  },
+  {
+    ranksKey: "rules.jokerName",
+    descKey: "rules.jokerPower",
+    shortKey: "game.abilityJoker",
+    Icon: Sparkles,
   },
 ];
 

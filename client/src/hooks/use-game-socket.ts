@@ -21,6 +21,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
 
   const [incomingEmote, setIncomingEmote] = useState<{ playerId: string; emoteId: string; at: number } | null>(null);
   const [matchReward, setMatchReward] = useState<MatchReward | null>(null);
+  const [privateReveal, setPrivateReveal] = useState<{ reveals: { playerId: string; cards: Card[] }[]; durationMs: number } | null>(null);
 
   useEffect(() => {
     if (!roomCode || !playerId) return;
@@ -143,6 +144,9 @@ export function useGameSocket(roomCode: string, playerId: string) {
               });
             }
             break;
+          case "private_reveal":
+            setPrivateReveal({ reveals: message.reveals, durationMs: message.durationMs });
+            break;
           case "emote":
             setIncomingEmote({ playerId: message.playerId, emoteId: message.emoteId, at: Date.now() });
             break;
@@ -200,5 +204,5 @@ export function useGameSocket(roomCode: string, playerId: string) {
     }
   }, []);
 
-  return { gameState, connected, sendAction, socketRef, revealedCard, setRevealedCard, swapInfo, setSwapInfo, sendEmote, incomingEmote, matchReward };
+  return { gameState, connected, sendAction, socketRef, revealedCard, setRevealedCard, swapInfo, setSwapInfo, sendEmote, incomingEmote, matchReward, privateReveal };
 }

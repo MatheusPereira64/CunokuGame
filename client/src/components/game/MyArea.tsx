@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { cn, fit } from "@/lib/utils";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import { useI18n } from "@/contexts/i18n-context";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Lock } from "lucide-react";
 import { loadProfile } from "@/lib/playerProfile";
 
 interface MyAreaProps {
@@ -17,9 +17,11 @@ interface MyAreaProps {
   phase: string | undefined;
   sendAction: (action: any) => void;
   registerCardPosition: (key: string, el: HTMLElement | null, card?: Card) => void;
+  /** Faces reveladas por Rei ou Coringa, por `${playerId}_${cardId}` */
+  revealedCards?: Record<string, Card>;
 }
 
-export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCardPosition }: MyAreaProps) {
+export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCardPosition, revealedCards = {} }: MyAreaProps) {
   const isCompact = useIsCompactGame();
   const { t } = useI18n();
   const [selectedHandIndex, setSelectedHandIndex] = useState<number | null>(null);
@@ -60,9 +62,13 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Pode trocar a carta comprada por qualquer carta da mão
-  const canReplace = isMyTurn && phase === "action" && !!gameState.drawnCard;
+  const canReplace = isMyTurn && phase === "action" && !!gameState.drawnCard && !gameState.jokerRevealed;
+  const isCardSealed = (cardId: string) => !!gameState.sealedCards?.some((s) => s.cardId === cardId);
 
   const handleCardClick = (cardIndex: number) => {
+    // Carta selada não pode ser trocada nem descartada nesta rodada
+    if (isCardSealed(me.hand[cardIndex]?.id)) return;
+
     // Descarte reativo fora do turno
     if (!isMyTurn) {
       if (matchInfo.canMatch && matchInfo.matchingCards.includes(cardIndex)) {
@@ -78,7 +84,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
     }
 
     // Substituição pela carta comprada
-    if (phase === "action" && gameState.drawnCard) {
+    if (phase === "action" && gameState.drawnCard && !gameState.jokerRevealed) {
       sendAction({ type: "replace_card", handIndex: cardIndex });
       return;
     }
@@ -111,7 +117,9 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
         {me.hand.map((card, i) => {
           const canMatchThisCard = !isMyTurn && matchInfo.canMatch && matchInfo.matchingCards.includes(i);
           const isKnownCard = me.knownCards[i.toString()] || me.knownCards[i];
-          const canQuickDiscard = showDiscardButtons;
+          const sealed = isCardSealed(card.id);
+          const canQuickDiscard = showDiscardButtons && !sealed;
+          const revealedFace = revealedCards[`${me.id}_${card.id}`];
           const isSafeDiscard = canQuickDiscard && discardInfo.matchingCards.includes(i);
 
           return (
@@ -132,7 +140,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
             >
               {/* Seta de troca: hover na carta quando pode substituir a comprada */}
               <AnimatePresence>
-                {canReplace && hoveredIndex === i && (
+                {canReplace && !sealed && hoveredIndex === i && (
                   <motion.div
                     initial={{ opacity: 0, y: 6, scale: 0.8 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -161,9 +169,18 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                 className="relative block w-full border-0 bg-transparent p-0 text-left"
                 ref={(el) => registerCardPosition(`${me.id}_${i}`, el, card)}
               >
+                {sealed && (
+                  <div
+                    className="absolute -top-1.5 -right-1.5 z-20 rounded-full bg-indigo-700 p-1 text-white shadow"
+                    title={t("game.sealed")}
+                    aria-label={t("game.sealed")}
+                  >
+                    <Lock className={fit(isCompact, "w-2.5 h-2.5", "w-3.5 h-3.5")} />
+                  </div>
+                )}
                 <PlayingCard
-                  card={card}
-                  hidden={!gameState.winnerId && !isKnownCard}
+                  card={revealedFace ?? card}
+                  hidden={!gameState.winnerId && (sealed || (!isKnownCard && !revealedFace))}
                   selected={selectedHandIndex === i}
                   className={cn(
                     "transition-all mx-auto",
@@ -172,7 +189,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                       : useFanOverlap
                         ? "w-16 h-24 md:w-20 md:h-28"
                         : "w-[4.5rem] h-[6.5rem] md:w-24 md:h-36",
-                    canReplace
+                    canReplace && !sealed
                       ? "cursor-pointer hover:ring-4 ring-green-400 ring-4 ring-green-400/40"
                       : "",
                     canMatchThisCard ? "cursor-pointer hover:ring-4 ring-orange-400" : "",
