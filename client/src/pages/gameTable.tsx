@@ -705,6 +705,7 @@ export function ActiveTable(props: {
           players={gameState.players}
           winnerId={gameState.winnerId}
           localPlayerId={props.playerId}
+          isOffline={props.isOffline}
           reward={props.matchReward}
           onBackHome={props.onBackHome}
         />

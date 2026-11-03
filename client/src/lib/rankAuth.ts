@@ -4,6 +4,15 @@ import type { PublicRankProfile, LeaderboardEntry, RankTier } from "@shared/rank
 
 const TOKEN_KEY = "cunoku_rank_token";
 const PLAYER_KEY = "cunoku_rank_player_id";
+const SAVED_ACCOUNTS_KEY = "cunoku_saved_accounts";
+
+/** Conta usada neste aparelho. Sem token, o jogador volta só digitando o PIN. */
+export interface SavedAccount {
+  playerId: string;
+  nickname: string;
+  displayName: string;
+  token: string | null;
+}
 
 export type { PublicRankProfile, LeaderboardEntry, RankTier };
 
@@ -32,6 +41,51 @@ function saveSession(token: string, playerId: string) {
   localStorage.setItem(PLAYER_KEY, playerId);
 }
 
+export function getSavedAccounts(): SavedAccount[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SAVED_ACCOUNTS_KEY) || "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (a): a is SavedAccount => typeof a?.playerId === "string" && typeof a?.nickname === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
+function writeSavedAccounts(accounts: SavedAccount[]) {
+  try {
+    localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(accounts));
+  } catch {
+    // quota / modo privado
+  }
+}
+
+/** A conta entrada por último fica no topo da lista. */
+function rememberAccount(profile: PublicRankProfile, token: string) {
+  const others = getSavedAccounts().filter((a) => a.playerId !== profile.playerId);
+  writeSavedAccounts([
+    { playerId: profile.playerId, nickname: profile.nickname, displayName: profile.displayName || profile.nickname, token },
+    ...others,
+  ]);
+}
+
+export function forgetSavedAccount(playerId: string): void {
+  writeSavedAccounts(getSavedAccounts().filter((a) => a.playerId !== playerId));
+  if (getRankPlayerId() === playerId) logoutRank();
+}
+
+/**
+ * Entra em uma conta salva sem digitar o PIN.
+ * Devolve null se a sessão expirou; a conta continua na lista para entrar com o PIN.
+ */
+export async function switchToSavedAccount(playerId: string): Promise<PublicRankProfile | null> {
+  const account = getSavedAccounts().find((a) => a.playerId === playerId);
+  if (!account?.token) return null;
+  saveSession(account.token, account.playerId);
+  return fetchRankMe();
+}
+
 /** A conta do ranking é a fonte do nome/ícone: o aparelho guarda uma cópia. */
 function rememberRankProfile(profile: PublicRankProfile): PublicRankProfile {
   saveProfile({
@@ -42,6 +96,7 @@ function rememberRankProfile(profile: PublicRankProfile): PublicRankProfile {
   return profile;
 }
 
+/** Encerra a sessão ativa; a conta continua salva para voltar depois. */
 export function logoutRank(): void {
   try {
     localStorage.removeItem(TOKEN_KEY);
@@ -94,6 +149,7 @@ export async function registerRankAccount(input: {
   if (!res.ok) throw new Error(await parseError(res));
   const data = await parseJson<{ token: string; profile: PublicRankProfile }>(res);
   saveSession(data.token, data.profile.playerId);
+  rememberAccount(data.profile, data.token);
   return rememberRankProfile(data.profile);
 }
 
@@ -109,6 +165,7 @@ export async function loginRankAccount(input: {
   if (!res.ok) throw new Error(await parseError(res));
   const data = await parseJson<{ token: string; profile: PublicRankProfile }>(res);
   saveSession(data.token, data.profile.playerId);
+  rememberAccount(data.profile, data.token);
   return rememberRankProfile(data.profile);
 }
 
@@ -119,11 +176,15 @@ export async function fetchRankMe(): Promise<PublicRankProfile | null> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (res.status === 401) {
+    // Sessão inválida: mantém a conta na lista, sem o token, para entrar de novo com o PIN
+    const playerId = getRankPlayerId();
+    writeSavedAccounts(getSavedAccounts().map((a) => (a.playerId === playerId ? { ...a, token: null } : a)));
     logoutRank();
     return null;
   }
   if (!res.ok) throw new Error(await parseError(res));
   const data = await parseJson<{ profile: PublicRankProfile }>(res);
+  rememberAccount(data.profile, token);
   return rememberRankProfile(data.profile);
 }
 

@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { loadProfile } from "@/lib/playerProfile";
+import { countsForGlobalRank, isRankLoggedIn } from "@/lib/rankAuth";
 
 interface GameOverModalProps {
   open: boolean;
@@ -20,6 +21,7 @@ interface GameOverModalProps {
   players: Player[];
   winnerId: string;
   localPlayerId?: string;
+  isOffline?: boolean;
   /** Pontos de liga e posição no desafio diário, quando a partida vale ranking */
   reward?: MatchReward | null;
   onBackHome: () => void;
@@ -31,6 +33,7 @@ export function GameOverModal({
   players,
   winnerId,
   localPlayerId,
+  isOffline = false,
   reward,
   onBackHome,
 }: GameOverModalProps) {
@@ -84,6 +87,12 @@ export function GameOverModal({
               </div>
             ))}
         </div>
+
+        {!isRankLoggedIn() && !!localPlayerId && countsForGlobalRank(isOffline, players, localPlayerId) && (
+          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            {t("rank.saveScoreHint")}
+          </p>
+        )}
 
         {reward && (
           <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-950">

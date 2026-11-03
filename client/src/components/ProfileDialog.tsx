@@ -35,9 +35,13 @@ import {
   registerRankAccount,
   syncRankProfile,
   type PublicRankProfile,
+  forgetSavedAccount,
+  getSavedAccounts,
+  switchToSavedAccount,
+  type SavedAccount,
 } from "@/lib/rankAuth";
 import { RankBadge } from "@/components/RankBadge";
-import { ArrowLeft, Check, Globe, Lock, Trophy, UserRound } from "lucide-react";
+import { ArrowLeft, Check, Globe, Lock, Trophy, UserRound, X } from "lucide-react";
 import {
   ACHIEVEMENTS,
   progressValue,
@@ -96,6 +100,8 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
   const [cosmeticError, setCosmeticError] = useState<string | null>(null);
 
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
   const [pin, setPin] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
@@ -122,6 +128,10 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
     setAuthError(null);
     setCosmeticError(null);
     setPin("");
+    const saved = getSavedAccounts();
+    setSavedAccounts(saved);
+    // Quem já teve conta aqui quase sempre quer entrar nela, não criar outra
+    if (saved.length > 0) setAuthMode("login");
     if (isRankLoggedIn()) {
       void fetchRankMe()
         .then((rp) => {
@@ -193,12 +203,8 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
             })
           : await loginRankAccount({ nickname, pin });
       applyRankProfile(rp);
-      const synced = loadProfile();
-      setProfile(synced);
-      setName(synced.displayName);
-      setIconId(synced.iconId);
-      setAccent(synced.accent);
-      onSaved?.(synced);
+      syncFormFromProfile();
+      setSavedAccounts(getSavedAccounts());
       setPin("");
       setAccountTab("look");
     } catch (err: any) {
@@ -211,6 +217,51 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
   const handleLogout = () => {
     logoutRank();
     applyRankProfile(null);
+    setSavedAccounts(getSavedAccounts());
+    setAuthMode("login");
+  };
+
+  const syncFormFromProfile = () => {
+    const synced = loadProfile();
+    setProfile(synced);
+    setName(synced.displayName);
+    setIconId(synced.iconId);
+    setAccent(synced.accent);
+    onSaved?.(synced);
+  };
+
+  const handleUseSaved = async (account: SavedAccount) => {
+    setAuthError(null);
+    // Sessão expirada: basta o PIN para voltar à mesma conta
+    if (!account.token) {
+      setAuthMode("login");
+      setNickname(account.nickname);
+      return;
+    }
+    setSwitchingId(account.playerId);
+    try {
+      const rp = await switchToSavedAccount(account.playerId);
+      setSavedAccounts(getSavedAccounts());
+      if (!rp) {
+        setAuthMode("login");
+        setNickname(account.nickname);
+        setAuthError(t("rank.sessionExpired"));
+        return;
+      }
+      applyRankProfile(rp);
+      syncFormFromProfile();
+      setAccountTab("look");
+    } catch {
+      setAuthError(t("rank.error.generic"));
+    } finally {
+      setSwitchingId(null);
+    }
+  };
+
+  const handleForgetSaved = (account: SavedAccount) => {
+    forgetSavedAccount(account.playerId);
+    setSavedAccounts(getSavedAccounts());
+    if (rankProfile?.playerId === account.playerId) applyRankProfile(null);
   };
 
   const rate = winRate(profile.stats);
@@ -640,6 +691,42 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                 </div>
               ) : (
                 <div className="space-y-3">
+                  {savedAccounts.length > 0 && (
+                    <div className="space-y-1.5">
+                      <Label>{t("rank.savedAccounts")}</Label>
+                      <ul className="space-y-1.5">
+                        {savedAccounts.map((account) => (
+                          <li key={account.playerId} className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-auto min-w-0 flex-1 justify-start py-1.5 text-left"
+                              isLoading={switchingId === account.playerId}
+                              onClick={() => void handleUseSaved(account)}
+                            >
+                              <span className="block min-w-0">
+                                <span className="block truncate font-bold">{account.displayName}</span>
+                                <span className="block truncate text-[11px] font-normal">
+                                  @{account.nickname}
+                                  {account.token ? "" : ` · ${t("rank.needsPin")}`}
+                                </span>
+                              </span>
+                            </Button>
+                            <button
+                              type="button"
+                              className="shrink-0 rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-red-600"
+                              aria-label={t("rank.forgetAccount", { nickname: account.nickname })}
+                              title={t("rank.forgetAccount", { nickname: account.nickname })}
+                              onClick={() => handleForgetSaved(account)}
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button
                       type="button"

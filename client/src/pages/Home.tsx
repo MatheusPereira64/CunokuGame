@@ -23,7 +23,7 @@ import { LeaderboardDialog } from "@/components/LeaderboardDialog";
 import { useI18n, type Language } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait, unlockOrientation } from "@/hooks/use-landscape";
 import { cn, fit } from "@/lib/utils";
-import { loadProfile } from "@/lib/playerProfile";
+import { loadProfile, saveProfile } from "@/lib/playerProfile";
 import { fetchRankMe, isRankLoggedIn } from "@/lib/rankAuth";
 import { APP_VERSION } from "@/lib/appVersion";
 import {
@@ -181,6 +181,11 @@ export default function Home() {
       cancelled = true;
     };
   }, []);
+
+  // O nome digitado em qualquer janela do menu fica salvo para a próxima vez
+  useEffect(() => {
+    if (name.trim() && name.trim() !== loadProfile().displayName) saveProfile({ displayName: name });
+  }, [name]);
 
   const createRoom = useCreateRoom();
   const joinRoom = useJoinRoom();

@@ -43,6 +43,9 @@ async function boot() {
     // Cache indisponível não pode impedir o jogo de abrir
   }
 
+  // Com pouco espaço, o sistema pode apagar dados de sites: isso pede para preservar os do jogo
+  void navigator.storage?.persist?.().catch(() => undefined);
+
   createRoot(document.getElementById("root")!).render(<App />);
 }
 
