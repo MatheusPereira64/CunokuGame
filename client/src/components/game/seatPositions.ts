@@ -41,6 +41,16 @@ const SEAT_LAYOUTS: Record<number, SeatPosition[]> = {
   ],
 };
 
+/**
+ * Oponentes na ordem dos assentos (esquerda, topo, direita): quem joga logo depois de mim
+ * senta à minha esquerda, então o turno anda no sentido horário na tela de todos os jogadores.
+ */
+export function opponentsInTurnOrder<T extends { id: string }>(players: T[], localPlayerId: string): T[] {
+  const me = players.findIndex((p) => p.id === localPlayerId);
+  if (me === -1) return players;
+  return [...players.slice(me + 1), ...players.slice(0, me)];
+}
+
 export function getSeatPositions(opponentCount: number): SeatPosition[] {
   return SEAT_LAYOUTS[opponentCount] ?? SEAT_LAYOUTS[5];
 }

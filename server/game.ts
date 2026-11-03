@@ -10,9 +10,12 @@ import {
   applyWind,
   drawForPower,
   expireSeals,
+  FINAL_ROUNDS,
+  finalRoundsEnded,
   isSealed,
   JOKER_REVEAL_MS,
   KING_REVEAL_MS,
+  recordSwap,
   replaceableIndexes,
   revealCards,
   withFreshId,
@@ -222,7 +225,7 @@ export class GameLogic {
     if (cardIdx1 < 0 || cardIdx1 >= player1.hand.length || cardIdx2 < 0 || cardIdx2 >= player2.hand.length) {
       return { success: false, message: "Invalid card indices for swap" };
     }
-    return this.exchangeCards(sourcePlayer, player1, cardIdx1, player2, cardIdx2, true);
+    return this.exchangeCards(state, sourcePlayer, player1, cardIdx1, player2, cardIdx2, true);
   }
 
   private static swapWithOpponent(
@@ -239,10 +242,11 @@ export class GameLogic {
     if (sourceCardIdx < 0 || sourceCardIdx >= sourcePlayer.hand.length || finalTargetCardIdx < 0 || finalTargetCardIdx >= targetPlayer.hand.length) {
       return { success: false, message: "Invalid card indices for swap" };
     }
-    return this.exchangeCards(sourcePlayer, sourcePlayer, sourceCardIdx, targetPlayer, finalTargetCardIdx, false);
+    return this.exchangeCards(state, sourcePlayer, sourcePlayer, sourceCardIdx, targetPlayer, finalTargetCardIdx, false);
   }
 
   private static exchangeCards(
+    state: GameState,
     sourcePlayer: Player,
     player1: Player,
     cardIdx1: number,
@@ -256,6 +260,7 @@ export class GameLogic {
     player2.hand[cardIdx2] = card1;
     delete player1.knownCards[cardIdx1.toString()];
     delete player2.knownCards[cardIdx2.toString()];
+    recordSwap(state, player1, cardIdx1, player2, cardIdx2);
     const message = nameBothPlayers
       ? `${sourcePlayer.name} swapped card ${cardIdx1 + 1} of ${player1.name} with card ${cardIdx2 + 1} of ${player2.name}`
       : `${sourcePlayer.name} swapped card ${cardIdx1 + 1} with card ${cardIdx2 + 1} of ${player2.name}`;
@@ -278,10 +283,10 @@ export class GameLogic {
     return { newState };
   }
 
-  private static advanceTurn(newState: GameState, playerId: string) {
+  private static advanceTurn(newState: GameState) {
     const nextPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
     if (nextPlayerIndex === 0) newState.round++;
-    if (newState.isFinalRound && newState.finalRoundDeclarerId === playerId) {
+    if (finalRoundsEnded(newState, nextPlayerIndex)) {
       newState.turnPhase = "finished";
       this.calculateFinalScores(newState);
       return;
@@ -375,7 +380,7 @@ export class GameLogic {
     newState.jokerRevealed = false;
     newState.turnPhase = "draw";
     newState.logs.push(`${newState.players[playerIndex].name} descartou a carta ${discardedCard.rank} de ${discardedCard.suit}`);
-    this.advanceTurn(newState, playerId);
+    this.advanceTurn(newState);
     return { newState };
   }
 
@@ -392,7 +397,7 @@ export class GameLogic {
     newState.drawnCard = null;
     newState.drawnFromDiscard = false;
     newState.turnPhase = "draw";
-    this.advanceTurn(newState, playerId);
+    this.advanceTurn(newState);
     return { newState };
   }
 
@@ -420,7 +425,7 @@ export class GameLogic {
     newState.drawnCard = null;
     newState.drawnFromDiscard = false;
     newState.turnPhase = "draw";
-    this.advanceTurn(newState, playerId);
+    this.advanceTurn(newState);
     return this.abilityActionResult(newState, playerId, action, abilityResult);
   }
 
@@ -436,7 +441,7 @@ export class GameLogic {
       return { newState };
     }
     newState.turnPhase = "draw";
-    this.advanceTurn(newState, playerId);
+    this.advanceTurn(newState);
     return { newState };
   }
 
@@ -463,7 +468,7 @@ export class GameLogic {
     newState.drawnCard = null;
     newState.jokerRevealed = false;
     newState.turnPhase = "draw";
-    this.advanceTurn(newState, playerId);
+    this.advanceTurn(newState);
     return { newState };
   }
 
@@ -571,14 +576,16 @@ export class GameLogic {
   }
 
   private static declareFinish(newState: GameState, playerId: string, playerIndex: number): ActionResult {
+    if (newState.isFinalRound) return { newState };
     if (newState.round < 5) {
       newState.logs.push(`${newState.players[playerIndex].name} cannot declare finish yet. Need at least 5 rounds.`);
       return { newState };
     }
     newState.finalRoundDeclarerId = playerId;
     newState.isFinalRound = true;
+    newState.finalRoundsLeft = FINAL_ROUNDS;
     newState.turnPhase = "draw";
-    newState.logs.push(`${newState.players[playerIndex].name} declarou CUNOKU! Rodada final iniciada.`);
+    newState.logs.push(`${newState.players[playerIndex].name} declarou CUNOKU! Faltam ${FINAL_ROUNDS} rodadas.`);
     return { newState };
   }
 
@@ -592,14 +599,14 @@ export class GameLogic {
     newState.discardPile.push(cardToDiscard);
     this.reindexKnownCards(player, action.cardIndex);
     newState.logs.push(`${newState.players[playerIndex].name} descartou a carta ${cardToDiscard.rank} de ${cardToDiscard.suit} da mão`);
-    this.advanceTurn(newState, playerId);
+    this.advanceTurn(newState);
     return { newState };
   }
 
   private static punishWrongDiscard(newState: GameState, player: Player, playerId: string, playerIndex: number): ActionResult {
     if (player.hand.length >= 6) {
       newState.logs.push(`${newState.players[playerIndex].name} tentou descartar carta errada! Perde a vez (tem 6 cartas).`);
-      this.advanceTurn(newState, playerId);
+      this.advanceTurn(newState);
       return { newState };
     }
     const drawn = this.drawPenaltyCards(newState, player);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSeatPositions } from "./seatPositions";
+import { getSeatPositions, opponentsInTurnOrder } from "./seatPositions";
 
 describe("getSeatPositions", () => {
   it("retorna layout exato para 1–5 oponentes", () => {
@@ -27,5 +27,28 @@ describe("getSeatPositions", () => {
         expect(seat.top).toBeLessThan(50);
       }
     }
+  });
+});
+
+describe("opponentsInTurnOrder", () => {
+  const players = ["a", "b", "c", "d"].map((id) => ({ id }));
+  const order = (me: string) => opponentsInTurnOrder(players, me).map((p) => p.id);
+
+  it("começa por quem joga logo depois do jogador local, em qualquer posição", () => {
+    expect(order("a")).toEqual(["b", "c", "d"]);
+    expect(order("b")).toEqual(["c", "d", "a"]);
+    expect(order("c")).toEqual(["d", "a", "b"]);
+    expect(order("d")).toEqual(["a", "b", "c"]);
+  });
+
+  it("os assentos vão da esquerda para a direita, formando o sentido horário", () => {
+    for (const count of [2, 3, 4, 5]) {
+      const lefts = getSeatPositions(count).map((seat) => seat.left);
+      expect(lefts).toEqual([...lefts].sort((x, y) => x - y));
+    }
+  });
+
+  it("mantém todos quando o jogador não está na mesa", () => {
+    expect(opponentsInTurnOrder(players, "x")).toEqual(players);
   });
 });

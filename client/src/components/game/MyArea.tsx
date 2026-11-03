@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameState, Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
 import { EmoteBubble } from "./EmotePicker";
+import { useSwapHighlightStyle } from "./swapHighlight";
 import { Button } from "@/components/Button";
 import { cn, fit } from "@/lib/utils";
 import { useIsCompactGame } from "@/hooks/use-landscape";
@@ -22,6 +23,10 @@ interface MyAreaProps {
   revealedCards?: Record<string, Card>;
   /** Emote ativo do jogador local */
   emoteId?: string;
+}
+
+function SwapGlow({ cardId, children }: { cardId: string; children: ReactNode }) {
+  return <div style={useSwapHighlightStyle(cardId)}>{children}</div>;
 }
 
 export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCardPosition, revealedCards = {}, emoteId }: MyAreaProps) {
@@ -181,6 +186,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                     <Lock className={fit(isCompact, "w-2.5 h-2.5", "w-3.5 h-3.5")} />
                   </div>
                 )}
+                <SwapGlow cardId={card.id}>
                 <PlayingCard
                   card={revealedFace ?? card}
                   hidden={!gameState.winnerId && (sealed || (!isKnownCard && !revealedFace))}
@@ -199,6 +205,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                     canQuickDiscard ? "cursor-pointer hover:ring-4 ring-blue-400" : ""
                   )}
                 />
+                </SwapGlow>
               </button>
 
               {isKnownCard && !showDiscardButtons && !isCompact && (
@@ -270,7 +277,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
       </div>
 
       {/* Botão Cunoku */}
-      {isMyTurn && phase === "draw" && gameState.round >= 5 && (
+      {isMyTurn && phase === "draw" && gameState.round >= 5 && !gameState.isFinalRound && (
         <div className={cn("absolute", fit(isCompact, "right-1 bottom-14", "right-4 bottom-28"))}>
           <Button
             variant="destructive"

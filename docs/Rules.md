@@ -18,7 +18,7 @@ Objetivo do jogo: ter a menor soma de cartas ao final da partida
 - *Cinco e Seis*: Permitem ver a carta de um oponente 
 - *Regras de descarte*: Um jogador pode descartar uma carta da sua mão se ela for igual ao mesmo valor da carta em cima da pilha de descarte ex: 7=7 ,quando o jogador comprar uma carta ele pode escolher ficar com ela e substituir uma de sua mão ou descartar a carta direto para a pilha de descarte, os jogadores que souberem que possuem a mesma carta podem descartar a mesma (O descarte é possível independente do Naipe, so precisa ser o mesmo numero ou letra na carta)
 - *Regras de compra*: Compre uma carta olhe o valor e decida o que fazer com a habilidade pode ser usada 
-- *Final de partida*: pode ocorrer a qualquer momento depois de 5 turnos , quando um jogador estiver satisfeito com seu deck e declarar o fim do jogo. A partir daí, haverá mais uma rodada de descarte e/ou poderes até chegar no jogador que declarou o fim do jogo. Então os jogadores revelam suas cartas e somam seus pontos. O jogador com menos pontos é o vencedor
+- *Final de partida*: depois de 5 turnos, um jogador satisfeito com suas cartas pode declarar o fim do jogo. A partir daí, todos jogam mais 3 rodadas, contando do turno de quem declarou. Então as cartas são reveladas e somadas, e quem tiver menos pontos vence
 - *Regra de punição*: Se um jogador descartar errado uma carta de valor diferente com a de cima da pilha, ele deve comprar duas cartas como punição, adicionando a sua mão
 
 -Limite maximo de jogadores é 6 e o minimo é 2

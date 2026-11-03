@@ -18,10 +18,12 @@ import { clearActiveSession, saveActiveSession } from "@/lib/activeSession";
 import { buildInviteUrl } from "@/lib/inviteLink";
 import { loadTableTheme, subscribeTableTheme } from "@/lib/tableTheme";
 import { copyToClipboard } from "@/lib/clipboard";
+import type { SwapHighlight } from "@/components/game/swapHighlight";
 import { ActiveTable, ConnectingScreen, renderPregame } from "@/pages/gameTable";
 import { applyOfflineSession, isOpeningDeal, leftWaitingRoom, matchInProgress, playTableAnimations, syncFinishedMatch } from "@/pages/gameMotion";
 
 const QUEUE_START_RETRY_MS = 2000;
+const SWAP_HIGHLIGHT_MS = 6000;
 
 export default function Game() {
   const [, params] = useRoute("/game/:code");
@@ -78,8 +80,6 @@ export default function Game() {
     socketRef,
     revealedCard: onlineRevealedCard,
     setRevealedCard: setOnlineRevealedCard,
-    swapInfo: onlineSwapInfo,
-    setSwapInfo: setOnlineSwapInfo,
     sendEmote: sendOnlineEmote,
     incomingEmote,
     matchReward,
@@ -88,8 +88,6 @@ export default function Game() {
 
   // Posições das cartas na tela (para animações)
   const cardRefs = useRef<Map<string, { x: number; y: number; card?: Card }>>(new Map());
-  // Estado anterior do jogo (para pegar cartas antes de uma troca)
-  const previousGameState = useRef<GameState | null>(null);
 
   const [abilityModalOpen, setAbilityModalOpen] = useState(false);
   const peekTimersRef = useRef<Map<number, NodeJS.Timeout>>(new Map());
@@ -247,46 +245,6 @@ export default function Game() {
     return () => clearTimeout(timeoutId);
   }, [gameState, animateDraw, animateDiscard, animateReplace, animatePenalty, animateDeal, playerId]);
 
-  // Guarda estado anterior para pegar cartas antes de uma troca
-  useEffect(() => {
-    if (gameState) {
-      previousGameState.current = JSON.parse(JSON.stringify(gameState));
-    }
-  }, [gameState]);
-
-  // Detecta troca de cartas (online) e anima
-  useEffect(() => {
-    if (onlineSwapInfo && gameState && previousGameState.current) {
-      const prevState = previousGameState.current;
-      const player1Prev = prevState.players.find((p) => p.id === onlineSwapInfo.player1Id);
-      const player2Prev = prevState.players.find((p) => p.id === onlineSwapInfo.player2Id);
-
-      if (player1Prev && player2Prev) {
-        // swapInfo usa índices baseados em 1
-        const card1Index = onlineSwapInfo.player1CardIndex - 1;
-        const card2Index = onlineSwapInfo.player2CardIndex - 1;
-        const player1Card = player1Prev.hand[card1Index];
-        const player2Card = player2Prev.hand[card2Index];
-
-        if (player1Card && player2Card) {
-          animateSwap(
-            onlineSwapInfo.player1Id,
-            card1Index,
-            onlineSwapInfo.player2Id,
-            card2Index,
-            player1Card,
-            player2Card
-          );
-          audioManager.playSwap();
-        }
-      }
-
-      setTimeout(() => {
-        if (!isOffline) setOnlineSwapInfo(null);
-      }, 3000);
-    }
-  }, [onlineSwapInfo, gameState, animateSwap, isOffline, setOnlineSwapInfo]);
-
   // Cleanup de timers ao desmontar
   useEffect(() => {
     const ownTimers = peekTimersRef.current;
@@ -419,6 +377,25 @@ export default function Game() {
       void unlockOrientation();
     };
   }, [isMatchInProgress]);
+
+  // Troca: as cartas voam para o destino e ficam destacadas por alguns segundos
+  const lastSwapCount = useRef<number | null>(null);
+  const swapHighlightTimer = useRef<ReturnType<typeof setTimeout>>();
+  const [swapHighlights, setSwapHighlights] = useState<Record<string, SwapHighlight>>({});
+  useEffect(() => {
+    if (!gameState) return;
+    const swap = gameState.lastSwap;
+    const count = swap?.count ?? 0;
+    const previous = lastSwapCount.current;
+    lastSwapCount.current = count;
+    if (previous === null || !swap || count === previous) return;
+    animateSwap(swap.player1Id, swap.player1CardIndex, swap.player2Id, swap.player2CardIndex);
+    audioManager.playSwap();
+    clearTimeout(swapHighlightTimer.current);
+    setSwapHighlights({ [swap.player2CardId]: "toSecond", [swap.player1CardId]: "toFirst" });
+    swapHighlightTimer.current = setTimeout(() => setSwapHighlights({}), SWAP_HIGHLIGHT_MS);
+  }, [gameState, animateSwap]);
+  useEffect(() => () => clearTimeout(swapHighlightTimer.current), []);
 
   // Vento: todos veem quem foi atingido. O anúncio de bots já vem pelo aviso da jogada deles.
   const lastWindCount = useRef<number | null>(null);
@@ -596,7 +573,6 @@ export default function Game() {
         targetPlayerId2: action.targetPlayerId,
         targetCardIndex3: action.targetCardIndex,
       });
-      audioManager.playSwap();
     }
 
     if (action.kind === "jack") {
@@ -650,7 +626,6 @@ export default function Game() {
         targetPlayerId2: action.player2Id,
         targetCardIndex3: action.card2Index,
       });
-      audioManager.playSwap();
     }
   };
 
@@ -733,6 +708,7 @@ export default function Game() {
       activeEmotes={activeEmotes}
       onEmote={handleSendEmote}
       matchReward={matchReward}
+      swapHighlights={swapHighlights}
     />
   );
 }

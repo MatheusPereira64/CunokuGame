@@ -9,7 +9,10 @@ import {
   applyWind,
   drawForPower,
   expireSeals,
+  FINAL_ROUNDS,
+  finalRoundsEnded,
   isSealed,
+  recordSwap,
   replaceableIndexes,
 } from "@shared/cardPowers";
 
@@ -86,10 +89,10 @@ function drawFromDiscard(newState: GameState): GameState {
   return newState;
 }
 
-function advanceTurn(newState: GameState, playerId: string) {
+function advanceTurn(newState: GameState) {
   const nextPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
   if (nextPlayerIndex === 0) newState.round++;
-  if (newState.isFinalRound && newState.finalRoundDeclarerId === playerId) {
+  if (finalRoundsEnded(newState, nextPlayerIndex)) {
     newState.turnPhase = "finished";
     calculateFinalScores(newState);
     return;
@@ -109,7 +112,7 @@ function discardDrawn(newState: GameState, player: Player, playerId: string): Ga
   newState.jokerRevealed = false;
   newState.turnPhase = "draw";
   newState.logs.push(`${player.name} discarded ${discardedCard.rank}`);
-  advanceTurn(newState, playerId);
+  advanceTurn(newState);
   return newState;
 }
 
@@ -126,7 +129,7 @@ function replaceDrawn(newState: GameState, player: Player, handIndex: number | u
   newState.drawnCard = null;
   newState.drawnFromDiscard = false;
   newState.turnPhase = "draw";
-  advanceTurn(newState, playerId);
+  advanceTurn(newState);
   return newState;
 }
 
@@ -160,7 +163,7 @@ function useDrawnAbility(newState: GameState, player: Player, action: AbilityAct
   newState.drawnCard = null;
   newState.drawnFromDiscard = false;
   newState.turnPhase = "draw";
-  advanceTurn(newState, playerId);
+  advanceTurn(newState);
   return newState;
 }
 
@@ -176,7 +179,7 @@ function useJack(newState: GameState, player: Player, playerId: string): GameSta
     return newState;
   }
   newState.turnPhase = "draw";
-  advanceTurn(newState, playerId);
+  advanceTurn(newState);
   return newState;
 }
 
@@ -194,7 +197,7 @@ function useJoker(newState: GameState, player: Player, action: AbilityAction, pl
   newState.drawnCard = null;
   newState.jokerRevealed = false;
   newState.turnPhase = "draw";
-  advanceTurn(newState, playerId);
+  advanceTurn(newState);
   return newState;
 }
 
@@ -225,6 +228,7 @@ function swapCards(newState: GameState, player: Player, action: AbilityAction, p
   second.hand[secondIndex] = firstCard;
   delete first.knownCards[firstIndex.toString()];
   delete second.knownCards[secondIndex.toString()];
+  recordSwap(newState, first, firstIndex, second, secondIndex);
 }
 
 function windOnOpponent(newState: GameState, player: Player, action: AbilityAction, playerId: string) {
@@ -264,12 +268,14 @@ function matchedDiscard(newState: GameState, player: Player, cardIndex: number |
 }
 
 function declareFinish(newState: GameState, player: Player, playerId: string): GameState {
+  if (newState.isFinalRound) return newState;
   if (newState.round < 5) {
     newState.logs.push(`${player.name} cannot declare finish yet. Need at least 5 rounds.`);
     return newState;
   }
   newState.finalRoundDeclarerId = playerId;
   newState.isFinalRound = true;
+  newState.finalRoundsLeft = FINAL_ROUNDS;
   newState.turnPhase = "draw";
   newState.logs.push(`${player.name} declared CUNOKU! Final round begins.`);
   return newState;
@@ -285,14 +291,14 @@ function discardFromHand(newState: GameState, player: Player, cardIndex: number 
   newState.discardPile.push(cardToDiscard);
   reindexKnownCards(player, cardIndex);
   newState.logs.push(`${player.name} discarded ${cardToDiscard.rank} from hand`);
-  advanceTurn(newState, playerId);
+  advanceTurn(newState);
   return newState;
 }
 
 function punishWrongDiscard(newState: GameState, player: Player, playerId: string): GameState {
   if (player.hand.length >= 6) {
     newState.logs.push(`${player.name} tried to discard wrong card! Loses turn (has 6 cards).`);
-    advanceTurn(newState, playerId);
+    advanceTurn(newState);
     return newState;
   }
   const cardsDrawn = drawPenaltyCards(newState, player);

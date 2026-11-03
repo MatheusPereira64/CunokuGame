@@ -8,6 +8,12 @@ import { Eye, Lock } from "lucide-react";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import type { SeatSide } from "./seatPositions";
 import { EmoteBubble } from "./EmotePicker";
+import { useSwapHighlightStyle } from "./swapHighlight";
+
+/** Mantém o destaque colorido na carta que acabou de chegar de uma troca. */
+function SwapGlow({ cardId, children }: { cardId: string; children: ReactNode }) {
+  return <div style={useSwapHighlightStyle(cardId)}>{children}</div>;
+}
 
 /** initial sempre é um objeto: trocar para `false` muda a quantidade de hooks do Framer Motion. */
 function FlippableCard({ flip, children }: { flip: boolean; children: ReactNode }) {
@@ -133,7 +139,9 @@ export function PlayerSeat({
                 />
               </FlippableCard>
             ) : (
-              <PlayingCard card={card} hidden className={cardSize} animate={false} />
+              <SwapGlow cardId={card.id}>
+                <PlayingCard card={card} hidden className={cardSize} animate={false} />
+              </SwapGlow>
             )}
 
             {sealedCardIds.includes(card.id) && (

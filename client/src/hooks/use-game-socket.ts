@@ -111,7 +111,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
             // Notificação quando alguém declara Cunoku
             toastRef.current({
               title: "🔥 CUNOKU Declarado!",
-              description: `${message.playerName} declarou fim de jogo! Rodada final iniciada.`,
+              description: `${message.playerName} declarou fim de jogo! A partida acaba em 3 rodadas.`,
               duration: 5000,
             });
             break;

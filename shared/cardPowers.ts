@@ -12,6 +12,29 @@ export function isSealed(state: GameState, cardId: string | undefined): boolean 
   return !!cardId && !!state.sealedCards?.some((s) => s.cardId === cardId);
 }
 
+/** Rodadas completas que a partida ainda dura depois de um jogador declarar Cunoku. */
+export const FINAL_ROUNDS = 3;
+
+/** Conta as voltas depois do Cunoku; devolve true quando a passagem de turno encerra a partida. */
+export function finalRoundsEnded(state: GameState, nextPlayerIndex: number): boolean {
+  if (!state.isFinalRound || state.players[nextPlayerIndex]?.id !== state.finalRoundDeclarerId) return false;
+  state.finalRoundsLeft = (state.finalRoundsLeft ?? FINAL_ROUNDS) - 1;
+  return state.finalRoundsLeft <= 0;
+}
+
+/** Registra a troca já feita: a carta em cada posição é a que veio do outro jogador. */
+export function recordSwap(state: GameState, player1: Player, index1: number, player2: Player, index2: number): void {
+  state.lastSwap = {
+    count: (state.lastSwap?.count ?? 0) + 1,
+    player1Id: player1.id,
+    player1CardIndex: index1,
+    player1CardId: player1.hand[index1].id,
+    player2Id: player2.id,
+    player2CardIndex: index2,
+    player2CardId: player2.hand[index2].id,
+  };
+}
+
 /** Id novo, sem relação com o antigo: cartas mascaradas mantêm o id e ele não pode ligar uma carta à sua face. */
 export function withFreshId(card: Card): Card {
   const id = Array.from({ length: 4 }, () => Math.floor(randomFloat() * 0x1_0000_0000).toString(16).padStart(8, "0")).join("");

@@ -17,7 +17,8 @@ import { EmotePicker } from "@/components/game/EmotePicker";
 import { RulesCheatSheet } from "@/components/game/RulesCheatSheet";
 import { AbilityModal } from "@/components/game/AbilityModal";
 import { AbilityAction, hasSpecialAbility, getAbilityDescription } from "@/components/game/helpers";
-import { getSeatPositions } from "@/components/game/seatPositions";
+import { getSeatPositions, opponentsInTurnOrder } from "@/components/game/seatPositions";
+import { SwapHighlight, SwapHighlightContext } from "@/components/game/swapHighlight";
 import { LandscapePrompt } from "@/components/game/LandscapePrompt";
 import { GameTutorial } from "@/components/game/GameTutorial";
 import { WaitingRoom } from "@/components/game/WaitingRoom";
@@ -248,9 +249,20 @@ function RoundBadge({ isCompact, gameState, t }: { isCompact: boolean; gameState
             {t("game.round")} {gameState.round}
             {roundSuffix(gameState.round)}
           </div>
+          {finalRoundsNotice(isCompact, gameState, t)}
           {desktopRoundDetail(isCompact, gameState, t)}
         </div>
       </motion.div>
+    </div>
+  );
+}
+
+function finalRoundsNotice(isCompact: boolean, gameState: GameState, t: Translate) {
+  if (!gameState.isFinalRound || gameState.winnerId) return null;
+  const left = gameState.finalRoundsLeft ?? 1;
+  return (
+    <div className={cn("font-bold text-red-300", cx(isCompact, "text-[9px] leading-tight", "text-xs mb-1"))}>
+      {left <= 1 ? t("game.lastRound") : t("game.finalRoundsLeft", { count: String(left) })}
     </div>
   );
 }
@@ -630,9 +642,10 @@ export function ActiveTable(props: {
   activeEmotes: Record<string, string>;
   onEmote: (emoteId: EmoteId) => void;
   matchReward: MatchReward | null;
+  swapHighlights: Record<string, SwapHighlight>;
 }) {
   const { gameState, isCompact, t } = props;
-  const opponents = gameState.players.filter((p) => p.id !== props.playerId);
+  const opponents = opponentsInTurnOrder(gameState.players, props.playerId);
   const graceSeconds = graceLeft(gameState.reconnectDeadline);
   const graceName = gameState.players.find((p) => p.id === gameState.reconnectPlayerId)?.name ?? "";
   const currentTurnPlayerId = gameState.players[gameState.currentPlayerIndex]?.id;
@@ -647,6 +660,7 @@ export function ActiveTable(props: {
       <TurnBanner isCompact={isCompact} graceSeconds={graceSeconds} graceName={graceName} isMyTurn={props.isMyTurn} phase={props.phase} t={t} />
       <RoundBadge isCompact={isCompact} gameState={gameState} t={t} />
       <SideHints forced={!!gameState.forcedReplace || !!gameState.jokerRevealed} isMyTurn={props.isMyTurn} phase={props.phase} card={gameState.jokerRevealed ? null : gameState.drawnCard} fromDiscard={gameState.drawnFromDiscard} isCompact={isCompact} t={t} />
+      <SwapHighlightContext.Provider value={props.swapHighlights}>
       <FeltTable
         isCompact={isCompact}
         mat={props.tableMat}
@@ -666,6 +680,7 @@ export function ActiveTable(props: {
         onUseAbility={() => props.onAbilityOpenChange(true)}
         me={props.me}
       />
+      </SwapHighlightContext.Provider>
       <AbilityModal
         open={props.abilityOpen}
         onOpenChange={props.onAbilityOpenChange}

@@ -51,6 +51,18 @@ export interface GameState {
   dailyDay?: string | null; // Dia (UTC) do desafio diário; ausente em partidas comuns
   /** Último uso do Vento, público para todos verem; count identifica cada uso. */
   lastWind?: { count: number; byId: string; targetId: string } | null;
+  /** Voltas que faltam depois do Cunoku; cada volta termina ao chegar de novo em quem declarou. */
+  finalRoundsLeft?: number;
+  /** Última troca de cartas, pública para todos verem para onde cada carta foi. */
+  lastSwap?: {
+    count: number;
+    player1Id: string;
+    player1CardIndex: number;
+    player1CardId: string;
+    player2Id: string;
+    player2CardIndex: number;
+    player2CardId: string;
+  } | null;
   /** 3 e 4: cartas que não podem ser vistas, trocadas nem descartadas até a vez de quem selou. */
   sealedCards?: { cardId: string; sealerId: string }[];
   /** Valete: a carta comprada precisa substituir uma da mão. */
