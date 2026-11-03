@@ -87,7 +87,7 @@ export default function Game() {
   } = useGameSocket(isOffline ? "" : roomCode, isOffline ? "" : playerId);
 
   // Posições das cartas na tela (para animações)
-  const cardRefs = useRef<Map<string, { x: number; y: number; card?: Card }>>(new Map());
+  const cardRefs = useRef<Map<string, { x: number; y: number; card?: Card; element?: HTMLElement }>>(new Map());
 
   const [abilityModalOpen, setAbilityModalOpen] = useState(false);
   const peekTimersRef = useRef<Map<number, NodeJS.Timeout>>(new Map());

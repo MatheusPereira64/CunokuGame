@@ -62,6 +62,17 @@ export interface ReplaceAnimationData {
 }
 
 // Dados para animação de troca
+type Box = { left: number; right: number; top: number; bottom: number };
+
+/**
+ * Centro da parte visível da carta. Em mãos em leque a carta seguinte cobre a anterior,
+ * e o centro geométrico cairia em cima da vizinha, apontando para a carta errada.
+ */
+export function visibleCardCenter(card: Box, nextCard?: Box | null): Position {
+  const coveredFrom = nextCard && nextCard.left > card.left && nextCard.left < card.right ? nextCard.left : card.right;
+  return { x: (card.left + coveredFrom) / 2, y: (card.top + card.bottom) / 2 };
+}
+
 export interface SwapAnimationData {
   player1Id: string;
   player1Name: string;

@@ -96,6 +96,19 @@ export function CardSwapAnimation({ data, onComplete, duration = DEFAULT_DURATIO
         </motion.div>
       ))}
 
+      {[
+        { position: player1Position, number: data.player1CardIndex + 1, color: SWAP_COLORS.toFirst },
+        { position: player2Position, number: data.player2CardIndex + 1, color: SWAP_COLORS.toSecond },
+      ].map(({ position, number, color }) => (
+        <div
+          key={number + color}
+          className="absolute flex h-6 min-w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full px-1 text-xs font-black text-black shadow-lg"
+          style={{ left: position.x, top: position.y, backgroundColor: color }}
+        >
+          {number}
+        </div>
+      ))}
+
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}

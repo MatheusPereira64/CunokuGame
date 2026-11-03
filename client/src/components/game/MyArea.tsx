@@ -1,10 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameState, Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
 import { EmoteBubble } from "./EmotePicker";
-import { useSwapHighlightStyle } from "./swapHighlight";
+import { swapCardStyle, useSwapHighlights } from "./swapHighlight";
+import { SwapBadge } from "./SwapBadge";
 import { Button } from "@/components/Button";
 import { cn, fit } from "@/lib/utils";
 import { useIsCompactGame } from "@/hooks/use-landscape";
@@ -25,13 +26,10 @@ interface MyAreaProps {
   emoteId?: string;
 }
 
-function SwapGlow({ cardId, children }: { cardId: string; children: ReactNode }) {
-  return <div style={useSwapHighlightStyle(cardId)}>{children}</div>;
-}
-
 export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCardPosition, revealedCards = {}, emoteId }: MyAreaProps) {
   const isCompact = useIsCompactGame();
   const { t } = useI18n();
+  const swapHighlights = useSwapHighlights();
   const [selectedHandIndex, setSelectedHandIndex] = useState<number | null>(null);
   const profile = loadProfile();
 
@@ -141,7 +139,13 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                     ? cn("shrink-0", i > 0 && "-ml-8 md:-ml-12")
                     : "min-w-[88px]"
               )}
-              style={useFanOverlap ? { zIndex: hoveredIndex === i ? 40 : i + 1 } : undefined}
+              style={
+                swapHighlights[card.id]
+                  ? { zIndex: 40 }
+                  : useFanOverlap
+                    ? { zIndex: hoveredIndex === i ? 40 : i + 1 }
+                    : undefined
+              }
               whileHover={(isMyTurn || canMatchThisCard || canQuickDiscard) && !isCompact ? { y: -12 } : {}}
               onHoverStart={() => setHoveredIndex(i)}
               onHoverEnd={() => setHoveredIndex((prev) => (prev === i ? null : prev))}
@@ -186,7 +190,8 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                     <Lock className={fit(isCompact, "w-2.5 h-2.5", "w-3.5 h-3.5")} />
                   </div>
                 )}
-                <SwapGlow cardId={card.id}>
+                <SwapBadge highlight={swapHighlights[card.id]} number={i + 1} />
+                <div style={swapCardStyle(swapHighlights[card.id])}>
                 <PlayingCard
                   card={revealedFace ?? card}
                   hidden={!gameState.winnerId && (sealed || (!isKnownCard && !revealedFace))}
@@ -205,7 +210,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                     canQuickDiscard ? "cursor-pointer hover:ring-4 ring-blue-400" : ""
                   )}
                 />
-                </SwapGlow>
+                </div>
               </button>
 
               {isKnownCard && !showDiscardButtons && !isCompact && (

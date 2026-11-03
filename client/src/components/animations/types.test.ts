@@ -3,8 +3,7 @@ import {
   getAnimationDuration,
   generateAnimationId,
   DEFAULT_DURATIONS,
-  type AnimationConfig,
-} from "./types";
+  type AnimationConfig, visibleCardCenter } from "./types";
 
 const baseConfig: AnimationConfig = {
   enabled: true,
@@ -37,5 +36,23 @@ describe("generateAnimationId", () => {
     expect(a.startsWith("anim_")).toBe(true);
     expect(b.startsWith("anim_")).toBe(true);
     expect(a).not.toBe(b);
+  });
+});
+
+describe("visibleCardCenter", () => {
+  const card = { left: 100, right: 148, top: 10, bottom: 78 };
+
+  it("usa o centro da carta inteira quando nada a cobre", () => {
+    expect(visibleCardCenter(card)).toEqual({ x: 124, y: 44 });
+    expect(visibleCardCenter(card, null)).toEqual({ x: 124, y: 44 });
+  });
+
+  it("usa a parte visível quando a carta seguinte cobre o resto", () => {
+    expect(visibleCardCenter(card, { left: 124, right: 172, top: 10, bottom: 78 })).toEqual({ x: 112, y: 44 });
+  });
+
+  it("ignora vizinha que não sobrepõe a carta", () => {
+    expect(visibleCardCenter(card, { left: 160, right: 208, top: 10, bottom: 78 }).x).toBe(124);
+    expect(visibleCardCenter(card, { left: 40, right: 88, top: 10, bottom: 78 }).x).toBe(124);
   });
 });

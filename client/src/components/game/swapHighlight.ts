@@ -13,9 +13,17 @@ export type SwapHighlight = keyof typeof SWAP_COLORS;
 /** Cartas recém-trocadas na mesa, por id. */
 export const SwapHighlightContext = createContext<Record<string, SwapHighlight>>({});
 
-/** Estilo do destaque da carta; undefined quando ela não acabou de ser trocada. */
-export function useSwapHighlightStyle(cardId: string): React.CSSProperties | undefined {
-  const highlight = useContext(SwapHighlightContext)[cardId];
-  if (!highlight) return undefined;
-  return { boxShadow: `0 0 0 3px ${SWAP_COLORS[highlight]}, 0 0 16px 4px ${SWAP_COLORS[highlight]}`, borderRadius: "0.5rem" };
+export function useSwapHighlights() {
+  return useContext(SwapHighlightContext);
+}
+
+/** Levanta a carta acima das vizinhas: em mãos em leque ela fica parcialmente coberta. */
+export function swapCardStyle(highlight: SwapHighlight | undefined, baseZIndex?: number): React.CSSProperties | undefined {
+  if (!highlight) return baseZIndex === undefined ? undefined : { zIndex: baseZIndex };
+  return {
+    zIndex: 40,
+    transform: "translateY(-6px)",
+    boxShadow: `0 0 0 3px ${SWAP_COLORS[highlight]}, 0 0 16px 4px ${SWAP_COLORS[highlight]}`,
+    borderRadius: "0.5rem",
+  };
 }

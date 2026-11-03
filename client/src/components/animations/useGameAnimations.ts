@@ -12,6 +12,7 @@ import {
   DealAnimationData,
   AnimationConfig,
   generateAnimationId,
+  visibleCardCenter,
 } from './types';
 import { useAnimationQueue } from './useAnimationQueue';
 
@@ -20,13 +21,14 @@ interface UseGameAnimationsOptions {
   playerId: string;
   config?: Partial<AnimationConfig>;
   onAnimationComplete?: (type: string) => void;
-  cardRefs?: React.MutableRefObject<Map<string, { x: number; y: number; card?: Card }>>; // Permite passar cardRefs externo
+  cardRefs?: React.MutableRefObject<Map<string, { x: number; y: number; card?: Card; element?: HTMLElement }>>; // Permite passar cardRefs externo
 }
 
 interface CardRefData {
   x: number;
   y: number;
   card?: Card;
+  element?: HTMLElement;
 }
 
 export function useGameAnimations({
@@ -67,6 +69,7 @@ export function useGameAnimations({
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2,
         card,
+        element,
       });
     } else {
       cardRefs.current.delete(key);
@@ -95,6 +98,11 @@ export function useGameAnimations({
   const getCardPosition = useCallback((playerIdArg: string, cardIndex: number): Position => {
     const key = `${playerIdArg}_${cardIndex}`;
     const ref = cardRefs.current.get(key);
+    // Mede na hora: a posição guardada na renderização envelhece com o leque e as animações
+    if (ref?.element?.isConnected) {
+      const next = ref.element.nextElementSibling?.getBoundingClientRect();
+      return visibleCardCenter(ref.element.getBoundingClientRect(), next);
+    }
     if (ref) {
       return { x: ref.x, y: ref.y };
     }
