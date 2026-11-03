@@ -157,7 +157,7 @@ export function PlayingCard({ card, hidden, onClick, className, selected, animat
         >
           {/* Canto superior */}
           <div className="flex flex-col items-center w-6">
-            <span className="text-xl font-bold leading-none font-display">{card.rank}</span>
+            <span className="text-xl font-bold leading-none font-display">{card.rank === "Joker" ? "★" : card.rank}</span>
             <div className="w-4 h-4 mt-1">{getIcon(card.suit)}</div>
           </div>
 
@@ -175,7 +175,7 @@ export function PlayingCard({ card, hidden, onClick, className, selected, animat
 
           {/* Canto inferior (rotacionado) */}
           <div className="flex flex-col items-center w-6 self-end rotate-180">
-            <span className="text-xl font-bold leading-none font-display">{card.rank}</span>
+            <span className="text-xl font-bold leading-none font-display">{card.rank === "Joker" ? "★" : card.rank}</span>
             <div className="w-4 h-4 mt-1">{getIcon(card.suit)}</div>
           </div>
         </div>
