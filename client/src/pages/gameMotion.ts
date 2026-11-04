@@ -150,7 +150,7 @@ function playPenalties(prev: GameState, current: GameState, triggered: Set<strin
     const prevPlayer = prev.players[playerIndex];
     if (!prevPlayer || player.hand.length <= prevPlayer.hand.length) return;
     const cardsAdded = player.hand.length - prevPlayer.hand.length;
-    if (cardsAdded !== 2 || current.currentPlayerIndex === playerIndex) return;
+    if (cardsAdded !== 2) return;
     const newCards = player.hand.slice(-2);
     remember(triggered, `penalty_${player.id}_${newCards[0]?.id}_${newCards[1]?.id}_${Date.now()}`, 3000, () => {
       animatePenalty(newCards, player.id, prevPlayer.hand.length);

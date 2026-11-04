@@ -6,7 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { EmoteBubble } from "./EmotePicker";
 import { swapCardStyle, useSwapHighlights } from "./swapHighlight";
 import { SwapBadge } from "./SwapBadge";
-import { handSizeDetail } from "./helpers";
+import { seatDetail } from "./helpers";
 import { Button } from "@/components/Button";
 import { cn, fit } from "@/lib/utils";
 import { useIsCompactGame } from "@/hooks/use-landscape";
@@ -34,30 +34,18 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
   const [selectedHandIndex, setSelectedHandIndex] = useState<number | null>(null);
   const profile = loadProfile();
 
-  // Descarte reativo: cartas conhecidas iguais ao topo da pilha, fora do meu turno
-  const getMatchInfo = (): { canMatch: boolean; matchingCards: number[] } => {
-    if (gameState.discardPile.length === 0) return { canMatch: false, matchingCards: [] };
-    const lastDiscarded = gameState.discardPile[gameState.discardPile.length - 1];
-    const matchingCards: number[] = [];
-    me.hand.forEach((card, index) => {
-      if (card.rank === lastDiscarded.rank && me.knownCards[index.toString()]) {
-        matchingCards.push(index);
-      }
-    });
-    return { canMatch: matchingCards.length > 0, matchingCards };
-  };
+  // Ação livre: fora da vez sempre; na própria vez, só antes de comprar
+  const canFreeDiscard =
+    !gameState.winnerId &&
+    gameState.turnPhase !== "finished" &&
+    gameState.discardPile.length > 0 &&
+    (!isMyTurn || phase === "draw");
 
-  // Na fase de compra, a carta igual ao topo pode ser descartada sem risco
-  const getSafeDiscards = (): number[] => {
-    if (!isMyTurn || phase !== "draw" || gameState.discardPile.length === 0) return [];
-    const topDiscard = gameState.discardPile[gameState.discardPile.length - 1];
-    return me.hand.flatMap((card, index) =>
-      me.knownCards[index.toString()] && card.rank === topDiscard.rank ? [index] : []
-    );
-  };
-
-  const matchInfo = getMatchInfo();
-  const safeDiscards = getSafeDiscards();
+  // Cartas que sei serem iguais à do topo: descartá-las não tem risco
+  const topDiscard = gameState.discardPile[gameState.discardPile.length - 1];
+  const safeDiscards = canFreeDiscard
+    ? me.hand.flatMap((card, index) => (me.knownCards[index.toString()] && card.rank === topDiscard?.rank ? [index] : []))
+    : [];
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Pode trocar a carta comprada por qualquer carta da mão
@@ -68,16 +56,8 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
     // Carta selada não pode ser trocada nem descartada nesta rodada
     if (isCardSealed(me.hand[cardIndex]?.id)) return;
 
-    // Descarte reativo fora do turno
-    if (!isMyTurn) {
-      if (matchInfo.canMatch && matchInfo.matchingCards.includes(cardIndex)) {
-        sendAction({ type: "matched_discard", cardIndex });
-      }
-      return;
-    }
-
     // Substituição pela carta comprada
-    if (phase === "action" && gameState.drawnCard && !gameState.jokerRevealed) {
+    if (isMyTurn && phase === "action" && gameState.drawnCard && !gameState.jokerRevealed) {
       sendAction({ type: "replace_card", handIndex: cardIndex });
       return;
     }
@@ -85,14 +65,14 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
     setSelectedHandIndex(cardIndex === selectedHandIndex ? null : cardIndex);
   };
 
-  // A seleção só vale para o turno em que foi feita
+  // A seleção só vale para a etapa em que foi feita e para a mão daquele momento
+  const selectionScope = isMyTurn ? phase : "off-turn";
   useEffect(() => {
-    if (!isMyTurn || phase !== "draw") setSelectedHandIndex(null);
-  }, [isMyTurn, phase]);
+    setSelectedHandIndex(null);
+  }, [selectionScope, me.hand.length]);
 
   // Leque quando mão grande
   const useFanOverlap = !isCompact && me.hand.length > 5;
-  const showDiscardButtons = isMyTurn && phase === "draw" && gameState.discardPile.length > 0;
 
   return (
     <div
@@ -122,10 +102,10 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
         )}
       >
         {me.hand.map((card, i) => {
-          const canMatchThisCard = !isMyTurn && matchInfo.canMatch && matchInfo.matchingCards.includes(i);
+          const canMatchThisCard = !isMyTurn && safeDiscards.includes(i);
           const isKnownCard = me.knownCards[i.toString()] || me.knownCards[i];
           const sealed = isCardSealed(card.id);
-          const canQuickDiscard = showDiscardButtons && !sealed;
+          const canQuickDiscard = canFreeDiscard && !sealed;
           const revealedFace = revealedCards[`${me.id}_${card.id}`];
           const isSafeDiscard = canQuickDiscard && safeDiscards.includes(i);
           const showDiscardButton = canQuickDiscard && (isSafeDiscard || selectedHandIndex === i);
@@ -244,7 +224,8 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      sendAction({ type: "discard_from_hand", cardIndex: i });
+                      setSelectedHandIndex(null);
+                      sendAction({ type: "matched_discard", cardIndex: i });
                     }}
                   >
                     {isSafeDiscard ? "✓" : "⚠"} {t("game.discard")}
@@ -257,7 +238,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
       </div>
 
       <div className={cn("absolute right-full bottom-0", fit(isCompact, "mr-1", "mr-3"))}>
-        <Avatar name={me.name} detail={handSizeDetail(me.hand.length, t)} isActive={isMyTurn} position="left" compact={isCompact} iconId={profile.iconId} accent={profile.accent} />
+        <Avatar name={me.name} detail={seatDetail(me, gameState.skipNextTurnIds, t)} isActive={isMyTurn} position="left" compact={isCompact} iconId={profile.iconId} accent={profile.accent} />
         <EmoteBubble emoteId={emoteId} className="right-full top-0 mr-1" />
       </div>
 
@@ -278,7 +259,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
       </div>
 
       {/* Indicador de descarte reativo */}
-      {!isMyTurn && matchInfo.canMatch && (
+      {!isMyTurn && safeDiscards.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

@@ -20,6 +20,8 @@ Objetivo do jogo: ter a menor soma de cartas ao final da partida
 - *Regras de compra*: Compre uma carta olhe o valor e decida o que fazer com a habilidade pode ser usada 
 - *Final de partida*: depois de 5 turnos, um jogador satisfeito com suas cartas pode declarar o fim do jogo. A partir daí, todos jogam mais 3 rodadas, contando do turno de quem declarou. Então as cartas são reveladas e somadas, e quem tiver menos pontos vence
 - *Regra de punição*: Se um jogador descartar errado uma carta de valor diferente com a de cima da pilha, ele deve comprar duas cartas como punição, adicionando a sua mão
+- *Ação livre*: O descarte pode ser feito a qualquer momento, mesmo fora da vez, e não encerra a vez de ninguém. A única exceção é a própria vez depois de comprar. Cartas seladas não podem ser descartadas
+- *Punição com 6 cartas*: Quem tem 6 cartas não compra a punição e perde a vez: a atual, se errou na própria vez, ou a próxima, se errou fora dela
 
 -Limite maximo de jogadores é 6 e o minimo é 2
 -Tema geral do jogo "Jogo de cartas de mesa com tema japones"

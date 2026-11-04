@@ -50,6 +50,8 @@ export interface GameState {
   logs: string[];
   finalRoundDeclarerId?: string | null; // ID do jogador que declarou fim de jogo
   isFinalRound?: boolean; // Se está na rodada final
+  /** Jogadores que erraram o descarte fora da vez com a mão cheia e perdem a próxima vez. */
+  skipNextTurnIds?: string[];
   seed?: string | null; // Seed do desafio diário (nunca enviada aos clientes)
   dailyDay?: string | null; // Dia (UTC) do desafio diário; ausente em partidas comuns
   /** Último uso do Vento, público para todos verem; count identifica cada uso. */

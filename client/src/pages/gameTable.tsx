@@ -317,6 +317,7 @@ function ArcSeat({
       compact={opponents.length >= 3 || isCompact}
       emoteId={emoteId}
       sealedCardIds={sealedIds(gameState)}
+      skipNextTurnIds={gameState.skipNextTurnIds}
       className="absolute z-20"
       style={seatStyle(pos)}
     />
@@ -341,6 +342,7 @@ function RowSeats(props: Omit<Parameters<typeof ArcSeats>[0], "isCompact">) {
           compact
           emoteId={activeEmotes[p.id]}
           sealedCardIds={sealedIds(gameState)}
+          skipNextTurnIds={gameState.skipNextTurnIds}
         />
       ))}
     </div>

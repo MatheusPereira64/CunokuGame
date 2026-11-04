@@ -81,9 +81,9 @@ Ter a **menor soma de cartas** quando a partida acabar. Cada jogador começa com
 
 ### Descarte e punição
 
-Você pode descartar uma carta da sua mão quando ela tiver o **mesmo número ou letra** da carta no topo da pilha, seja qual for o naipe (por exemplo, 7 sobre 7).
+O descarte é uma **ação livre**: a qualquer momento, mesmo fora da sua vez, você pode descartar uma carta da mão que tenha o **mesmo número ou letra** da carta no topo da pilha, seja qual for o naipe (por exemplo, 7 sobre 7). Acertar não encerra a vez de ninguém. Só não dá para fazer isso na sua vez depois de comprar.
 
-Mas é um risco: se errar, você compra **2 cartas de punição**. Quem já tem 6 cartas apenas perde a vez.
+Mas é um risco: você não precisa conhecer a carta para tentar e, se errar, compra **2 cartas de punição**. Quem já tem 6 cartas perde a vez: a atual, se for a dela, ou a próxima, se errou fora dela.
 
 ### Fim da partida
 

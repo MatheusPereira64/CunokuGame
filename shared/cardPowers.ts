@@ -22,6 +22,47 @@ export function finalRoundsEnded(state: GameState, nextPlayerIndex: number): boo
   return state.finalRoundsLeft <= 0;
 }
 
+/** Passa a vez, pulando quem ficou devendo uma; devolve false quando a passagem encerra a partida. */
+export function moveToNextPlayer(state: GameState): boolean {
+  do {
+    const next = (state.currentPlayerIndex + 1) % state.players.length;
+    if (next === 0) state.round++;
+    if (finalRoundsEnded(state, next)) return false;
+    state.currentPlayerIndex = next;
+    expireSeals(state);
+  } while (consumeSkippedTurn(state));
+  return true;
+}
+
+function consumeSkippedTurn(state: GameState): boolean {
+  const current = state.players[state.currentPlayerIndex];
+  if (!current || !state.skipNextTurnIds?.includes(current.id)) return false;
+  state.skipNextTurnIds = state.skipNextTurnIds.filter((id) => id !== current.id);
+  state.logs.push(`${current.name} perdeu a vez por errar o descarte`);
+  return true;
+}
+
+export type FreeDiscardVerdict = "ignored" | "match" | "wrong";
+
+/**
+ * O descarte é uma ação livre: vale a qualquer momento, inclusive fora da vez. A única exceção é
+ * o próprio turno depois de comprar, quando a mão ainda vai receber a carta comprada.
+ */
+export function judgeFreeDiscard(state: GameState, playerIndex: number, cardIndex: unknown): FreeDiscardVerdict {
+  if (state.winnerId || state.turnPhase === "finished" || state.turnPhase === "waiting") return "ignored";
+  if (state.currentPlayerIndex === playerIndex && state.turnPhase !== "draw") return "ignored";
+  const card = typeof cardIndex === "number" ? state.players[playerIndex]?.hand[cardIndex] : undefined;
+  const top = state.discardPile[state.discardPile.length - 1];
+  if (!card || !top || isSealed(state, card.id)) return "ignored";
+  return card.rank === top.rank ? "match" : "wrong";
+}
+
+/** Erro fora da vez com a mão cheia: não há vez para perder agora, então perde a próxima. */
+export function skipNextTurn(state: GameState, playerId: string): void {
+  if (state.skipNextTurnIds?.includes(playerId)) return;
+  state.skipNextTurnIds = [...(state.skipNextTurnIds ?? []), playerId];
+}
+
 /** Registra a troca já feita: a carta em cada posição é a que veio do outro jogador. */
 export function recordSwap(state: GameState, player1: Player, index1: number, player2: Player, index2: number): void {
   state.lastSwap = {

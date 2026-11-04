@@ -12,7 +12,7 @@ import type { SeatSide } from "./seatPositions";
 import { EmoteBubble } from "./EmotePicker";
 import { swapCardStyle, useSwapHighlights } from "./swapHighlight";
 import { SwapBadge } from "./SwapBadge";
-import { handSizeDetail } from "./helpers";
+import { seatDetail } from "./helpers";
 
 /** initial sempre é um objeto: trocar para `false` muda a quantidade de hooks do Framer Motion. */
 function FlippableCard({ flip, children }: { flip: boolean; children: ReactNode }) {
@@ -78,6 +78,8 @@ interface PlayerSeatProps {
   compact?: boolean;
   /** Cartas seladas pelos poderes de 3 e 4 */
   sealedCardIds?: string[];
+  /** Quem perde a próxima vez por errar o descarte */
+  skipNextTurnIds?: string[];
   /** Emote ativo deste jogador */
   emoteId?: string;
   style?: React.CSSProperties;
@@ -96,6 +98,7 @@ export function PlayerSeat({
   compact: compactProp,
   emoteId,
   sealedCardIds = [],
+  skipNextTurnIds,
   style,
   className,
 }: PlayerSeatProps) {
@@ -183,7 +186,7 @@ export function PlayerSeat({
       <Avatar
         name={player.name}
         isBot={player.isBot}
-        detail={handSizeDetail(player.hand.length, t)}
+        detail={seatDetail(player, skipNextTurnIds, t)}
         isActive={isActive}
         compact={compact || isCompact}
         iconId={player.iconId as ProfileIconId | undefined}

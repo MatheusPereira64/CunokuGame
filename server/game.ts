@@ -9,9 +9,11 @@ import {
   applySeal,
   applyWind,
   drawForPower,
-  expireSeals,
+  HAND_LIMIT,
+  judgeFreeDiscard,
+  moveToNextPlayer,
+  skipNextTurn,
   FINAL_ROUNDS,
-  finalRoundsEnded,
   isSealed,
   JOKER_REVEAL_MS,
   KING_REVEAL_MS,
@@ -284,15 +286,9 @@ export class GameLogic {
   }
 
   private static advanceTurn(newState: GameState) {
-    const nextPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
-    if (nextPlayerIndex === 0) newState.round++;
-    if (finalRoundsEnded(newState, nextPlayerIndex)) {
-      newState.turnPhase = "finished";
-      this.calculateFinalScores(newState);
-      return;
-    }
-    newState.currentPlayerIndex = nextPlayerIndex;
-    expireSeals(newState);
+    if (moveToNextPlayer(newState)) return;
+    newState.turnPhase = "finished";
+    this.calculateFinalScores(newState);
   }
 
   private static reindexKnownCards(player: Player, removedIndex: number) {
@@ -324,11 +320,10 @@ export class GameLogic {
       case "use_ability":
         return this.applyDrawnAbility(newState, action, playerId, playerIndex);
       case "matched_discard":
-        return this.matchedDiscard(newState, player, action);
+      case "discard_from_hand":
+        return this.freeDiscard(newState, player, action, playerIndex);
       case "declare_finish":
         return this.declareFinish(newState, playerId, playerIndex);
-      case "discard_from_hand":
-        return this.discardFromHand(newState, player, action, playerId, playerIndex);
       default:
         return { newState };
     }
@@ -560,18 +555,14 @@ export class GameLogic {
     };
   }
 
-  private static matchedDiscard(newState: GameState, player: Player, action: any): ActionResult {
-    if (action.cardIndex === undefined) return { newState };
-    const cardToDiscard = player.hand[action.cardIndex];
-    const lastDiscarded = newState.discardPile[newState.discardPile.length - 1];
-    if (!cardToDiscard || !player.knownCards[action.cardIndex.toString()] || !lastDiscarded || lastDiscarded.rank !== cardToDiscard.rank) {
-      return { newState };
-    }
-    if (isSealed(newState, cardToDiscard.id)) return { newState };
-    player.hand.splice(action.cardIndex, 1);
-    newState.discardPile.push(cardToDiscard);
+  private static freeDiscard(newState: GameState, player: Player, action: any, playerIndex: number): ActionResult {
+    const verdict = judgeFreeDiscard(newState, playerIndex, action.cardIndex);
+    if (verdict === "ignored") return { newState };
+    if (verdict === "wrong") return this.punishWrongDiscard(newState, player, playerIndex);
+    const [card] = player.hand.splice(action.cardIndex, 1);
+    newState.discardPile.push(card);
     this.reindexKnownCards(player, action.cardIndex);
-    newState.logs.push(`${player.name} descartou a carta ${cardToDiscard.rank} de ${cardToDiscard.suit} (corresponde ao descarte)`);
+    newState.logs.push(`${player.name} descartou a carta ${card.rank} de ${card.suit}`);
     return { newState };
   }
 
@@ -589,30 +580,16 @@ export class GameLogic {
     return { newState };
   }
 
-  private static discardFromHand(newState: GameState, player: Player, action: any, playerId: string, playerIndex: number): ActionResult {
-    if (action.cardIndex === undefined || newState.discardPile.length === 0) return { newState };
-    const cardToDiscard = player.hand[action.cardIndex];
-    const topDiscard = newState.discardPile[newState.discardPile.length - 1];
-    if (!cardToDiscard || !topDiscard || isSealed(newState, cardToDiscard.id)) return { newState };
-    if (cardToDiscard.rank !== topDiscard.rank) return this.punishWrongDiscard(newState, player, playerId, playerIndex);
-    player.hand.splice(action.cardIndex, 1);
-    newState.discardPile.push(cardToDiscard);
-    this.reindexKnownCards(player, action.cardIndex);
-    newState.logs.push(`${newState.players[playerIndex].name} descartou a carta ${cardToDiscard.rank} de ${cardToDiscard.suit} da mão`);
-    this.advanceTurn(newState);
-    return { newState };
-  }
-
-  private static punishWrongDiscard(newState: GameState, player: Player, playerId: string, playerIndex: number): ActionResult {
-    if (player.hand.length >= 6) {
-      newState.logs.push(`${newState.players[playerIndex].name} tentou descartar carta errada! Perde a vez (tem 6 cartas).`);
-      this.advanceTurn(newState);
+  private static punishWrongDiscard(newState: GameState, player: Player, playerIndex: number): ActionResult {
+    if (player.hand.length >= HAND_LIMIT) {
+      newState.logs.push(`${player.name} tentou descartar carta errada! Perde a vez (tem ${HAND_LIMIT} cartas).`);
+      if (newState.currentPlayerIndex === playerIndex) this.advanceTurn(newState);
+      else skipNextTurn(newState, player.id);
       return { newState };
     }
     const drawn = this.drawPenaltyCards(newState, player);
     if (drawn.ended) return { newState };
-    const cardsDrawn = drawn.count;
-    newState.logs.push(`${newState.players[playerIndex].name} tentou descartar carta errada! Compra ${cardsDrawn} carta${cardsDrawn > 1 ? "s" : ""} como punição.`);
+    newState.logs.push(`${player.name} tentou descartar carta errada! Compra ${drawn.count} carta${drawn.count > 1 ? "s" : ""}.`);
     return { newState };
   }
 

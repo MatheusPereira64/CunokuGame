@@ -8,9 +8,11 @@ import {
   applySeal,
   applyWind,
   drawForPower,
-  expireSeals,
+  HAND_LIMIT,
+  judgeFreeDiscard,
+  moveToNextPlayer,
+  skipNextTurn,
   FINAL_ROUNDS,
-  finalRoundsEnded,
   isSealed,
   recordSwap,
   replaceableIndexes,
@@ -41,11 +43,10 @@ export function processOfflineAction(
     case "use_ability":
       return useDrawnAbility(newState, player, action, playerId);
     case "matched_discard":
-      return matchedDiscard(newState, player, action.cardIndex);
+    case "discard_from_hand":
+      return freeDiscard(newState, player, action.cardIndex);
     case "declare_finish":
       return declareFinish(newState, player, playerId);
-    case "discard_from_hand":
-      return discardFromHand(newState, player, action.cardIndex, playerId);
     default:
       return newState;
   }
@@ -90,15 +91,9 @@ function drawFromDiscard(newState: GameState): GameState {
 }
 
 function advanceTurn(newState: GameState) {
-  const nextPlayerIndex = (newState.currentPlayerIndex + 1) % newState.players.length;
-  if (nextPlayerIndex === 0) newState.round++;
-  if (finalRoundsEnded(newState, nextPlayerIndex)) {
-    newState.turnPhase = "finished";
-    calculateFinalScores(newState);
-    return;
-  }
-  newState.currentPlayerIndex = nextPlayerIndex;
-  expireSeals(newState);
+  if (moveToNextPlayer(newState)) return;
+  newState.turnPhase = "finished";
+  calculateFinalScores(newState);
 }
 
 function discardDrawn(newState: GameState, player: Player, playerId: string): GameState {
@@ -254,16 +249,15 @@ function reindexKnownCards(player: Player, removedIndex: number) {
   player.knownCards = newKnownCards;
 }
 
-function matchedDiscard(newState: GameState, player: Player, cardIndex: number | undefined): GameState {
-  if (cardIndex === undefined) return newState;
-  const cardToDiscard = player.hand[cardIndex];
-  if (!cardToDiscard || !player.knownCards[cardIndex.toString()] || isSealed(newState, cardToDiscard.id)) return newState;
-  const lastDiscarded = newState.discardPile[newState.discardPile.length - 1];
-  if (!lastDiscarded || lastDiscarded.rank !== cardToDiscard.rank) return newState;
-  player.hand.splice(cardIndex, 1);
-  newState.discardPile.push(cardToDiscard);
-  reindexKnownCards(player, cardIndex);
-  newState.logs.push(`${player.name} discarded matching ${cardToDiscard.rank}`);
+function freeDiscard(newState: GameState, player: Player, cardIndex: number | undefined): GameState {
+  const verdict = judgeFreeDiscard(newState, newState.players.indexOf(player), cardIndex);
+  if (verdict === "ignored") return newState;
+  if (verdict === "wrong") return punishWrongDiscard(newState, player);
+  const index = cardIndex as number;
+  const [card] = player.hand.splice(index, 1);
+  newState.discardPile.push(card);
+  reindexKnownCards(player, index);
+  newState.logs.push(`${player.name} discarded ${card.rank}`);
   return newState;
 }
 
@@ -281,29 +275,16 @@ function declareFinish(newState: GameState, player: Player, playerId: string): G
   return newState;
 }
 
-function discardFromHand(newState: GameState, player: Player, cardIndex: number | undefined, playerId: string): GameState {
-  if (cardIndex === undefined || newState.discardPile.length === 0) return newState;
-  const cardToDiscard = player.hand[cardIndex];
-  const topDiscard = newState.discardPile[newState.discardPile.length - 1];
-  if (!cardToDiscard || !topDiscard || isSealed(newState, cardToDiscard.id)) return newState;
-  if (cardToDiscard.rank !== topDiscard.rank) return punishWrongDiscard(newState, player, playerId);
-  player.hand.splice(cardIndex, 1);
-  newState.discardPile.push(cardToDiscard);
-  reindexKnownCards(player, cardIndex);
-  newState.logs.push(`${player.name} discarded ${cardToDiscard.rank} from hand`);
-  advanceTurn(newState);
-  return newState;
-}
-
-function punishWrongDiscard(newState: GameState, player: Player, playerId: string): GameState {
-  if (player.hand.length >= 6) {
-    newState.logs.push(`${player.name} tried to discard wrong card! Loses turn (has 6 cards).`);
-    advanceTurn(newState);
+function punishWrongDiscard(newState: GameState, player: Player): GameState {
+  if (player.hand.length >= HAND_LIMIT) {
+    newState.logs.push(`${player.name} tried to discard wrong card! Loses turn (has ${HAND_LIMIT} cards).`);
+    if (newState.players[newState.currentPlayerIndex] === player) advanceTurn(newState);
+    else skipNextTurn(newState, player.id);
     return newState;
   }
   const cardsDrawn = drawPenaltyCards(newState, player);
   if (cardsDrawn == null) return newState;
-  newState.logs.push(`${player.name} tried to discard wrong card! Draws ${cardsDrawn} card${cardsDrawn > 1 ? "s" : ""} as penalty.`);
+  newState.logs.push(`${player.name} tried to discard wrong card! Draws ${cardsDrawn} card${cardsDrawn > 1 ? "s" : ""}.`);
   return newState;
 }
 

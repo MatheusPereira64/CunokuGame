@@ -15,6 +15,8 @@ export function useOfflineGame(
   const [gameState, setGameState] = useState<GameState | null>(initialGameState);
   const [botPlayers, setBotPlayers] = useState<Map<string, BotPlayer>>(new Map());
   const processingRef = useRef(false);
+  // Fonte única do estado: o descarte é livre e pode acontecer enquanto o bot "pensa"
+  const latestState = useRef<GameState | null>(initialGameState);
 
   // Atualiza o estado quando initialGameState muda (carregado do sessionStorage)
   useEffect(() => {
@@ -23,74 +25,61 @@ export function useOfflineGame(
         players: initialGameState.players.length,
         currentPlayer: initialGameState.currentPlayerIndex 
       });
+      latestState.current = initialGameState;
       setGameState(initialGameState);
     }
   }, [initialGameState]);
 
+  const commitState = useCallback((state: GameState) => {
+    latestState.current = state;
+    setGameState(state);
+    sessionStorage.setItem(`offline_game_${playerId}`, JSON.stringify(state));
+  }, [playerId]);
+
   // Processa turnos dos bots automaticamente
-  const processBotTurns = useCallback((currentState: GameState, bots: Map<string, BotPlayer>) => {
+  const processBotTurns = useCallback((bots: Map<string, BotPlayer>) => {
     if (processingRef.current) return; // Evita múltiplas execuções simultâneas
     processingRef.current = true;
 
-    let state = { ...currentState };
-    
     // Continua processando enquanto for turno de bot
     const processNextBot = () => {
-      if (!state || state.winnerId) {
-        setGameState(state);
+      const state = latestState.current;
+      const currentPlayer = state?.players[state.currentPlayerIndex];
+      const bot = currentPlayer && bots.get(currentPlayer.id);
+      if (!state || state.winnerId || !currentPlayer?.isBot || currentPlayer.id === playerId || !bot) {
         processingRef.current = false;
         return;
       }
 
-      const currentPlayer = state.players[state.currentPlayerIndex];
-      
-      // Se não é bot, para
-      if (!currentPlayer.isBot || currentPlayer.id === playerId) {
-        setGameState(state);
-        sessionStorage.setItem(`offline_game_${playerId}`, JSON.stringify(state));
-        processingRef.current = false;
-        return;
-      }
+      // Espera 3 segundos antes de executar a ação
+      setTimeout(() => {
+        const before = latestState.current;
+        if (!before || before.winnerId) {
+          processingRef.current = false;
+          return;
+        }
+        const action = bot.decideTurn(before, before.currentPlayerIndex);
+        const after = processOfflineAction(before, action, currentPlayer.id);
 
-      // Processa turno do bot
-      const bot = bots.get(currentPlayer.id);
-      if (bot) {
-        // Espera 3 segundos antes de executar a ação
-        setTimeout(() => {
-          const logsBefore = [...state.logs];
-          const action = bot.decideTurn(state, state.currentPlayerIndex);
-          state = processOfflineAction(state, action, currentPlayer.id);
-          
-          // Detecta novos logs e mostra notificação
-          const newLogs = state.logs.slice(logsBefore.length);
-          if (newLogs.length > 0) {
-            const lastLog = newLogs[newLogs.length - 1];
-            if (lastLog && lastLog.includes(currentPlayer.name)) {
-              const botActionMessage = lastLog.replace(`${currentPlayer.name} `, "");
-              const translatedMessage = translateBotMessage(botActionMessage);
-              toast({
-                title: currentPlayer.name,
-                description: translatedMessage,
-                duration: 4000,
-              });
-            }
-          }
-          
-          // Salva estado
-          setGameState(state);
-          sessionStorage.setItem(`offline_game_${playerId}`, JSON.stringify(state));
-          
-          // Continua processando após um pequeno delay
-          setTimeout(processNextBot, 500);
-        }, 3000);
-      } else {
-        setGameState(state);
-        processingRef.current = false;
-      }
+        // Detecta novos logs e mostra notificação
+        const lastLog = after.logs.slice(before.logs.length).at(-1);
+        if (lastLog?.includes(currentPlayer.name)) {
+          toast({
+            title: currentPlayer.name,
+            description: translateBotMessage(lastLog.replace(`${currentPlayer.name} `, "")),
+            duration: 4000,
+          });
+        }
+
+        commitState(after);
+
+        // Continua processando após um pequeno delay
+        setTimeout(processNextBot, 500);
+      }, 3000);
     };
-    
+
     processNextBot();
-  }, [playerId, toast]);
+  }, [playerId, toast, translateBotMessage, commitState]);
 
   // Inicializa bots quando o estado do jogo é carregado
   useEffect(() => {
@@ -107,7 +96,7 @@ export function useOfflineGame(
       const currentPlayer = gameState.players[gameState.currentPlayerIndex];
       if (currentPlayer && currentPlayer.isBot && currentPlayer.id !== playerId) {
         setTimeout(() => {
-          processBotTurns(gameState, bots);
+          processBotTurns(bots);
         }, 1000);
       }
     }
@@ -115,20 +104,16 @@ export function useOfflineGame(
 
   // Processa ação do jogador e turnos dos bots
   const sendAction = useCallback((action: GameAction) => {
-    if (!gameState) return;
+    const current = latestState.current;
+    if (!current) return;
 
-    // Processa ação do jogador
-    let newState = processOfflineAction(gameState, action, playerId);
-    
-    // Salva estado atualizado
-    setGameState(newState);
-    sessionStorage.setItem(`offline_game_${playerId}`, JSON.stringify(newState));
+    commitState(processOfflineAction(current, action, playerId));
 
     // Se não é mais o turno do jogador humano, processa bots
     setTimeout(() => {
-      processBotTurns(newState, botPlayers);
+      processBotTurns(botPlayers);
     }, 500);
-  }, [gameState, playerId, botPlayers, processBotTurns]);
+  }, [playerId, botPlayers, processBotTurns, commitState]);
 
   return { gameState, sendAction, connected: true };
 }

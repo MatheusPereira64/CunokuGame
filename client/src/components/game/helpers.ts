@@ -1,3 +1,4 @@
+import type { Player } from "@shared/schema";
 import { Card } from "@shared/schema";
 
 /** Todas as cartas do baralho possuem habilidade especial */
@@ -85,9 +86,14 @@ export function abilityConfirmDisabled(input: AbilityConfirmInput): boolean {
   return false;
 }
 
-/** Só avisa quando a mão fugiu do normal: as 4 cartas iniciais não precisam de legenda. */
-export function handSizeDetail(cardCount: number, t: (key: string, vars?: Record<string, string>) => string): string | null {
-  return cardCount > 4 ? t("game.cardCount", { count: String(cardCount) }) : null;
+/** Só avisa o que foge do normal: as 4 cartas iniciais não precisam de legenda. */
+export function seatDetail(
+  player: Pick<Player, "id" | "hand">,
+  skipNextTurnIds: string[] | undefined,
+  t: (key: string, vars?: Record<string, string>) => string,
+): string | null {
+  if (skipNextTurnIds?.includes(player.id)) return t("game.losesNextTurn");
+  return player.hand.length > 4 ? t("game.cardCount", { count: String(player.hand.length) }) : null;
 }
 
 const DEFAULT_MAX_PLAYERS = 4;
