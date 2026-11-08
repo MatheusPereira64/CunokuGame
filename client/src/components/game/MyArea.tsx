@@ -162,6 +162,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                 onClick={() => handleCardClick(i)}
                 className="relative block w-full border-0 bg-transparent p-0 text-left"
                 ref={(el) => registerCardPosition(`${me.id}_${i}`, el, card)}
+                data-card-target={`${me.id}:${i}`}
               >
                 {sealed && (
                   <div
@@ -237,7 +238,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
         })}
       </div>
 
-      <div className={cn("absolute right-full bottom-0", fit(isCompact, "mr-1", "mr-3"))}>
+      <div className={cn("absolute right-full bottom-0", fit(isCompact, "mr-1", "mr-3"))} data-player-target={me.id}>
         <Avatar name={me.name} detail={seatDetail(me, gameState.skipNextTurnIds, t)} isActive={isMyTurn} position="left" compact={isCompact} iconId={profile.iconId} accent={profile.accent} />
         <EmoteBubble emoteId={emoteId} className="right-full top-0 mr-1" />
       </div>

@@ -15,7 +15,8 @@ import { MyArea } from "@/components/game/MyArea";
 import { GameOverModal } from "@/components/game/GameOverModal";
 import { EmotePicker } from "@/components/game/EmotePicker";
 import { RulesCheatSheet } from "@/components/game/RulesCheatSheet";
-import { AbilityModal } from "@/components/game/AbilityModal";
+import { AbilityTargeting } from "@/components/game/AbilityTargeting";
+import { abilityTargeting, canPickPlayer, TargetingSpreadContext } from "@/components/game/targetingRules";
 import { AbilityAction, hasSpecialAbility, getAbilityDescription } from "@/components/game/helpers";
 import { getSeatPositions, opponentsInTurnOrder, seatStyle } from "@/components/game/seatPositions";
 import { SwapHighlight, SwapHighlightContext } from "@/components/game/swapHighlight";
@@ -535,6 +536,7 @@ export function ActiveTable(props: {
   const graceName = gameState.players.find((p) => p.id === gameState.reconnectPlayerId)?.name ?? "";
   const currentTurnPlayerId = gameState.players[gameState.currentPlayerIndex]?.id;
   return (
+    <TargetingSpreadContext.Provider value={targetingSpread(props.abilityOpen, gameState, props.playerId)}>
     <div className={cn("min-h-[100dvh] bg-neutral-900 text-white relative overflow-hidden flex flex-col pwa-safe game-landscape", props.cunokuCaller && "cunoku-shake")}>
       {props.isPortrait ? <LandscapePrompt /> : null}
       {props.cunokuCaller ? <CunokuCallOverlay playerName={props.cunokuCaller} onComplete={props.onCunokuCallDone} /> : null}
@@ -576,13 +578,12 @@ export function ActiveTable(props: {
         me={props.me}
       />
       </SwapHighlightContext.Provider>
-      <AbilityModal
+      <AbilityTargeting
         open={props.abilityOpen}
         onOpenChange={props.onAbilityOpenChange}
         drawnCard={gameState.drawnCard ?? null}
         players={gameState.players}
         playerId={props.playerId}
-        myHand={props.me?.hand ?? []}
         sealedCardIds={sealedIds(gameState)}
         jokerRevealed={!!gameState.jokerRevealed}
         onConfirm={props.onConfirmAbility}
@@ -606,8 +607,18 @@ export function ActiveTable(props: {
         />
       ) : null}
     </div>
+    </TargetingSpreadContext.Provider>
   );
 }
+
+/** Enquanto se escolhe uma carta, as mãos que dá para tocar abrem sem sobreposição. */
+function targetingSpread(open: boolean, gameState: GameState, playerId: string): ReadonlySet<string> {
+  const spec = open ? abilityTargeting(gameState.drawnCard?.rank, !!gameState.jokerRevealed) : null;
+  if (spec?.pick !== "card") return NO_SPREAD;
+  return new Set(gameState.players.filter((p) => canPickPlayer(spec, p.id, playerId)).map((p) => p.id));
+}
+
+const NO_SPREAD: ReadonlySet<string> = new Set();
 
 function graceLeft(deadline: number | null | undefined) {
   if (deadline == null) return null;

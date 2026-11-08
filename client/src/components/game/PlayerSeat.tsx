@@ -13,6 +13,7 @@ import { EmoteBubble } from "./EmotePicker";
 import { swapCardStyle, useSwapHighlights } from "./swapHighlight";
 import { SwapBadge } from "./SwapBadge";
 import { seatDetail } from "./helpers";
+import { useTargetingSpread } from "./targetingRules";
 
 /** initial sempre é um objeto: trocar para `false` muda a quantidade de hooks do Framer Motion. */
 function FlippableCard({ flip, children }: { flip: boolean; children: ReactNode }) {
@@ -105,6 +106,7 @@ export function PlayerSeat({
   const isCompact = useIsCompactGame();
   const { t } = useI18n();
   const swapHighlights = useSwapHighlights();
+  const targetingSpread = useTargetingSpread();
   const previousRevealedState = useRef<Map<string, boolean>>(new Map());
 
   const compact = compactProp ?? (opponentCount >= 4 || isCompact);
@@ -112,7 +114,8 @@ export function PlayerSeat({
   const overlapClass = seatOverlap(compact, isCompact, player.hand.length);
 
   // Abre o leque enquanto há carta revelada: ela não fica coberta e continua na sua posição na mão
-  const spreadHand = player.hand.some((card) => revealedCardKeys.includes(`${player.id}_${card.id}`));
+  const spreadHand =
+    targetingSpread.has(player.id) || player.hand.some((card) => revealedCardKeys.includes(`${player.id}_${card.id}`));
 
   const hand = (
     <div
@@ -140,6 +143,7 @@ export function PlayerSeat({
             className={cn("relative shrink-0", i > 0 && !spreadHand && overlapClass)}
             style={swapCardStyle(swapHighlights[card.id], i + 1)}
             ref={(el) => registerCardPosition(positionKey, el, card)}
+            data-card-target={`${player.id}:${i}`}
           >
             <SwapBadge highlight={swapHighlights[card.id]} number={i + 1} />
             {shouldShowCard ? (
@@ -182,7 +186,7 @@ export function PlayerSeat({
   );
 
   const avatar = (
-    <div className="relative">
+    <div className="relative" data-player-target={player.id}>
       <Avatar
         name={player.name}
         isBot={player.isBot}
