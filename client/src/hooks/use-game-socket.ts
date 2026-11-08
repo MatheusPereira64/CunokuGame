@@ -31,6 +31,44 @@ export function useGameSocket(roomCode: string, playerId: string) {
     let attempt = 0;
     let retryTimer = 0;
     let ws: WebSocket | null = null;
+    let lastHeardAt = Date.now();
+
+    // No celular a conexão pode morrer sem avisar (tela bloqueada, troca de Wi-Fi para 4G):
+    // sem resposta ao ping, abandona o socket e reconecta na hora.
+    const reconnectNow = () => {
+      if (stopped) return;
+      window.clearTimeout(retryTimer);
+      if (ws) {
+        ws.onclose = null;
+        ws.onmessage = null;
+        try {
+          ws.close();
+        } catch {
+          /* ignore */
+        }
+      }
+      setConnected(false);
+      attempt = 0;
+      connect();
+    };
+    const checkAlive = (graceMs: number) => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        if (!ws || ws.readyState === WebSocket.CLOSED) reconnectNow();
+        return;
+      }
+      const sentAt = Date.now();
+      ws.send("ping");
+      window.setTimeout(() => {
+        if (!stopped && lastHeardAt < sentAt) reconnectNow();
+      }, graceMs);
+    };
+    const heartbeat = window.setInterval(() => checkAlive(10_000), 20_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") checkAlive(4_000);
+    };
+    const onOnline = () => checkAlive(4_000);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
 
     const connect = () => {
       if (stopped) return;
@@ -41,6 +79,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
       ws.onopen = () => {
         if (stopped) return;
         attempt = 0;
+        lastHeardAt = Date.now();
         setConnected(true);
         const { iconId, accent } = loadProfile();
         ws?.send(JSON.stringify({
@@ -55,6 +94,8 @@ export function useGameSocket(roomCode: string, playerId: string) {
       };
 
     ws.onmessage = (event) => {
+      lastHeardAt = Date.now();
+      if (event.data === "pong") return;
       try {
         const message: WsMessage = JSON.parse(event.data);
         console.log("WS message received:", message.type, message);
@@ -181,6 +222,9 @@ export function useGameSocket(roomCode: string, playerId: string) {
     return () => {
       stopped = true;
       window.clearTimeout(retryTimer);
+      window.clearInterval(heartbeat);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
       ws?.close();
     };
   }, [roomCode, playerId]);

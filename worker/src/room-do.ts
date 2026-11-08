@@ -17,54 +17,13 @@ import {
   type RoomSessionData,
 } from "../../server/roomHandlers";
 import { createCompetitionStore, createStorage } from "./storage";
+import { DoBackedStorage, LatestStateWriter } from "./doBackedStorage";
 import type { Env } from "./env";
 
 type Attachment = {
   playerId: string | null;
   roomCode: string;
 };
-
-/** Storage que prioriza o cache do DO (necessário sem DB compartilhado entre isolates). */
-class DoBackedStorage implements IStorage {
-  constructor(
-    private inner: IStorage,
-    private state: DurableObjectState,
-  ) {}
-
-  private async cacheRoom(room: Room): Promise<void> {
-    await this.state.storage.put("room", room);
-  }
-
-  async createRoom(room: Parameters<IStorage["createRoom"]>[0]): Promise<Room> {
-    const created = await this.inner.createRoom(room);
-    await this.cacheRoom(created);
-    return created;
-  }
-
-  async getRoom(code: string): Promise<Room | undefined> {
-    const cached = await this.state.storage.get<Room>("room");
-    if (cached && cached.code === code) return cached;
-    const room = await this.inner.getRoom(code);
-    if (room) await this.cacheRoom(room);
-    return room;
-  }
-
-  async listRooms(): Promise<Room[]> {
-    return this.inner.listRooms();
-  }
-
-  async updateGameState(code: string, state: GameState): Promise<Room> {
-    const room = await this.inner.updateGameState(code, state);
-    await this.cacheRoom(room);
-    return room;
-  }
-
-  async updateRoomStatus(code: string, status: string): Promise<Room> {
-    const room = await this.inner.updateRoomStatus(code, status);
-    await this.cacheRoom(room);
-    return room;
-  }
-}
 
 /**
  * Um Durable Object por código de sala: WebSockets + bots (alarms).
@@ -73,9 +32,26 @@ export class RoomDurableObject extends DurableObject<Env> {
   private session: RoomSessionData = createEmptySession();
   private sessionLoaded = false;
   private roomCode = "";
+  private backupWriter = new LatestStateWriter(
+    (code, state) => createStorage(this.env).updateGameState(code, state),
+    (work) => this.ctx.waitUntil(work),
+  );
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    // Responde ao ping do cliente sem acordar o objeto: só serve para saber se a conexão está viva
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+  }
 
   private storage(): IStorage {
-    return new DoBackedStorage(createStorage(this.env), this.ctx);
+    return new DoBackedStorage(
+      createStorage(this.env),
+      {
+        get: () => this.ctx.storage.get<Room>("room"),
+        put: (room) => this.ctx.storage.put("room", room),
+      },
+      this.backupWriter,
+    );
   }
 
   private async loadSession(): Promise<void> {

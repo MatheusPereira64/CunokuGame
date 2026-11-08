@@ -327,6 +327,10 @@ export async function registerRoutes(
 
     ws.on("message", async (data) => {
       try {
+        if (data.toString() === "ping") {
+          ws.send("pong");
+          return;
+        }
         const msg = JSON.parse(data.toString());
 
         if (msg.type === "join") {

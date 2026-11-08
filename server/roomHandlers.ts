@@ -260,6 +260,15 @@ export async function handleStartGame(
   }
 }
 
+/**
+ * Quem manda uma ação está conectado. Um aviso de desconexão atrasado pode ter marcado o
+ * contrário, e aí o servidor jogaria a vez dele sozinho ao fim da janela de reconexão.
+ */
+function markActingPlayerConnected(state: GameState, playerId: string): void {
+  const player = state.players.find((p) => p.id === playerId);
+  if (player && !player.isBot && !player.isConnected) player.isConnected = true;
+}
+
 export async function handlePlayerAction(
   storage: IStorage,
   messenger: RoomMessenger,
@@ -277,13 +286,13 @@ export async function handlePlayerAction(
 
   const state = room.gameState as GameState;
   if (state.winnerId) return;
+  markActingPlayerConnected(state, playerId);
   const result = GameLogic.processAction(state, action as never, playerId);
   result.newState = syncReconnectWindow(result.newState);
 
   await storage.updateGameState(roomCode, result.newState);
-  const rewards = await settleFinishedMatch(competition, room, result.newState, session);
   messenger.broadcast({ type: "game_state", state: result.newState });
-  sendRewards(messenger, rewards);
+  sendRewards(messenger, await settleFinishedMatch(competition, room, result.newState, session));
 
   if ((action as { type?: string }).type === "declare_finish" && result.newState.isFinalRound) {
     const declarer = result.newState.players.find((p) => p.id === playerId);
