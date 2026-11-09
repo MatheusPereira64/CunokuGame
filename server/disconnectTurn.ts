@@ -1,18 +1,31 @@
-import type { GameState } from "@shared/schema";
+import type { GameState, Player } from "@shared/schema";
 import { GameLogic } from "./game";
 import { replaceableIndexes } from "@shared/cardPowers";
 
 /** Janela para o jogador desconectado voltar quando chega a vez dele. */
 export const DISCONNECT_TURN_MS = 50_000;
 
-function currentHumanDisconnected(state: GameState) {
+/** Tempo de cada vez para quem está conectado: sem isso, quem larga o celular trava a mesa. */
+export const TURN_TIME_MS = 60_000;
+
+function currentHumanTurn(state: GameState): Player | null {
   if (state.winnerId || state.turnPhase === "finished" || state.turnPhase === "waiting") return null;
   // No desafio diário a partida espera o jogador voltar: não há outro humano aguardando
   if (state.dailyDay) return null;
   const player = state.players[state.currentPlayerIndex];
-  if (!player || player.isBot || player.isConnected) return null;
+  if (!player || player.isBot) return null;
   if (state.turnPhase !== "draw" && state.turnPhase !== "action") return null;
   return player;
+}
+
+function currentHumanDisconnected(state: GameState) {
+  const player = currentHumanTurn(state);
+  return player && !player.isConnected ? player : null;
+}
+
+/** Identifica a vez: o mesmo jogador volta a jogar em outra rodada, com outro relógio. */
+function turnKey(state: GameState) {
+  return `${state.round}:${state.currentPlayerIndex}`;
 }
 
 /**
@@ -34,14 +47,24 @@ export function syncReconnectWindow(state: GameState, now = Date.now()): GameSta
 }
 
 /**
- * Se a janela acabou e o jogador segue offline: compra do monte (se ainda não comprou)
- * e descarta essa carta.
+ * Relógios da vez: a janela de reconexão para quem caiu e o tempo limite para quem está
+ * conectado. O tempo limite só vale com 2 humanos ou mais, que é quando alguém fica esperando.
  */
-export function autoPlayDisconnectedTurn(state: GameState, now = Date.now()): GameState {
-  const player = currentHumanDisconnected(state);
-  if (!player || state.reconnectPlayerId !== player.id) return state;
-  if (state.reconnectDeadline == null || now < state.reconnectDeadline) return state;
+export function syncTurnClock(state: GameState, now = Date.now()): GameState {
+  const synced = syncReconnectWindow(state, now);
+  const player = currentHumanTurn(synced);
+  const humans = synced.players.filter((p) => !p.isBot).length;
+  if (!player || !player.isConnected || humans < 2) {
+    if (synced.turnDeadline == null && synced.turnKey == null) return synced;
+    return { ...synced, turnDeadline: null, turnKey: null };
+  }
+  const key = turnKey(synced);
+  if (synced.turnKey === key && synced.turnDeadline != null) return synced;
+  return { ...synced, turnKey: key, turnDeadline: now + TURN_TIME_MS };
+}
 
+/** Compra do monte (se ainda não comprou) e descarta a carta comprada pelo jogador. */
+function autoPlayTurn(state: GameState, player: Player, reason: string): GameState {
   let current = state;
   if (current.turnPhase === "draw" || !current.drawnCard) {
     current = GameLogic.processAction(current, { type: "draw_deck" }, player.id).newState;
@@ -59,8 +82,28 @@ export function autoPlayDisconnectedTurn(state: GameState, now = Date.now()): Ga
     current.turnPhase !== "finished"
   ) {
     current = GameLogic.processAction(current, { type: "discard_drawn" }, player.id).newState;
-    current.logs.push(`${player.name} não reconectou a tempo e a carta comprada foi descartada.`);
+    current.logs.push(reason);
   }
+  return current;
+}
 
-  return syncReconnectWindow(current, now);
+/**
+ * Se a janela acabou e o jogador segue offline: compra do monte (se ainda não comprou)
+ * e descarta essa carta.
+ */
+export function autoPlayDisconnectedTurn(state: GameState, now = Date.now()): GameState {
+  const player = currentHumanDisconnected(state);
+  if (!player || state.reconnectPlayerId !== player.id) return state;
+  if (state.reconnectDeadline == null || now < state.reconnectDeadline) return state;
+  const played = autoPlayTurn(state, player, `${player.name} não reconectou a tempo e a carta comprada foi descartada.`);
+  return syncTurnClock(played, now);
+}
+
+/** Tempo da vez esgotado com o jogador conectado: joga por ele do mesmo jeito. */
+export function autoPlayTimedOutTurn(state: GameState, now = Date.now()): GameState {
+  const player = currentHumanTurn(state);
+  if (!player || !player.isConnected || state.turnKey !== turnKey(state)) return state;
+  if (state.turnDeadline == null || now < state.turnDeadline) return state;
+  const played = autoPlayTurn(state, player, `${player.name} demorou demais e a carta comprada foi descartada.`);
+  return syncTurnClock(played, now);
 }

@@ -17,8 +17,10 @@ import {
   handleJoinMessage,
   handlePlayerAction,
   handlePlayerDisconnect,
+  handleRematch,
   handleStartGame,
   resolveDisconnectedTurn,
+  resolveTimedOutTurn,
   type RoomSessionData,
 } from "./roomHandlers";
 import { ensureRankSchema } from "./rankEnsure";
@@ -301,20 +303,19 @@ export async function registerRoutes(
     }
 
     clearDisconnectTimer(roomCode);
-    if (!state.reconnectDeadline || !state.reconnectPlayerId) return;
-    const playerId = state.reconnectPlayerId;
-    const delay = Math.max(0, state.reconnectDeadline - Date.now());
+    const reconnectPlayerId = state.reconnectDeadline ? state.reconnectPlayerId : null;
+    const deadline = reconnectPlayerId ? state.reconnectDeadline : state.turnDeadline;
+    if (!deadline) return;
+    const delay = Math.max(0, deadline - Date.now());
     const timer = setTimeout(() => {
       disconnectTimers.delete(roomCode);
       void (async () => {
         const live = roomsLive.get(roomCode);
         if (!live) return;
-        const next = await resolveDisconnectedTurn(
-          storage,
-          makeMessenger(roomCode),
-          roomCode,
-          playerId,
-        );
+        const messenger = makeMessenger(roomCode);
+        const next = reconnectPlayerId
+          ? await resolveDisconnectedTurn(storage, messenger, roomCode, reconnectPlayerId)
+          : await resolveTimedOutTurn(storage, messenger, roomCode);
         if (next) scheduleNextBotTurn(roomCode, next);
       })();
     }, delay);
@@ -377,6 +378,12 @@ export async function registerRoutes(
             playerId,
             scheduleNextBotTurn,
           );
+        }
+
+        if (msg.type === "rematch") {
+          if (!currentRoom || !currentPlayer) return;
+          await handleRematch(storage, makeMessenger(currentRoom), currentRoom, currentPlayer, scheduleNextBotTurn);
+          return;
         }
 
         if (msg.type === "player_action") {

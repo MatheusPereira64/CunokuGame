@@ -754,7 +754,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                         id="rankNick"
                         value={nickname}
                         onChange={(e) => setNickname(e.target.value)}
-                        placeholder="apelido"
+                        placeholder={t("profile.nicknamePlaceholder")}
                         maxLength={16}
                         className="h-9 text-sm"
                       />

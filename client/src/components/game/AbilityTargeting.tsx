@@ -9,6 +9,7 @@ import {
   buildAbilityAction,
   canPickCard,
   canPickPlayer,
+  samePick,
   targetingPrompt,
   togglePick,
   type TargetPick,
@@ -96,7 +97,7 @@ export function AbilityTargeting({
         }
         p.hand.forEach((card, i) => {
           const box = cardBoxes[i];
-          const pick = { playerId: p.id, cardIndex: i };
+          const pick = { playerId: p.id, cardIndex: i, cardId: card.id };
           if (box && canPickCard(spec, [], pick, playerId, sealedCardIds.includes(card.id))) {
             found.push({ key: `${p.id}:${i}`, pick, box: touchBox(box) });
           }
@@ -127,10 +128,10 @@ export function AbilityTargeting({
 
   const action = buildAbilityAction(drawnCard.rank, jokerRevealed, picks, playerId);
   const ready = action !== null && (spec.pick === "none" || picks.length === spec.slots);
-  const isPicked = (pick: TargetPick) => picks.some((p) => p.playerId === pick.playerId && p.cardIndex === pick.cardIndex);
+  const isPicked = (pick: TargetPick) => picks.some((p) => samePick(p, pick));
   const pickable = (target: HitTarget) =>
     spec.pick === "player" ||
-    canPickCard(spec, picks, target.pick as Required<TargetPick>, playerId, false);
+    canPickCard(spec, picks, target.pick as TargetPick & { cardIndex: number }, playerId, false);
 
   const confirm = () => {
     if (!ready || !action) return;
@@ -141,7 +142,7 @@ export function AbilityTargeting({
 
   // Na troca, a seta aparece assim que as duas cartas estão escolhidas
   const pickedBoxes = picks
-    .map((p) => targets.find((target) => target.pick.playerId === p.playerId && target.pick.cardIndex === p.cardIndex)?.box)
+    .map((p) => targets.find((target) => samePick(target.pick, p))?.box)
     .filter((b): b is Box => !!b);
   const center = (b: Box) => ({ x: b.left + b.width / 2, y: b.top + b.height / 2 });
 

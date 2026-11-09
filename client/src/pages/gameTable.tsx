@@ -22,6 +22,7 @@ import { getSeatPositions, opponentsInTurnOrder, seatStyle } from "@/components/
 import { SwapHighlight, SwapHighlightContext } from "@/components/game/swapHighlight";
 import { LandscapePrompt } from "@/components/game/LandscapePrompt";
 import { GameTutorial } from "@/components/game/GameTutorial";
+import { PowerTips } from "@/components/game/PowerTips";
 import { WaitingRoom } from "@/components/game/WaitingRoom";
 import { TableMatId } from "@/lib/tableTheme";
 import { AnimationEvent } from "@/components/animations/types";
@@ -65,11 +66,11 @@ export function OfflineBoot({
   );
 }
 
-export function ConnectingScreen({ roomCode }: { roomCode: string }) {
+export function ConnectingScreen({ roomCode, t }: { roomCode: string; t: Translate }) {
   return (
     <div className="min-h-screen bg-indigo-950 flex flex-col items-center justify-center text-white">
-      <div className="animate-pulse text-2xl font-display mb-4">Connecting to Table...</div>
-      <div className="text-white/50">Room: {roomCode}</div>
+      <div className="animate-pulse text-2xl font-display mb-4">{t("net.connecting")}</div>
+      <div className="text-white/50">{t("net.room", { code: roomCode })}</div>
     </div>
   );
 }
@@ -213,6 +214,7 @@ function StatusLine({
 }) {
   const currentName = gameState.players[gameState.currentPlayerIndex]?.name ?? "";
   const textSize = cx(isCompact, "text-[10px]", "text-sm");
+  const secondsLeft = turnSecondsLeft(gameState.turnDeadline);
   const message =
     graceSeconds != null && graceName ? (
       <span className={cn("truncate font-bold text-amber-300", textSize)}>
@@ -238,6 +240,18 @@ function StatusLine({
       <RoundStatus isCompact={isCompact} gameState={gameState} t={t} />
       <span className="h-4 w-px shrink-0 bg-white/20" />
       {message}
+      {secondsLeft != null && (
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-1.5 font-mono font-bold tabular-nums",
+            textSize,
+            isMyTurn && secondsLeft <= 10 ? "bg-red-600 text-white motion-safe:animate-pulse" : "bg-white/15 text-white/90"
+          )}
+          aria-label={t("game.turnTimeLeft", { seconds: String(secondsLeft) })}
+        >
+          {secondsLeft}s
+        </span>
+      )}
     </div>
   );
 }
@@ -507,6 +521,7 @@ export function ActiveTable(props: {
   onExit: () => void;
   onCopyCode: () => void;
   onBackHome: () => void;
+  onRematch: () => void;
   currentAnimation: AnimationEvent | null;
   onAnimationComplete: () => void;
   opponentNotice: { playerName: string; actionType: OpponentActionType } | null;
@@ -593,7 +608,12 @@ export function ActiveTable(props: {
           <RevealOverlay revealed={props.revealedOpponentCard} isCompact={props.isCompact} isOffline={props.isOffline} t={t} onClose={props.onCloseReveal} />
         ) : null}
       </AnimatePresence>
-      {showTutorial(gameState) ? <GameTutorial /> : null}
+      {showTutorial(gameState) ? (
+        <>
+          <GameTutorial />
+          <PowerTips gameState={gameState} playerId={props.playerId} isMyTurn={props.isMyTurn} />
+        </>
+      ) : null}
       {gameState.winnerId ? (
         <GameOverModal
           open={props.gameOverOpen}
@@ -604,6 +624,8 @@ export function ActiveTable(props: {
           isOffline={props.isOffline}
           reward={props.matchReward}
           onBackHome={props.onBackHome}
+          onRematch={gameState.dailyDay ? undefined : props.onRematch}
+          dailyDay={gameState.dailyDay ?? undefined}
         />
       ) : null}
     </div>
@@ -619,6 +641,15 @@ function targetingSpread(open: boolean, gameState: GameState, playerId: string):
 }
 
 const NO_SPREAD: ReadonlySet<string> = new Set();
+
+/** Só mostra o relógio na reta final: os primeiros segundos não precisam de pressa. */
+const TURN_CLOCK_VISIBLE_S = 20;
+
+function turnSecondsLeft(deadline: number | null | undefined) {
+  if (deadline == null) return null;
+  const left = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+  return left <= TURN_CLOCK_VISIBLE_S ? left : null;
+}
 
 function graceLeft(deadline: number | null | undefined) {
   if (deadline == null) return null;
@@ -652,6 +683,7 @@ export function renderPregame(args: {
   maxPlayers: number | null;
   onCopyCode: () => void;
   onShareInvite: () => void;
+  onInviteFriend: (name: string) => void;
   onCopyLanUrl: () => void;
   networkMode: "lan" | "server";
   lanJoinUrl: string | null;
@@ -674,6 +706,7 @@ export function renderPregame(args: {
       maxPlayers={args.maxPlayers}
       onCopyCode={args.onCopyCode}
       onShareInvite={args.onShareInvite}
+      onInviteFriend={args.onInviteFriend}
       onCopyLanUrl={args.onCopyLanUrl}
       networkMode={args.networkMode}
       lanJoinUrl={args.lanJoinUrl}

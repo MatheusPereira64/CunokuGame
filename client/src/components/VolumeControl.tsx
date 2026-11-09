@@ -14,11 +14,20 @@ import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
 import { TableThemePicker } from "@/components/TableThemePicker";
 import { useI18n } from "@/contexts/i18n-context";
+import { hapticsEnabled, setHapticsEnabled, vibrate } from "@/lib/haptics";
 
 export function VolumeControl() {
   const [musicVolume, setMusicVolume] = useState(audioManager.getMusicVolume());
   const [sfxVolume, setSfxVolume] = useState(audioManager.getSfxVolume());
   const [isMuted, setIsMuted] = useState(audioManager.getMuted());
+  const [haptics, setHaptics] = useState(hapticsEnabled());
+  const hapticsId = useId();
+  const toggleHaptics = () => {
+    const next = !haptics;
+    setHapticsEnabled(next);
+    setHaptics(next);
+    if (next) vibrate("turn");
+  };
   const [isOpen, setIsOpen] = useState(false);
   const { t } = useI18n();
   const isPortrait = useIsPortrait();
@@ -62,7 +71,7 @@ export function VolumeControl() {
           variant="ghost"
           size="icon"
           className="relative"
-          aria-label="Ajustar volume"
+          aria-label={t("settings.volumeLabel")}
         >
           {isMuted ? (
             <VolumeX className="h-5 w-5" />
@@ -83,7 +92,7 @@ export function VolumeControl() {
         <div className={cn(isLandscapeMenu ? "space-y-3 py-1" : "space-y-6 py-4")}>
           {/* Controle de Mute */}
           <label htmlFor={muteId} className="flex items-center justify-between gap-3">
-            <span className="text-sm font-medium">Som</span>
+            <span className="text-sm font-medium">{t("settings.sound")}</span>
             <Button
               id={muteId}
               variant="outline"
@@ -94,14 +103,21 @@ export function VolumeControl() {
               {isMuted ? (
                 <>
                   <VolumeX className="h-4 w-4" />
-                  Desmutar
+                  {t("settings.unmute")}
                 </>
               ) : (
                 <>
                   <Volume2 className="h-4 w-4" />
-                  Mutar
+                  {t("settings.mute")}
                 </>
               )}
+            </Button>
+          </label>
+
+          <label htmlFor={hapticsId} className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium">{t("settings.vibration")}</span>
+            <Button id={hapticsId} variant="outline" size="sm" onClick={toggleHaptics} aria-pressed={haptics}>
+              {haptics ? t("settings.on") : t("settings.off")}
             </Button>
           </label>
 

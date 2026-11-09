@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { PlayingCard } from "../PlayingCard";
 import { DiscardAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
 import { randomFloat } from "@shared/secureRandom";
+import { useI18n } from "@/contexts/i18n-context";
 
 interface CardDiscardAnimationProps extends BaseAnimationProps {
   data: DiscardAnimationData;
@@ -15,6 +16,7 @@ export function CardDiscardAnimation({
   duration = DEFAULT_DURATIONS.discard,
   isOwnPlayer = false
 }: CardDiscardAnimationProps) {
+  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(true);
 
   const { 
@@ -50,14 +52,14 @@ export function CardDiscardAnimation({
             ? 'from-green-500 to-emerald-600' 
             : 'from-red-500 to-rose-600',
           icon: isSuccess ? '✓' : '✗',
-          text: isSuccess ? 'Descarte Combinado!' : 'Erro no Descarte',
+          text: isSuccess ? t("anim.matchOk") : t("anim.matchFail"),
           glowColor: isSuccess ? 'bg-green-400' : 'bg-red-400',
         };
       case 'from_hand':
         return {
           gradient: 'from-orange-500 to-amber-600',
           icon: '📤',
-          text: 'Descartando da Mão',
+          text: t("anim.discardHand"),
           glowColor: 'bg-orange-400',
         };
       case 'drawn':
@@ -65,7 +67,7 @@ export function CardDiscardAnimation({
         return {
           gradient: 'from-purple-500 to-violet-600',
           icon: '↓',
-          text: 'Descartando Carta',
+          text: t("anim.discardCard"),
           glowColor: 'bg-purple-400',
         };
     }

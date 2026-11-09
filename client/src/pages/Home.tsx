@@ -218,7 +218,7 @@ export default function Home() {
       setCreateDialogOpen(false);
       setLocation(`/game/${result.code}?player=${result.playerId}`);
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("error.generic"), description: err.message, variant: "destructive" });
     }
   };
 
@@ -254,7 +254,7 @@ export default function Home() {
       sessionStorage.setItem(`playerName_${result.code}`, name);
       setLocation(`/game/${result.code}?player=${result.playerId}`);
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("error.generic"), description: err.message, variant: "destructive" });
     }
   };
 

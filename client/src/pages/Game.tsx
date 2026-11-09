@@ -9,6 +9,9 @@ import { START_COUNTDOWN_MS } from "@shared/matchQueue";
 import { useGameAnimations, OpponentActionType } from "@/components/animations";
 import { useToast } from "@/hooks/use-toast";
 import { audioManager } from "@/utils/audioManager";
+import { vibrate } from "@/lib/haptics";
+import { rememberPlayers } from "@/lib/friends";
+import { createOfflineGame } from "@/utils/localGame";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useI18n } from "@/contexts/i18n-context";
 import { AbilityAction } from "@/components/game/helpers";
@@ -147,12 +150,14 @@ export default function Game() {
   }, [isDailyMatch]);
   const [, setReconnectTick] = useState(0);
 
+  // Relógios da vez: redesenha a cada segundo enquanto algum estiver correndo
+  const clockDeadline = gameState?.reconnectDeadline ?? gameState?.turnDeadline;
   useEffect(() => {
-    if (!gameState?.reconnectDeadline) return;
+    if (!clockDeadline) return;
     setReconnectTick((n) => n + 1);
     const id = window.setInterval(() => setReconnectTick((n) => n + 1), 1000);
     return () => window.clearInterval(id);
-  }, [gameState?.reconnectDeadline]);
+  }, [clockDeadline]);
 
   useEffect(() => {
     if (!fromQueue || isOffline) return;
@@ -432,6 +437,7 @@ export default function Game() {
       if (declarer) {
         setCunokuCaller(declarer.name);
         audioManager.playCunokuCall();
+        vibrate("cunoku");
       }
     }
     prevFinalRound.current = gameState.isFinalRound || false;
@@ -446,6 +452,7 @@ export default function Game() {
   useEffect(() => {
     if (isMyTurn && !prevIsMyTurn.current && !gameState?.winnerId) {
       audioManager.playYourTurn();
+      vibrate("turn");
     }
     prevIsMyTurn.current = !!isMyTurn;
   }, [isMyTurn, gameState?.winnerId]);
@@ -484,11 +491,11 @@ export default function Game() {
     });
   };
 
-  const handleShareInvite = async () => {
+  const handleShareInvite = async (text: string = roomCode) => {
     const url = buildInviteUrl(roomCode);
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: "Cunoku", text: roomCode, url });
+        await navigator.share({ title: "Cunoku", text, url });
         return;
       } catch {
         // usuário cancelou ou o WebView não completou — cai no clipboard
@@ -521,6 +528,7 @@ export default function Game() {
         ability: "peek_own",
         targetPlayerId: playerId,
         targetCardIndex: cardIndex,
+        targetCardId: action.cardId,
       });
       audioManager.playCardFlip();
 
@@ -559,6 +567,7 @@ export default function Game() {
         ability: "peek_opponent",
         targetPlayerId: action.targetPlayerId,
         targetCardIndex: action.targetCardIndex,
+        targetCardId: action.cardId,
       });
     }
 
@@ -570,6 +579,8 @@ export default function Game() {
         targetCardIndex: action.myCardIndex,
         targetPlayerId2: action.targetPlayerId,
         targetCardIndex3: action.targetCardIndex,
+        targetCardId: action.myCardId,
+        targetCardId2: action.targetCardId,
       });
     }
 
@@ -587,6 +598,7 @@ export default function Game() {
         ability: "seal",
         targetPlayerId: action.targetPlayerId,
         targetCardIndex: action.cardIndex,
+        targetCardId: action.cardId,
       });
     }
 
@@ -607,6 +619,7 @@ export default function Game() {
         ability: "joker_force",
         targetPlayerId: action.targetPlayerId,
         targetCardIndex: action.cardIndex,
+        targetCardId: action.cardId,
       });
     }
 
@@ -623,17 +636,54 @@ export default function Game() {
         targetCardIndex: action.card1Index,
         targetPlayerId2: action.player2Id,
         targetCardIndex3: action.card2Index,
+        targetCardId: action.card1Id,
+        targetCardId2: action.card2Id,
       });
     }
   };
 
+
+  // Quem jogou online com você entra na lista de amigos e recentes do aparelho
+  const tablemates = !isOffline && gameState && gameState.turnPhase !== "waiting"
+    ? gameState.players.filter((p) => !p.isBot && p.id !== playerId)
+    : [];
+  const tablematesKey = tablemates.map((p) => p.name).join("|");
+  useEffect(() => {
+    if (tablemates.length > 0) rememberPlayers(tablemates);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando muda quem está na mesa
+  }, [tablematesKey]);
+
+  // Revanche: online o servidor monta a nova partida para todos; offline começa outra contra os mesmos bots
+  const handleRematch = () => {
+    if (!gameState) return;
+    if (isOffline) {
+      const myName = gameState.players.find((p) => p.id === playerId)?.name ?? "";
+      const difficulty = (sessionStorage.getItem(`offline_difficulty_${playerId}`) as "easy" | "medium" | "hard" | null) ?? "medium";
+      const fresh = createOfflineGame(myName, gameState.players.filter((p) => p.isBot).length, difficulty);
+      sessionStorage.setItem(`offline_game_${fresh.playerId}`, JSON.stringify(fresh.gameState));
+      sessionStorage.setItem(`offline_player_${fresh.playerId}`, fresh.playerId);
+      sessionStorage.setItem(`offline_difficulty_${fresh.playerId}`, difficulty);
+      window.location.assign(`/game/offline?player=${fresh.playerId}&mode=offline`);
+      return;
+    }
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: "rematch" }));
+      return;
+    }
+    toast({ title: t("net.error"), description: t("net.notConnected"), variant: "destructive" });
+  };
+
+  // Partida nova (revanche): o resultado da anterior sai da tela
+  useEffect(() => {
+    if (!gameState?.winnerId) setGameOverModalOpen(false);
+  }, [gameState?.winnerId]);
 
   const startTable = () => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({ type: "start_game" }));
       return;
     }
-    toast({ title: "Connection Error", description: "Not connected to server", variant: "destructive" });
+    toast({ title: t("net.error"), description: t("net.notConnected"), variant: "destructive" });
   };
 
   const closeReveal = () => {
@@ -659,14 +709,15 @@ export default function Game() {
     hostId: storedHostId,
     maxPlayers: Number(sessionStorage.getItem(`maxPlayers_${roomCode}`)) || null,
     onCopyCode: handleCopyCode,
-    onShareInvite: handleShareInvite,
+    onShareInvite: () => void handleShareInvite(),
+    onInviteFriend: (name: string) => void handleShareInvite(t("friends.inviteText", { name, code: roomCode })),
     onCopyLanUrl: handleCopyLanUrl,
     networkMode: getNetworkMode(),
     lanJoinUrl: getLanJoinUrl(),
     onStart: startTable,
   });
   if (pregame) return pregame;
-  if (!gameState) return <ConnectingScreen roomCode={roomCode} />;
+  if (!gameState) return <ConnectingScreen roomCode={roomCode} t={t} />;
 
   return (
     <ActiveTable
@@ -685,6 +736,7 @@ export default function Game() {
       t={t}
       onExit={() => setLocation("/")}
       onCopyCode={handleCopyCode}
+      onRematch={handleRematch}
       onBackHome={() => {
         clearActiveSession();
         setLocation("/");

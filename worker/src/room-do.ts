@@ -10,8 +10,10 @@ import {
   handleJoinMessage,
   handlePlayerAction,
   handlePlayerDisconnect,
+  handleRematch,
   handleStartGame,
   resolveDisconnectedTurn,
+  resolveTimedOutTurn,
   serializeBots,
   type PlayerLook,
   type RoomSessionData,
@@ -150,6 +152,11 @@ export class RoomDurableObject extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(Math.max(Date.now() + 50, state.reconnectDeadline));
       return;
     }
+    if (playing && state.turnDeadline) {
+      await this.ctx.storage.put("alarmKind", "turn");
+      await this.ctx.storage.setAlarm(Math.max(Date.now() + 50, state.turnDeadline));
+      return;
+    }
     await this.ctx.storage.delete("alarmKind");
     await this.ctx.storage.deleteAlarm();
   }
@@ -254,6 +261,13 @@ export class RoomDurableObject extends DurableObject<Env> {
         return;
       }
 
+      if (msg.type === "rematch") {
+        if (!playerId) return;
+        await handleRematch(storage, messenger, roomCode, playerId, (c, s) => this.scheduleBot(c, s));
+        await this.saveSession();
+        return;
+      }
+
       if (msg.type === "player_action") {
         if (!playerId || !roomCode) return;
         await handlePlayerAction(
@@ -332,6 +346,12 @@ export class RoomDurableObject extends DurableObject<Env> {
         );
         if (next) this.scheduleBot(this.roomCode, next);
       }
+      await this.saveSession();
+      return;
+    }
+    if (kind === "turn") {
+      const next = await resolveTimedOutTurn(this.storage(), this.makeMessenger(), this.roomCode);
+      if (next) this.scheduleBot(this.roomCode, next);
       await this.saveSession();
       return;
     }

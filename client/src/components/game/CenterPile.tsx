@@ -43,7 +43,8 @@ export function CenterPile({
     <div className={cn("flex items-center", fit(isCompact, "gap-2.5", "gap-10"))}>
       {/* Baralho */}
       <div className="relative group" ref={deckRef}>
-        {gameState.deck.length > 0 ? (
+        {/* Baralho vazio continua clicável na sua vez: a compra embaralha o descarte ou encerra a partida */}
+        {gameState.deck.length > 0 || canDraw ? (
           <button
             type="button"
             disabled={!canDraw}
@@ -72,7 +73,7 @@ export function CenterPile({
               cardClass
             )}
           >
-            <span className={cn("text-white/20", fit(isCompact, "text-[8px]", "text-xs"))}>EMPTY</span>
+            <span className={cn("text-white/20", fit(isCompact, "text-[8px]", "text-xs"))}>{t("game.emptyPile")}</span>
           </div>
         )}
       </div>
@@ -158,7 +159,7 @@ export function CenterPile({
             <div className={cn(labelClass, "text-white/50")}>{isCompact ? t("game.discardPileShort") : t("game.discardPile")}</div>
             <PlayingCard
               card={gameState.discardPile[gameState.discardPile.length - 1]}
-              className={cn("brightness-90", cardClass)}
+              className={cardClass}
             />
           </div>
         ) : (
@@ -168,7 +169,7 @@ export function CenterPile({
               cardClass
             )}
           >
-            <span className={cn("text-white/20", fit(isCompact, "text-[8px]", "text-xs"))}>EMPTY</span>
+            <span className={cn("text-white/20", fit(isCompact, "text-[8px]", "text-xs"))}>{t("game.emptyPile")}</span>
           </div>
         )}
       </div>

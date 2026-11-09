@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { PlayingCard } from "../PlayingCard";
 import { PeekAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
+import { useI18n } from "@/contexts/i18n-context";
 
 interface CardPeekAnimationProps extends BaseAnimationProps {
   data: PeekAnimationData;
@@ -13,6 +14,7 @@ export function CardPeekAnimation({
   onComplete,
   duration = DEFAULT_DURATIONS.peek
 }: CardPeekAnimationProps) {
+  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(true);
   const [phase, setPhase] = useState<'lifting' | 'revealing' | 'showing' | 'hiding' | 'returning'>('lifting');
 
@@ -102,9 +104,9 @@ export function CardPeekAnimation({
   // Texto baseado na habilidade
   const getAbilityText = () => {
     if (isOwnCard) {
-      return `Espiando própria carta (${abilityRank})`;
+      return t("anim.peekOwn", { rank: abilityRank });
     }
-    return `Espiando carta de ${playerName} (${abilityRank})`;
+    return t("anim.peekOther", { player: playerName, rank: abilityRank });
   };
 
   // Cor baseada no tipo

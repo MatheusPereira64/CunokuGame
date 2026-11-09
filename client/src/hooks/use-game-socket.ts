@@ -7,12 +7,29 @@ import { wsUrl } from "@/lib/gameServer";
 import { getRankToken } from "@/lib/rankAuth";
 import { loadProfile } from "@/lib/playerProfile";
 
+/** O servidor responde em inglês; o jogador vê no idioma dele. */
+const SERVER_ERRORS: [RegExp, string][] = [
+  [/^Room not found/, "net.roomNotFound"],
+  [/^Game has already started/, "net.gameStarted"],
+  [/^Room is full/, "net.roomFull"],
+  [/^Only the host/, "net.hostOnly"],
+  [/^Need at least 2 players/, "net.needPlayers"],
+  [/^No room associated/, "net.reconnectNeeded"],
+];
+
+function translateServerError(message: string, t: (key: string, vars?: Record<string, string>) => string): string {
+  const match = SERVER_ERRORS.find(([pattern]) => pattern.test(message));
+  return match ? t(match[1]) : message;
+}
+
 export function useGameSocket(roomCode: string, playerId: string) {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
-  const { translateBotMessage } = useI18n();
+  const { translateBotMessage, t } = useI18n();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [revealedCard, setRevealedCard] = useState<{ card: Card; playerName: string; targetPlayerId?: string; targetCardIndex?: number } | null>(null);
   const [swapInfo, setSwapInfo] = useState<{ player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number } | null>(null);
   const toastRef = useRef(toast);
@@ -139,8 +156,8 @@ export function useGameSocket(roomCode: string, playerId: string) {
           case "player_joined":
             console.log("Player joined notification:", (message as any).name);
             toastRef.current({
-              title: "Player Joined",
-              description: `${(message as any).name} joined the room`,
+              title: tRef.current("net.playerJoined"),
+              description: tRef.current("net.playerJoinedDesc", { name: (message as any).name }),
             });
             // Quando alguém entra, o servidor deve enviar lobby_state atualizado automaticamente
             // Não precisamos fazer nada aqui, apenas aguardar o lobby_state
@@ -148,8 +165,8 @@ export function useGameSocket(roomCode: string, playerId: string) {
           case "error":
             toastRef.current({
               variant: "destructive",
-              title: "Error",
-              description: message.message
+              title: tRef.current("net.error"),
+              description: translateServerError(message.message, tRef.current)
             });
             break;
           case "player_action":
@@ -238,8 +255,8 @@ export function useGameSocket(roomCode: string, playerId: string) {
     } else {
       toast({
         variant: "destructive",
-        title: "Connection Lost",
-        description: "Trying to reconnect..."
+        title: tRef.current("net.connectionLost"),
+        description: tRef.current("net.reconnecting")
       });
     }
   }, [toast]);

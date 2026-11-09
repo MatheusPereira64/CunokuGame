@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Card, GameState, Player } from "@shared/schema";
 import { filterGameStateForPlayer } from "@shared/gameFilter";
 import { processOfflineAction } from "../client/src/utils/offlineGameLogic";
+import { applyBotReactions } from "@shared/cardPowers";
 import { GameLogic } from "./game";
 
 const card = (id: string, rank: Card["rank"]): Card => ({ id, rank, value: 5, suit: "hearts", isFaceUp: false });
@@ -200,5 +201,56 @@ describe.each([
   it("baralho vazio durante a punição encerra a partida sem travar", () => {
     const after = act(table({ deck: [], discardPile: [card("top", "10")] }), discard(0), "bia");
     expect(after.turnPhase).toBe("finished");
+  });
+});
+
+describe("bots reagem ao descarte", () => {
+  const discardAs = (s: GameState, botId: string, cardIndex: number) =>
+    GameLogic.processAction(s, { type: "matched_discard", cardIndex }, botId).newState;
+
+  function withBot(known: number[]) {
+    const state = table();
+    state.players[1] = { ...state.players[1]!, isBot: true, knownCards: Object.fromEntries(known.map((i) => [String(i), true])) };
+    return state;
+  }
+
+  it("descarta só a carta que sabe ser igual ao topo", () => {
+    const after = applyBotReactions(withBot([1]), discardAs, () => true);
+    expect(after.players[1]!.hand.map((c) => c.id)).toEqual(["b1", "b3"]);
+    expect(after.discardPile.at(-1)?.id).toBe("b2");
+  });
+
+  it("não arrisca carta que não conhece", () => {
+    const state = withBot([0]);
+    expect(applyBotReactions(state, discardAs, () => true)).toBe(state);
+  });
+
+  it("bot que não reage fica parado", () => {
+    const state = withBot([1]);
+    expect(applyBotReactions(state, discardAs, () => false)).toBe(state);
+  });
+});
+
+describe("alvo do poder pelo id da carta", () => {
+  it("acha a carta escolhida mesmo depois de a mão mudar", () => {
+    const shrunk = GameLogic.processAction(table({ turnPhase: "action", drawnCard: card("s", "9") }), discard(1), "bia").newState;
+    const after = GameLogic.processAction(
+      shrunk,
+      { type: "use_ability", ability: "swap", targetPlayerId: "ana", targetCardIndex: 0, targetCardId: "a1", targetPlayerId2: "bia", targetCardIndex3: 0, targetCardId2: "b3" },
+      "ana",
+    ).newState;
+    expect(after.players[0]!.hand[0]!.id).toBe("b3");
+    expect(after.players[1]!.hand.map((c) => c.id)).toEqual(["b1", "a1"]);
+  });
+
+  it("se a carta escolhida saiu da mão, o poder não acontece", () => {
+    const shrunk = GameLogic.processAction(table({ turnPhase: "action", drawnCard: card("s", "5") }), discard(1), "bia").newState;
+    const after = GameLogic.processAction(
+      shrunk,
+      { type: "use_ability", ability: "peek_opponent", targetPlayerId: "bia", targetCardIndex: 1, targetCardId: "b2" },
+      "ana",
+    ).newState;
+    expect(after.drawnCard?.id).toBe("s");
+    expect(after.turnPhase).toBe("action");
   });
 });

@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { PlayingCard } from "../PlayingCard";
 import { DrawAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
+import { useI18n } from "@/contexts/i18n-context";
 
 interface CardDrawAnimationProps extends BaseAnimationProps {
   data: DrawAnimationData;
@@ -14,6 +15,7 @@ export function CardDrawAnimation({
   duration = DEFAULT_DURATIONS.draw,
   isOwnPlayer = false
 }: CardDrawAnimationProps) {
+  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(true);
   const [showCardFace, setShowCardFace] = useState(false);
 
@@ -44,7 +46,7 @@ export function CardDrawAnimation({
 
   if (!isVisible) return null;
 
-  const sourceLabel = source === 'deck' ? '🃏 Baralho' : '📤 Descarte';
+  const sourceLabel = source === 'deck' ? `🃏 ${t("anim.fromDeck")}` : `📤 ${t("anim.fromDiscard")}`;
   const sourceColor = source === 'deck' ? 'blue' : 'amber';
 
   return (

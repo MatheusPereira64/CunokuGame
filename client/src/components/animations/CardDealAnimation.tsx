@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useMemo } from "react";
 import { PlayingCard } from "../PlayingCard";
 import { DealAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
+import { useI18n } from "@/contexts/i18n-context";
 
 interface CardDealAnimationProps extends BaseAnimationProps {
   data: DealAnimationData;
@@ -20,6 +21,7 @@ export function CardDealAnimation({
   onComplete,
   duration = DEFAULT_DURATIONS.deal // Por carta
 }: CardDealAnimationProps) {
+  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(true);
   const [dealtCards, setDealtCards] = useState<Set<string>>(new Set());
   const [phase, setPhase] = useState<'dealing' | 'complete'>('dealing');
@@ -154,7 +156,7 @@ export function CardDealAnimation({
             >
               <div className="bg-gradient-to-r from-emerald-600 to-teal-600 backdrop-blur-md rounded-2xl px-5 py-3 md:px-8 md:py-4 shadow-2xl border border-white/10">
                 <div className="text-white font-bold text-base md:text-xl text-center mb-2">
-                  Distribuindo Cartas
+                  {t("anim.dealing")}
                 </div>
                 <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
                   {playerProgress.map((player, index) => (
@@ -204,7 +206,7 @@ export function CardDealAnimation({
                 <span>{dealtCards.size}</span>
                 <span className="text-emerald-500">/</span>
                 <span className="text-emerald-600">{dealingSequence.length}</span>
-                <span className="text-sm font-normal text-emerald-600 ml-1">cartas</span>
+                <span className="text-sm font-normal text-emerald-600 ml-1">{t("anim.cards")}</span>
               </div>
             </motion.div>
           </div>

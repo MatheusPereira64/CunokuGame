@@ -38,18 +38,27 @@ export function getAbilityDescription(rank: string, t: (key: string) => string):
 }
 
 /** Ação escolhida no modal de habilidade, resolvida pelo Game */
+/** Os ids identificam a carta tocada mesmo que a mão mude antes de a jogada chegar. */
 export type AbilityAction =
   | { kind: "wind"; targetPlayerId: string }
-  | { kind: "seal"; targetPlayerId: string; cardIndex: number }
+  | { kind: "seal"; targetPlayerId: string; cardIndex: number; cardId?: string }
   | { kind: "jack" }
   | { kind: "queen"; targetPlayerId: string }
   | { kind: "king"; targetPlayerId: string }
   | { kind: "joker_reveal" }
-  | { kind: "joker_force"; targetPlayerId: string; cardIndex: number }
-  | { kind: "peek_own"; cardIndex: number }
-  | { kind: "peek_opponent"; targetPlayerId: string; targetCardIndex: number }
-  | { kind: "swap_me"; myCardIndex: number; targetPlayerId: string; targetCardIndex: number }
-  | { kind: "swap_others"; player1Id: string; card1Index: number; player2Id: string; card2Index: number };
+  | { kind: "joker_force"; targetPlayerId: string; cardIndex: number; cardId?: string }
+  | { kind: "peek_own"; cardIndex: number; cardId?: string }
+  | { kind: "peek_opponent"; targetPlayerId: string; targetCardIndex: number; cardId?: string }
+  | { kind: "swap_me"; myCardIndex: number; targetPlayerId: string; targetCardIndex: number; myCardId?: string; targetCardId?: string }
+  | {
+      kind: "swap_others";
+      player1Id: string;
+      card1Index: number;
+      player2Id: string;
+      card2Index: number;
+      card1Id?: string;
+      card2Id?: string;
+    };
 
 /** Só avisa o que foge do normal: as 4 cartas iniciais não precisam de legenda. */
 export function seatDetail(

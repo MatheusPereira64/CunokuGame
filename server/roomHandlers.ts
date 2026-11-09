@@ -1,8 +1,9 @@
+import { applyBotReactions } from "@shared/cardPowers";
 import type { GameState, Player, Room } from "@shared/schema";
 import { filterGameStateForPlayer } from "@shared/gameFilter";
 import { GameLogic } from "./game";
 import { BotPlayer, createBots, type BotDifficulty } from "./bot";
-import { autoPlayDisconnectedTurn, syncReconnectWindow } from "./disconnectTurn";
+import { autoPlayDisconnectedTurn, autoPlayTimedOutTurn, syncTurnClock } from "./disconnectTurn";
 import type { IStorage } from "./storage";
 import { EMOTE_COOLDOWN_MS, isEmoteId } from "@shared/emotes";
 import { recordFinishedMatch, type RecordedReward } from "./competition";
@@ -97,7 +98,7 @@ export async function handleJoinMessage(
       session.playerNames.set(playerId, name);
     }
     registerConnection(playerId);
-    const synced = syncReconnectWindow(state);
+    const synced = syncTurnClock(state);
     await storage.updateGameState(code, synced);
     messenger.broadcast({ type: "game_state", state: synced });
     scheduleFollowUp?.(code, synced);
@@ -147,7 +148,7 @@ export async function handlePlayerDisconnect(
   const player = state.players.find((p) => p.id === playerId);
   if (!player || player.isBot || !player.isConnected) return;
   player.isConnected = false;
-  const synced = syncReconnectWindow(state);
+  const synced = syncTurnClock(state);
   await storage.updateGameState(roomCode, synced);
   messenger.broadcast({ type: "game_state", state: synced });
   scheduleFollowUp?.(roomCode, synced);
@@ -168,6 +169,64 @@ export async function resolveDisconnectedTurn(
   await storage.updateGameState(roomCode, next);
   messenger.broadcast({ type: "game_state", state: next });
   return next;
+}
+
+/** Tempo da vez acabou: joga por quem estava conectado e não jogou. */
+export async function resolveTimedOutTurn(
+  storage: IStorage,
+  messenger: RoomMessenger,
+  roomCode: string,
+): Promise<GameState | null> {
+  const room = await storage.getRoom(roomCode);
+  const state = room?.gameState as GameState | undefined;
+  if (!state) return null;
+  const next = autoPlayTimedOutTurn(state);
+  if (next === state) return state;
+  await storage.updateGameState(roomCode, next);
+  messenger.broadcast({ type: "game_state", state: next });
+  return next;
+}
+
+/**
+ * Revanche: nova partida na mesma sala, com quem ainda está conectado e os mesmos bots.
+ * Dois pedidos ao mesmo tempo não criam duas partidas: o segundo já encontra a nova em andamento.
+ */
+export async function handleRematch(
+  storage: IStorage,
+  messenger: RoomMessenger,
+  roomCode: string,
+  playerId: string,
+  scheduleBot: (roomCode: string, state: GameState) => void,
+): Promise<void> {
+  const room = await storage.getRoom(roomCode);
+  const state = room?.gameState as GameState | undefined;
+  if (!room || !state?.winnerId || state.dailyDay) return;
+  if (!state.players.some((p) => p.id === playerId && !p.isBot)) return;
+
+  const connected = new Set(messenger.getConnectedPlayerIds());
+  const players: Player[] = state.players
+    .filter((p) => p.isBot || connected.has(p.id))
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      isBot: p.isBot,
+      isConnected: true,
+      hand: [],
+      score: 0,
+      knownCards: {},
+      ...(p.iconId ? { iconId: p.iconId } : {}),
+      ...(p.accent ? { accent: p.accent } : {}),
+    }));
+  if (players.length < 2) {
+    messenger.send(playerId, { type: "error", message: "Need at least 2 players (including bots) to start" });
+    return;
+  }
+
+  const next = syncTurnClock(GameLogic.createInitialState(players));
+  await storage.updateGameState(roomCode, next);
+  await storage.updateRoomStatus(roomCode, "playing");
+  messenger.broadcast({ type: "game_state", state: next });
+  scheduleBot(roomCode, next);
 }
 
 export async function handleStartGame(
@@ -250,14 +309,39 @@ export async function handleStartGame(
     return;
   }
 
-  const newState = GameLogic.createInitialState(players);
+  const newState = syncTurnClock(GameLogic.createInitialState(players));
   await storage.updateGameState(roomCode, newState);
   await storage.updateRoomStatus(roomCode, "playing");
   messenger.broadcast({ type: "game_state", state: newState });
+  scheduleBot(roomCode, newState);
+}
 
-  if (newState.players[0]?.isBot) {
-    scheduleBot(roomCode, newState);
-  }
+/** Bot fácil não reage: o descarte rápido é o que torna os outros níveis mais espertos. */
+function botsReact(state: GameState, room: Room, session?: RoomSessionData): GameState {
+  const fallback = (room.botDifficulty as BotDifficulty) || "medium";
+  return applyBotReactions(
+    state,
+    (s, botId, cardIndex) => GameLogic.processAction(s, { type: "matched_discard", cardIndex }, botId).newState,
+    (botId) => (session?.bots.find((b) => b.id === botId)?.difficulty ?? fallback) !== "easy",
+  );
+}
+
+/** As reações saem num estado à parte, para a mesa animar o descarte do bot depois da jogada. */
+async function broadcastBotReactions(
+  storage: IStorage,
+  messenger: RoomMessenger,
+  roomCode: string,
+  room: Room,
+  state: GameState,
+  session?: RoomSessionData,
+): Promise<GameState> {
+  if (state.winnerId) return state;
+  const reacted = botsReact(state, room, session);
+  if (reacted === state) return state;
+  const synced = syncTurnClock(reacted);
+  await storage.updateGameState(roomCode, synced);
+  messenger.broadcast({ type: "game_state", state: synced });
+  return synced;
 }
 
 /**
@@ -288,7 +372,7 @@ export async function handlePlayerAction(
   if (state.winnerId) return;
   markActingPlayerConnected(state, playerId);
   const result = GameLogic.processAction(state, action as never, playerId);
-  result.newState = syncReconnectWindow(result.newState);
+  result.newState = syncTurnClock(result.newState);
 
   await storage.updateGameState(roomCode, result.newState);
   messenger.broadcast({ type: "game_state", state: result.newState });
@@ -324,9 +408,10 @@ export async function handlePlayerAction(
     });
   }
 
-  const next = result.newState.players[result.newState.currentPlayerIndex];
-  if (!result.newState.winnerId && (next?.isBot || result.newState.reconnectDeadline)) {
-    scheduleBot(roomCode, result.newState);
+  const settled = await broadcastBotReactions(storage, messenger, roomCode, room, result.newState, session);
+  const next = settled.players[settled.currentPlayerIndex];
+  if (!settled.winnerId && (next?.isBot || settled.reconnectDeadline || settled.turnDeadline)) {
+    scheduleBot(roomCode, settled);
   }
 }
 
@@ -406,7 +491,8 @@ export async function executeBotTurn(
     sendRewards(messenger, rewards);
   }
 
-  const synced = syncReconnectWindow(updatedState);
+  updatedState = await broadcastBotReactions(storage, messenger, roomCode, room, updatedState, session);
+  const synced = syncTurnClock(updatedState);
   if (synced !== updatedState) {
     updatedState = synced;
     await storage.updateGameState(roomCode, updatedState);
@@ -414,7 +500,7 @@ export async function executeBotTurn(
   }
 
   const next = updatedState.players[updatedState.currentPlayerIndex];
-  if (!updatedState.winnerId && (next?.isBot || updatedState.reconnectDeadline)) {
+  if (!updatedState.winnerId && (next?.isBot || updatedState.reconnectDeadline || updatedState.turnDeadline)) {
     scheduleBot(roomCode, updatedState);
   }
 }

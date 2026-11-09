@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Card, GameState, Player } from "@shared/schema";
-import { autoPlayDisconnectedTurn, DISCONNECT_TURN_MS, syncReconnectWindow } from "./disconnectTurn";
+import { autoPlayDisconnectedTurn, autoPlayTimedOutTurn, DISCONNECT_TURN_MS, syncReconnectWindow, syncTurnClock, TURN_TIME_MS } from "./disconnectTurn";
 
 function card(id: string, rank: Card["rank"]): Card {
   return { id, suit: "spades", rank, value: 1, isFaceUp: false };
@@ -84,5 +84,50 @@ describe("turno de jogador desconectado", () => {
     expect(cleared.reconnectDeadline).toBeNull();
     expect(cleared.reconnectPlayerId).toBeNull();
     expect(autoPlayDisconnectedTurn(cleared, now + DISCONNECT_TURN_MS)).toBe(cleared);
+  });
+});
+
+describe("tempo da vez de quem está conectado", () => {
+  const online = () => state({ players: [player("p1", true), player("p2", true)] });
+
+  it("começa a contar quando a vez é de um humano conectado e há outro humano esperando", () => {
+    const s = syncTurnClock(online(), 1000);
+    expect(s.turnDeadline).toBe(1000 + TURN_TIME_MS);
+    expect(s.turnKey).toBe("1:0");
+  });
+
+  it("não reinicia na mesma vez, nem quando o jogador compra", () => {
+    const s = syncTurnClock(online(), 1000);
+    expect(syncTurnClock({ ...s, turnPhase: "action" }, 5000).turnDeadline).toBe(1000 + TURN_TIME_MS);
+  });
+
+  it("reinicia quando a vez passa para outro jogador", () => {
+    const s = syncTurnClock(online(), 1000);
+    const next = syncTurnClock({ ...s, currentPlayerIndex: 1 }, 9000);
+    expect(next.turnDeadline).toBe(9000 + TURN_TIME_MS);
+    expect(next.turnKey).toBe("1:1");
+  });
+
+  it("não conta contra bots, no desafio diário nem com um humano só", () => {
+    const vsBot = online();
+    vsBot.players[1]!.isBot = true;
+    expect(syncTurnClock(vsBot, 1000).turnDeadline ?? null).toBeNull();
+    expect(syncTurnClock({ ...online(), dailyDay: "2026-11-09" }, 1000).turnDeadline ?? null).toBeNull();
+  });
+
+  it("quem caiu fica com a janela de reconexão, não com o tempo da vez", () => {
+    const s = syncTurnClock(state(), 1000);
+    expect(s.reconnectDeadline).toBe(1000 + DISCONNECT_TURN_MS);
+    expect(s.turnDeadline ?? null).toBeNull();
+  });
+
+  it("ao esgotar, compra e descarta pelo jogador e passa a vez", () => {
+    const s = syncTurnClock(online(), 1000);
+    expect(autoPlayTimedOutTurn(s, 1000 + TURN_TIME_MS - 1)).toBe(s);
+    const after = autoPlayTimedOutTurn(s, 1000 + TURN_TIME_MS);
+    expect(after.currentPlayerIndex).toBe(1);
+    expect(after.discardPile.at(-1)?.id).toBe("d2");
+    expect(after.players[0]!.hand).toHaveLength(4);
+    expect(after.turnKey).toBe("1:1");
   });
 });

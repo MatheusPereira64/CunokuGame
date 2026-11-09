@@ -10,6 +10,7 @@ import {
   drawForPower,
   HAND_LIMIT,
   judgeFreeDiscard,
+  resolveAbilityTargets,
   moveToNextPlayer,
   skipNextTurn,
   FINAL_ROUNDS,
@@ -40,8 +41,10 @@ export function processOfflineAction(
       return discardDrawn(newState, player, playerId);
     case "replace_card":
       return replaceDrawn(newState, player, action.handIndex, playerId);
-    case "use_ability":
-      return useDrawnAbility(newState, player, action, playerId);
+    case "use_ability": {
+      const resolved = resolveAbilityTargets(newState, action);
+      return resolved ? useDrawnAbility(newState, player, resolved, playerId) : newState;
+    }
     case "matched_discard":
     case "discard_from_hand":
       return freeDiscard(newState, player, action.cardIndex);

@@ -1,5 +1,6 @@
 import { GameState, Card } from "@shared/schema";
 import { audioManager } from "@/utils/audioManager";
+import { vibrate } from "@/lib/haptics";
 import { OpponentActionType } from "@/components/animations";
 import {
   hasRecordedMatchStats,
@@ -145,7 +146,13 @@ function playHandDiscards(
   });
 }
 
-function playPenalties(prev: GameState, current: GameState, triggered: Set<string>, animatePenalty: MotionApi["animatePenalty"]) {
+function playPenalties(
+  prev: GameState,
+  current: GameState,
+  playerId: string,
+  triggered: Set<string>,
+  animatePenalty: MotionApi["animatePenalty"],
+) {
   current.players.forEach((player, playerIndex) => {
     const prevPlayer = prev.players[playerIndex];
     if (!prevPlayer || player.hand.length <= prevPlayer.hand.length) return;
@@ -155,6 +162,7 @@ function playPenalties(prev: GameState, current: GameState, triggered: Set<strin
     remember(triggered, `penalty_${player.id}_${newCards[0]?.id}_${newCards[1]?.id}_${Date.now()}`, 3000, () => {
       animatePenalty(newCards, player.id, prevPlayer.hand.length);
       audioManager.playPenalty();
+      if (player.id === playerId) vibrate("penalty");
     });
   });
 }
@@ -184,7 +192,7 @@ export function playTableAnimations(
   playDraw(prev, current, triggered, api.animateDraw);
   playReplaceOrDiscard(prev, current, playerId, triggered, api, notify);
   playHandDiscards(prev, current, playerId, triggered, api.animateDiscard, notify);
-  playPenalties(prev, current, triggered, api.animatePenalty);
+  playPenalties(prev, current, playerId, triggered, api.animatePenalty);
 }
 
 export function applyOfflineSession(

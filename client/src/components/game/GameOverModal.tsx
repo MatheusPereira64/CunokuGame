@@ -12,8 +12,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { loadProfile } from "@/lib/playerProfile";
+import { loadProfile, type ProfileAccent, type ProfileIconId } from "@/lib/playerProfile";
 import { countsForGlobalRank, isRankLoggedIn } from "@/lib/rankAuth";
+import { useToast } from "@/hooks/use-toast";
+import { DEFAULT_CLOUD_SERVER } from "@/lib/gameServer";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface GameOverModalProps {
   open: boolean;
@@ -25,6 +28,10 @@ interface GameOverModalProps {
   /** Pontos de liga e posição no desafio diário, quando a partida vale ranking */
   reward?: MatchReward | null;
   onBackHome: () => void;
+  /** Ausente no desafio diário, que tem uma tentativa por dia */
+  onRematch?: () => void;
+  /** Dia do desafio, para o texto compartilhado */
+  dailyDay?: string;
 }
 
 export function GameOverModal({
@@ -36,8 +43,34 @@ export function GameOverModal({
   isOffline = false,
   reward,
   onBackHome,
+  onRematch,
+  dailyDay,
 }: GameOverModalProps) {
   const isCompact = useIsCompactGame();
+  const { toast } = useToast();
+
+  const shareDailyResult = async () => {
+    if (!reward?.daily || !dailyDay) return;
+    const myScore = players.find((p) => p.id === localPlayerId)?.score ?? 0;
+    const text = t("daily.shareText", {
+      day: dailyDay,
+      score: String(myScore),
+      rank: String(reward.daily.rank),
+      total: String(reward.daily.total),
+      streak: String(reward.daily.streak),
+    });
+    const url = DEFAULT_CLOUD_SERVER;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Cunoku", text, url });
+        return;
+      }
+    } catch {
+      return; // o jogador fechou a janela de compartilhar
+    }
+    const ok = await copyToClipboard(`${text}\n${url}`);
+    toast({ title: ok ? t("daily.copied") : t("error.generic") });
+  };
   const { t } = useI18n();
   const winnerName = players.find((p) => p.id === winnerId)?.name || "";
   const profile = loadProfile();
@@ -66,22 +99,25 @@ export function GameOverModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-6 space-y-4">
+        <div className={cn(isCompact ? "space-y-1 py-1" : "space-y-4 py-6")}>
           {[...players]
             .sort((a, b) => a.score - b.score)
             .map((p, i) => (
-              <div key={p.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div key={p.id} className={cn("flex items-center justify-between rounded-lg bg-gray-50", isCompact ? "px-2 py-1" : "p-3")}>
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-gray-400 w-6">#{i + 1}</span>
                   <Avatar
                     name={p.name}
-                    className="scale-50 w-8 h-8"
-                    iconId={p.id === localPlayerId ? profile.iconId : undefined}
-                    accent={p.id === localPlayerId ? profile.accent : undefined}
+                    isBot={p.isBot}
+                    compact
+                    hideLabel
+                    className="shrink-0"
+                    iconId={(p.id === localPlayerId ? profile.iconId : p.iconId) as ProfileIconId | undefined}
+                    accent={(p.id === localPlayerId ? profile.accent : p.accent) as ProfileAccent | undefined}
                   />
                   <span className="font-bold text-gray-900">{p.name}</span>
                 </div>
-                <span className="font-mono font-bold text-xl">
+                <span className={cn("font-mono font-bold", isCompact ? "text-base" : "text-xl")}>
                   {p.score} {t("game.points")}
                 </span>
               </div>
@@ -109,9 +145,22 @@ export function GameOverModal({
           </div>
         )}
 
-        <Button onClick={onBackHome} className="w-full">
-          {t("game.backToHome")}
-        </Button>
+        {/* No celular deitado os botões ficam lado a lado: assim cabem sem rolar */}
+        <div className={cn("flex gap-2", isCompact ? "flex-row [&>*]:flex-1" : "flex-col")}>
+          {onRematch && (
+            <Button onClick={onRematch} className="w-full">
+              {t("game.playAgain")}
+            </Button>
+          )}
+          {reward?.daily && dailyDay && (
+            <Button variant="secondary" onClick={() => void shareDailyResult()} className="w-full">
+              {t("daily.share")}
+            </Button>
+          )}
+          <Button variant={onRematch ? "outline" : "primary"} onClick={onBackHome} className="w-full">
+            {t("game.backToHome")}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

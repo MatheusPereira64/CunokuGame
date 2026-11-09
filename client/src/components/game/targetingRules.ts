@@ -14,7 +14,14 @@ export type TargetingSpec = {
   confirmKey: string;
 };
 
-export type TargetPick = { playerId: string; cardIndex?: number };
+export type TargetPick = { playerId: string; cardIndex?: number; cardId?: string };
+
+/** A mesma carta, mesmo que tenha mudado de posição na mão. */
+export function samePick(a: TargetPick, b: TargetPick): boolean {
+  if (a.playerId !== b.playerId) return false;
+  if (a.cardId && b.cardId) return a.cardId === b.cardId;
+  return a.cardIndex === b.cardIndex;
+}
 
 export function abilityTargeting(rank: Card["rank"] | undefined, jokerRevealed: boolean): TargetingSpec | null {
   switch (rank) {
@@ -64,12 +71,12 @@ export function canPickPlayer(spec: TargetingSpec, targetId: string, playerId: s
 export function canPickCard(
   spec: TargetingSpec,
   picks: TargetPick[],
-  target: Required<TargetPick>,
+  target: TargetPick & { cardIndex: number },
   playerId: string,
   sealed: boolean,
 ): boolean {
   if (spec.pick !== "card" || sealed || !canPickPlayer(spec, target.playerId, playerId)) return false;
-  const already = picks.some((p) => p.playerId === target.playerId && p.cardIndex === target.cardIndex);
+  const already = picks.some((p) => samePick(p, target));
   if (already) return true;
   if (spec.slots === 2 && picks.length === 1) return picks[0]!.playerId !== target.playerId;
   return true;
@@ -77,8 +84,7 @@ export function canPickCard(
 
 /** Tocar de novo desmarca; com tudo escolhido, a nova escolha troca a última. */
 export function togglePick(spec: TargetingSpec, picks: TargetPick[], pick: TargetPick): TargetPick[] {
-  const same = (p: TargetPick) => p.playerId === pick.playerId && p.cardIndex === pick.cardIndex;
-  if (picks.some(same)) return picks.filter((p) => !same(p));
+  if (picks.some((p) => samePick(p, pick))) return picks.filter((p) => !samePick(p, pick));
   if (picks.length < spec.slots) return [...picks, pick];
   return [...picks.slice(0, spec.slots - 1), pick];
 }
@@ -96,22 +102,39 @@ export function buildAbilityAction(
       return a ? { kind: "wind", targetPlayerId: a.playerId } : null;
     case "3":
     case "4":
-      return a?.cardIndex != null ? { kind: "seal", targetPlayerId: a.playerId, cardIndex: a.cardIndex } : null;
+      return a?.cardIndex != null ? { kind: "seal", targetPlayerId: a.playerId, cardIndex: a.cardIndex, cardId: a.cardId } : null;
     case "5":
     case "6":
-      return a?.cardIndex != null ? { kind: "peek_opponent", targetPlayerId: a.playerId, targetCardIndex: a.cardIndex } : null;
+      return a?.cardIndex != null
+        ? { kind: "peek_opponent", targetPlayerId: a.playerId, targetCardIndex: a.cardIndex, cardId: a.cardId }
+        : null;
     case "7":
     case "8":
-      return a?.cardIndex != null ? { kind: "peek_own", cardIndex: a.cardIndex } : null;
+      return a?.cardIndex != null ? { kind: "peek_own", cardIndex: a.cardIndex, cardId: a.cardId } : null;
     case "9":
     case "10": {
       if (a?.cardIndex == null || b?.cardIndex == null || a.playerId === b.playerId) return null;
       const mine = [a, b].find((p) => p.playerId === playerId);
       const theirs = [a, b].find((p) => p !== mine);
       if (mine && theirs) {
-        return { kind: "swap_me", myCardIndex: mine.cardIndex!, targetPlayerId: theirs.playerId, targetCardIndex: theirs.cardIndex! };
+        return {
+          kind: "swap_me",
+          myCardIndex: mine.cardIndex!,
+          targetPlayerId: theirs.playerId,
+          targetCardIndex: theirs.cardIndex!,
+          myCardId: mine.cardId,
+          targetCardId: theirs.cardId,
+        };
       }
-      return { kind: "swap_others", player1Id: a.playerId, card1Index: a.cardIndex, player2Id: b.playerId, card2Index: b.cardIndex };
+      return {
+        kind: "swap_others",
+        player1Id: a.playerId,
+        card1Index: a.cardIndex,
+        player2Id: b.playerId,
+        card2Index: b.cardIndex,
+        card1Id: a.cardId,
+        card2Id: b.cardId,
+      };
     }
     case "J":
       return { kind: "jack" };
@@ -121,7 +144,9 @@ export function buildAbilityAction(
       return a ? { kind: "king", targetPlayerId: a.playerId } : null;
     case "Joker":
       if (!jokerRevealed) return { kind: "joker_reveal" };
-      return a?.cardIndex != null ? { kind: "joker_force", targetPlayerId: a.playerId, cardIndex: a.cardIndex } : null;
+      return a?.cardIndex != null
+        ? { kind: "joker_force", targetPlayerId: a.playerId, cardIndex: a.cardIndex, cardId: a.cardId }
+        : null;
     default:
       return null;
   }

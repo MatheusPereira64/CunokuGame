@@ -13,6 +13,7 @@ import { loadProfile, type ProfileAccent, type ProfileIconId } from "@/lib/playe
 import { loadTableTheme, subscribeTableTheme } from "@/lib/tableTheme";
 import { audioManager } from "@/utils/audioManager";
 import { emptySeatCount } from "./helpers";
+import { FriendsInvite } from "./FriendsInvite";
 
 interface WaitingRoomProps {
   roomCode: string;
@@ -25,6 +26,8 @@ interface WaitingRoomProps {
   maxPlayers?: number | null;
   onCopyCode: () => void;
   onShareInvite?: () => void;
+  /** Convida um amigo ou jogador recente pelo nome */
+  onInviteFriend?: (name: string) => void;
   onCopyLanUrl?: () => void;
   onStart: () => void;
   networkMode?: "lan" | "server";
@@ -71,6 +74,7 @@ export function WaitingRoom({
   maxPlayers,
   onCopyCode,
   onShareInvite,
+  onInviteFriend,
   onCopyLanUrl,
   onStart,
   networkMode = "server",
@@ -168,6 +172,10 @@ export function WaitingRoom({
                 >
                   <Link2 className="mr-2 h-4 w-4" /> {t("invite.share")}
                 </Button>
+              )}
+
+              {onInviteFriend && (
+                <FriendsInvite inRoom={players.map((p) => p.name)} compact={isLandscape} onInvite={onInviteFriend} />
               )}
 
               {isLan && lanJoinUrl && (

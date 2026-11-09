@@ -17,7 +17,8 @@ export function getConnectionString(env: Env): string | null {
 export function createDb(env: Env): WorkerDb | null {
   const connectionString = getConnectionString(env);
   if (!connectionString) return null;
-  const client = postgres(connectionString, { max: 5, prepare: false });
+  // Cada gravação cria um cliente; sem idle_timeout a conexão ficava aberta até o Neon recusar novas
+  const client = postgres(connectionString, { max: 1, idle_timeout: 5, connect_timeout: 10, prepare: false });
   return drizzle(client, { schema });
 }
 

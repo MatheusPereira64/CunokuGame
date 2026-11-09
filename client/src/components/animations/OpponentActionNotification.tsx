@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useI18n } from "@/contexts/i18n-context";
 
 export type OpponentActionType = 
   | 'draw_deck'
@@ -24,11 +25,11 @@ const ACTION_ICONS: Record<OpponentActionType, string> = {
 };
 
 const ACTION_TEXTS: Record<OpponentActionType, string> = {
-  draw_deck: 'comprou do baralho',
-  draw_discard: 'comprou do descarte',
-  discard: 'descartou uma carta',
-  replace: 'substituiu uma carta',
-  use_ability: 'usou uma habilidade',
+  draw_deck: 'opp.draw_deck',
+  draw_discard: 'opp.draw_discard',
+  discard: 'opp.discard',
+  replace: 'opp.replace',
+  use_ability: 'opp.use_ability',
 };
 
 const ACTION_COLORS: Record<OpponentActionType, string> = {
@@ -45,6 +46,7 @@ export function OpponentActionNotification({
   onComplete,
   duration = 2000
 }: OpponentActionNotificationProps) {
+  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
@@ -98,7 +100,7 @@ export function OpponentActionNotification({
                 <span className="text-xl">
                   <span className="font-extrabold">{playerName}</span>
                   {' '}
-                  <span className="font-semibold">{ACTION_TEXTS[actionType]}</span>
+                  <span className="font-semibold">{t(ACTION_TEXTS[actionType])}</span>
                 </span>
                 <motion.div
                   initial={{ width: 0 }}

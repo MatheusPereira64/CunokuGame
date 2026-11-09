@@ -162,7 +162,7 @@ export function PlayingCard({ card, hidden, onClick, className, selected, animat
           </div>
 
           {/* Naipe grande ao centro */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center opacity-[0.16] pointer-events-none">
             <div className="w-20 h-20">{getIcon(card.suit)}</div>
           </div>
 

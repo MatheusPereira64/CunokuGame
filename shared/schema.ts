@@ -77,6 +77,10 @@ export interface GameState {
   /** Epoch ms: jogador offline tem até esse instante para voltar no turno dele */
   reconnectDeadline?: number | null;
   reconnectPlayerId?: string | null;
+  /** Epoch ms: fim do tempo da vez de quem está conectado (só com 2 humanos ou mais) */
+  turnDeadline?: number | null;
+  /** Qual vez o relógio mede: `rodada:índice do jogador` */
+  turnKey?: string | null;
 }
 
 // === TABLE DEFINITIONS ===
@@ -199,7 +203,7 @@ export type GameAction =
   | { type: "draw_discard" }
   | { type: "discard_drawn" }
   | { type: "replace_card"; handIndex: number } // Replace hand card with drawn card
-  | { type: "use_ability"; ability: string; targetPlayerId?: string; targetCardIndex?: number; targetCardIndex2?: number; targetPlayerId2?: string; targetCardIndex3?: number }
+  | { type: "use_ability"; ability: string; targetPlayerId?: string; targetCardIndex?: number; targetCardIndex2?: number; targetPlayerId2?: string; targetCardIndex3?: number; /** Ids das cartas escolhidas: valem mais que as posições, que mudam com descartes */ targetCardId?: string; targetCardId2?: string }
   | { type: "declare_finish" }
   | { type: "matched_discard"; cardIndex: number } // Rule: Discard same card out of turn
   | { type: "discard_from_hand"; cardIndex: number }; // Rule: Discard card from hand if matches top of discard pile

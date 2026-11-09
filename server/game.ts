@@ -11,6 +11,7 @@ import {
   drawForPower,
   HAND_LIMIT,
   judgeFreeDiscard,
+  resolveAbilityTargets,
   moveToNextPlayer,
   skipNextTurn,
   FINAL_ROUNDS,
@@ -317,8 +318,10 @@ export class GameLogic {
         return this.discardDrawnCard(newState, playerIndex, playerId);
       case "replace_card":
         return this.replaceDrawnCard(newState, player, action, playerId, playerIndex);
-      case "use_ability":
-        return this.applyDrawnAbility(newState, action, playerId, playerIndex);
+      case "use_ability": {
+        const resolved = resolveAbilityTargets(newState, action);
+        return resolved ? this.applyDrawnAbility(newState, resolved, playerId, playerIndex) : { newState };
+      }
       case "matched_discard":
       case "discard_from_hand":
         return this.freeDiscard(newState, player, action, playerIndex);

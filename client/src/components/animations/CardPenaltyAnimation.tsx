@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { PlayingCard } from "../PlayingCard";
 import { PenaltyAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
+import { useI18n } from "@/contexts/i18n-context";
 
 interface CardPenaltyAnimationProps extends BaseAnimationProps {
   data: PenaltyAnimationData;
@@ -13,6 +14,7 @@ export function CardPenaltyAnimation({
   onComplete,
   duration = DEFAULT_DURATIONS.penalty
 }: CardPenaltyAnimationProps) {
+  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(true);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [phase, setPhase] = useState<'shake' | 'dealing' | 'complete'>('shake');
@@ -174,10 +176,10 @@ export function CardPenaltyAnimation({
                     transition={{ duration: 0.3, repeat: phase === 'shake' ? 2 : 0 }}
                     className="text-xl"
                   >
-                    ⚠️ Penalidade!
+                    ⚠️ {t("anim.penalty")}
                   </motion.span>
                   <span className="text-sm font-normal text-red-100 mt-1">
-                    {playerName} compra {cards.length} carta{cards.length > 1 ? 's' : ''} como punição
+                    {t(cards.length > 1 ? "anim.penaltyDesc" : "anim.penaltyDescOne", { player: playerName, count: String(cards.length) })}
                   </span>
                 </div>
               </div>

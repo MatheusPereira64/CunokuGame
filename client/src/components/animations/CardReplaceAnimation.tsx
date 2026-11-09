@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { PlayingCard } from "../PlayingCard";
 import { ReplaceAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
+import { useI18n } from "@/contexts/i18n-context";
 
 function motionForPhase<T>(phase: string, poses: { highlight: T; lift: T; swap: T; done: T }): T {
   if (phase === "highlight") return poses.highlight;
@@ -25,6 +26,7 @@ export function CardReplaceAnimation({
   duration = DEFAULT_DURATIONS.replace,
   isOwnPlayer = false
 }: CardReplaceAnimationProps) {
+  const { t } = useI18n();
   const [isVisible, setIsVisible] = useState(true);
   const [phase, setPhase] = useState<'highlight' | 'lift' | 'swap' | 'complete'>('highlight');
 
@@ -122,7 +124,7 @@ export function CardReplaceAnimation({
                 animate={{ opacity: 1, scale: 1 }}
                 className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap"
               >
-                → Descarte
+                → {t("anim.fromDiscard")}
               </motion.div>
             )}
           </motion.div>
@@ -212,9 +214,9 @@ export function CardReplaceAnimation({
                   🔄
                 </motion.span>
                 <div className="flex flex-col">
-                  <span>Substituindo Carta</span>
+                  <span>{t("anim.replacing")}</span>
                   <span className="text-xs font-normal text-cyan-100">
-                    {playerName} • Carta da mão → Descarte • Carta comprada → Mão
+                    {t("anim.replacingDesc", { player: playerName })}
                   </span>
                 </div>
               </div>

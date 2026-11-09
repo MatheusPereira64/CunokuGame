@@ -57,10 +57,57 @@ export function judgeFreeDiscard(state: GameState, playerIndex: number, cardInde
   return card.rank === top.rank ? "match" : "wrong";
 }
 
+/**
+ * Bots também descartam fora da vez, mas só a carta que sabem ser igual ao topo: não blefam.
+ * Uma carta descartada pode puxar outra de mesmo valor, então repete até ninguém mais reagir.
+ */
+export function applyBotReactions(
+  state: GameState,
+  discard: (state: GameState, botId: string, cardIndex: number) => GameState,
+  reacts: (botId: string) => boolean,
+): GameState {
+  let current = state;
+  for (let guard = 0; guard < current.players.length * HAND_LIMIT; guard++) {
+    let moved = false;
+    for (let i = 0; i < current.players.length && !moved; i++) {
+      const bot = current.players[i]!;
+      if (!bot.isBot || !reacts(bot.id)) continue;
+      const index = bot.hand.findIndex((_, k) => bot.knownCards[String(k)] && judgeFreeDiscard(current, i, k) === "match");
+      if (index < 0) continue;
+      current = discard(current, bot.id, index);
+      moved = true;
+    }
+    if (!moved) break;
+  }
+  return current;
+}
+
 /** Erro fora da vez com a mão cheia: não há vez para perder agora, então perde a próxima. */
 export function skipNextTurn(state: GameState, playerId: string): void {
   if (state.skipNextTurnIds?.includes(playerId)) return;
   state.skipNextTurnIds = [...(state.skipNextTurnIds ?? []), playerId];
+}
+
+const TARGET_SLOTS = [
+  ["targetPlayerId", "targetCardIndex", "targetCardId"],
+  ["targetPlayerId2", "targetCardIndex3", "targetCardId2"],
+] as const;
+
+/**
+ * Um descarte fora da vez muda as posições da mão enquanto alguém escolhe o alvo do poder.
+ * Com o id da carta, o poder acha a carta onde ela estiver; se ela saiu da mão, o poder não acontece.
+ */
+export function resolveAbilityTargets<T extends object>(state: GameState, action: T): T | null {
+  const next = { ...action } as Record<string, unknown>;
+  for (const [playerKey, indexKey, idKey] of TARGET_SLOTS) {
+    const cardId = next[idKey];
+    if (typeof cardId !== "string") continue;
+    const hand = state.players.find((p) => p.id === next[playerKey])?.hand;
+    const index = hand?.findIndex((c) => c.id === cardId) ?? -1;
+    if (index < 0) return null;
+    next[indexKey] = index;
+  }
+  return next as T;
 }
 
 /** Registra a troca já feita: a carta em cada posição é a que veio do outro jogador. */

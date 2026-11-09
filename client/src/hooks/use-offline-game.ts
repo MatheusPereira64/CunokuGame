@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { GameState, GameAction, Player } from "@shared/schema";
 import { processOfflineAction } from "@/utils/offlineGameLogic";
+import { applyBotReactions } from "@shared/cardPowers";
 import { BotPlayer } from "@/utils/botPlayer";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/contexts/i18n-context";
@@ -35,6 +36,23 @@ export function useOfflineGame(
     setGameState(state);
     sessionStorage.setItem(`offline_game_${playerId}`, JSON.stringify(state));
   }, [playerId]);
+
+  // Bots descartam fora da vez a carta que sabem ser igual ao topo, um instante depois da jogada
+  const reactionTimer = useRef(0);
+  const scheduleBotReactions = useCallback(() => {
+    if (botDifficulty === "easy") return;
+    window.clearTimeout(reactionTimer.current);
+    reactionTimer.current = window.setTimeout(() => {
+      const current = latestState.current;
+      if (!current || current.winnerId) return;
+      const reacted = applyBotReactions(
+        current,
+        (s, botId, cardIndex) => processOfflineAction(structuredClone(s), { type: "matched_discard", cardIndex }, botId),
+        () => true,
+      );
+      if (reacted !== current) commitState(reacted);
+    }, 700);
+  }, [botDifficulty, commitState]);
 
   // Processa turnos dos bots automaticamente
   const processBotTurns = useCallback((bots: Map<string, BotPlayer>) => {
@@ -72,6 +90,7 @@ export function useOfflineGame(
         }
 
         commitState(after);
+        scheduleBotReactions();
 
         // Continua processando após um pequeno delay
         setTimeout(processNextBot, 500);
@@ -79,7 +98,7 @@ export function useOfflineGame(
     };
 
     processNextBot();
-  }, [playerId, toast, translateBotMessage, commitState]);
+  }, [playerId, toast, translateBotMessage, commitState, scheduleBotReactions]);
 
   // Inicializa bots quando o estado do jogo é carregado
   useEffect(() => {
@@ -108,12 +127,13 @@ export function useOfflineGame(
     if (!current) return;
 
     commitState(processOfflineAction(current, action, playerId));
+    scheduleBotReactions();
 
     // Se não é mais o turno do jogador humano, processa bots
     setTimeout(() => {
       processBotTurns(botPlayers);
     }, 500);
-  }, [playerId, botPlayers, processBotTurns, commitState]);
+  }, [playerId, botPlayers, processBotTurns, commitState, scheduleBotReactions]);
 
   return { gameState, sendAction, connected: true };
 }
