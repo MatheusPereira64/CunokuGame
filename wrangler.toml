@@ -28,13 +28,13 @@ new_sqlite_classes = ["RoomDurableObject"]
 tag = "v2"
 new_sqlite_classes = ["MatchQueueDurableObject"]
 
-# Opcional: descomente após criar o Hyperdrive (wrangler hyperdrive create ...)
-# [[hyperdrive]]
-# binding = "HYPERDRIVE"
-# id = "YOUR_HYPERDRIVE_ID"
-# localConnectionString = "<DATABASE_URL do Postgres local>"
-
-# Sem Hyperdrive: use `wrangler secret put DATABASE_URL` (Neon recomendado)
+# Hyperdrive (cunoku-db): reaproveita as conexões com o Neon e corta a latência de cada consulta.
+# Usa a conexão direta do Neon (sem -pooler) e o cache de consultas desligado, para o ranking
+# e as salas nunca lerem dados atrasados. O DATABASE_URL continua como reserva no código.
+# Para `wrangler dev` com banco local, defina CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE.
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "b08cee4694324e2fbfc4ab2dc56e65ef"
 
 [alias]
 "@shared" = "./shared"
