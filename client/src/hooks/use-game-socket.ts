@@ -27,15 +27,13 @@ export function useGameSocket(roomCode: string, playerId: string) {
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const { toast } = useToast();
-  const { translateBotMessage, t } = useI18n();
+  const { t } = useI18n();
   const tRef = useRef(t);
   tRef.current = t;
   const [revealedCard, setRevealedCard] = useState<{ card: Card; playerName: string; targetPlayerId?: string; targetCardIndex?: number } | null>(null);
   const [swapInfo, setSwapInfo] = useState<{ player1Id: string; player1Name: string; player1CardIndex: number; player2Id: string; player2Name: string; player2CardIndex: number } | null>(null);
   const toastRef = useRef(toast);
   toastRef.current = toast;
-  const translateRef = useRef(translateBotMessage);
-  translateRef.current = translateBotMessage;
 
   const [incomingEmote, setIncomingEmote] = useState<{ playerId: string; emoteId: string; at: number } | null>(null);
   const [matchReward, setMatchReward] = useState<MatchReward | null>(null);
@@ -173,25 +171,13 @@ export function useGameSocket(roomCode: string, playerId: string) {
             // Optional: Show toast for other player actions
             break;
           case "cunoku_declared":
-            // Notificação quando alguém declara Cunoku
-            toastRef.current({
-              title: "🔥 CUNOKU Declarado!",
-              description: `${message.playerName} declarou fim de jogo! A partida acaba em 3 rodadas.`,
-              duration: 5000,
-            });
+            // O anúncio em tela cheia vem do estado (finalRound), igual para todos
             break;
           case "bot_thinking":
             // A linha de status já mostra de quem é a vez
             break;
           case "bot_action":
-            // Notificação quando um bot executa uma ação
-            const botMessage = (message as any).message;
-            const translatedMessage = translateRef.current(botMessage);
-            toastRef.current({
-              title: `${(message as any).botName}`,
-              description: translatedMessage,
-              duration: 4000,
-            });
+            // A jogada do bot aparece no assento dele, a partir do log do estado (useActionFeed)
             break;
           case "private_info":
             // Mensagem privada (para cartas 5 e 6) - armazena para exibir no overlay

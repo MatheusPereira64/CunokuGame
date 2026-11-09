@@ -55,3 +55,20 @@ describe("isValidPin", () => {
     expect(isValidPin("abcdef")).toBe(false);
   });
 });
+
+describe("e-mail e senha", () => {
+  it("normaliza e-mail para minúsculas", async () => {
+    const { normalizeEmail } = await import("./rank");
+    expect(normalizeEmail("  Ana@Exemplo.COM ")).toBe("ana@exemplo.com");
+    expect(normalizeEmail("sem-arroba.com")).toBeNull();
+    expect(normalizeEmail("a@b")).toBeNull();
+    expect(normalizeEmail("a b@c.com")).toBeNull();
+  });
+
+  it("senha tem de 8 a 128 caracteres", async () => {
+    const { isValidPassword } = await import("./rank");
+    expect(isValidPassword("1234567")).toBe(false);
+    expect(isValidPassword("12345678")).toBe(true);
+    expect(isValidPassword("x".repeat(129))).toBe(false);
+  });
+});

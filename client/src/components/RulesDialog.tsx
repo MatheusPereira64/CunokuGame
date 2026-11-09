@@ -1,98 +1,180 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/Button";
 import { useI18n } from "@/contexts/i18n-context";
-import { BookOpen, Crown, Eye, Glasses, ArrowLeftRight, Lock, Plus, Sparkles, Users, Wind, type LucideIcon } from "lucide-react";
+import {
+  ArrowLeftRight,
+  BookOpen,
+  Crown,
+  Eye,
+  Glasses,
+  Layers,
+  Lock,
+  Megaphone,
+  Plus,
+  Repeat,
+  ShieldAlert,
+  Sparkles,
+  Target,
+  Users,
+  Wind,
+  type LucideIcon,
+} from "lucide-react";
 import { cn, fit } from "@/lib/utils";
 
-/** Mesmos ícones usados no selo das cartas (PlayingCard) */
-const ABILITY_RULES: {
-  ranksKey: string;
-  descKey: string;
-  shortKey: string;
-  Icon: LucideIcon;
-}[] = [
-  {
-    ranksKey: "rules.aceAndTwo",
-    descKey: "rules.aceTwo",
-    shortKey: "game.abilityWind",
-    Icon: Wind,
-  },
-  {
-    ranksKey: "rules.threeAndFour",
-    descKey: "rules.threeFour",
-    shortKey: "game.abilitySeal",
-    Icon: Lock,
-  },
-  {
-    ranksKey: "rules.fiveAndSix",
-    descKey: "rules.fiveSix",
-    shortKey: "game.abilityPeekOpponent",
-    Icon: Eye,
-  },
-  {
-    ranksKey: "rules.sevenAndEight",
-    descKey: "rules.sevenEight",
-    shortKey: "game.abilityPeekOwn",
-    Icon: Glasses,
-  },
-  {
-    ranksKey: "rules.nineAndTen",
-    descKey: "rules.nineTen",
-    shortKey: "game.abilitySwap",
-    Icon: ArrowLeftRight,
-  },
-  {
-    ranksKey: "rules.jackName",
-    descKey: "rules.jackPower",
-    shortKey: "game.abilityJack",
-    Icon: Plus,
-  },
-  {
-    ranksKey: "rules.queenName",
-    descKey: "rules.queenPower",
-    shortKey: "game.abilityQueen",
-    Icon: Users,
-  },
-  {
-    ranksKey: "rules.kingName",
-    descKey: "rules.kingPower",
-    shortKey: "game.abilityKing",
-    Icon: Crown,
-  },
-  {
-    ranksKey: "rules.jokerName",
-    descKey: "rules.jokerPower",
-    shortKey: "game.abilityJoker",
-    Icon: Sparkles,
-  },
+type RulesTab = "play" | "powers" | "points";
+
+/** Mesmos ícones do selo das cartas (PlayingCard). */
+const POWERS: { ranks: string; id: string; Icon: LucideIcon }[] = [
+  { ranks: "A · 2", id: "wind", Icon: Wind },
+  { ranks: "3 · 4", id: "seal", Icon: Lock },
+  { ranks: "5 · 6", id: "peekOpponent", Icon: Eye },
+  { ranks: "7 · 8", id: "peekOwn", Icon: Glasses },
+  { ranks: "9 · 10", id: "swap", Icon: ArrowLeftRight },
+  { ranks: "J", id: "jack", Icon: Plus },
+  { ranks: "Q", id: "queen", Icon: Users },
+  { ranks: "K", id: "king", Icon: Crown },
+  { ranks: "🃏", id: "joker", Icon: Sparkles },
 ];
 
-function AbilityIconBadge({ Icon, compact = false }: { Icon: LucideIcon; compact?: boolean }) {
+const STEPS: { id: string; Icon: LucideIcon }[] = [
+  { id: "goal", Icon: Target },
+  { id: "turn", Icon: Layers },
+  { id: "discard", Icon: Repeat },
+  { id: "mistake", Icon: ShieldAlert },
+  { id: "cunoku", Icon: Megaphone },
+];
+
+/** Valores em ordem crescente: o que importa é somar pouco. */
+const VALUES: { rank: string; value: string; highlight?: "good" | "bad" }[] = [
+  { rank: "🃏", value: "-1", highlight: "good" },
+  { rank: "K", value: "0", highlight: "good" },
+  { rank: "A", value: "1" },
+  { rank: "2–10", value: "2–10" },
+  { rank: "J", value: "11", highlight: "bad" },
+  { rank: "Q", value: "12", highlight: "bad" },
+];
+
+function IconBadge({ Icon, compact, tone = "amber" }: { Icon: LucideIcon; compact: boolean; tone?: "amber" | "indigo" }) {
   return (
     <div
       className={cn(
-        "shrink-0 rounded-full bg-amber-100 ring-2 ring-amber-500/60 flex items-center justify-center shadow-sm",
-        fit(compact, "w-8 h-8", "w-11 h-11")
+        "flex shrink-0 items-center justify-center rounded-full shadow-sm ring-2",
+        tone === "amber" ? "bg-amber-100 ring-amber-500/60" : "bg-indigo-100 ring-indigo-400/60",
+        fit(compact, "h-8 w-8", "h-10 w-10"),
       )}
       aria-hidden
     >
-      <Icon className={cn("text-amber-700", fit(compact, "w-4 h-4", "w-5 h-5"))} strokeWidth={2.2} />
+      <Icon
+        className={cn(tone === "amber" ? "text-amber-700" : "text-indigo-700", fit(compact, "h-4 w-4", "h-5 w-5"))}
+        strokeWidth={2.2}
+      />
+    </div>
+  );
+}
+
+function PlayTab({ compact }: { compact: boolean }) {
+  const { t } = useI18n();
+  return (
+    <div className="space-y-2">
+      <ol className={cn("grid gap-2", compact && "grid-cols-2 [&>li:last-child]:col-span-2")}>
+        {STEPS.map(({ id, Icon }, i) => (
+          <li key={id} className="flex items-start gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-2.5">
+            <IconBadge Icon={Icon} compact={compact} tone="indigo" />
+            <div className="min-w-0">
+              <div className={cn("font-bold text-indigo-950", fit(compact, "text-sm", "text-base"))}>
+                <span className="mr-1 text-indigo-400">{i + 1}.</span>
+                {t(`rulesv2.step.${id}.title`)}
+              </div>
+              <p className={cn("leading-snug text-gray-700", fit(compact, "text-xs", "text-sm"))}>{t(`rulesv2.step.${id}.body`)}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="text-center text-xs text-gray-500">{t("rulesv2.players")}</p>
+    </div>
+  );
+}
+
+function PowersTab({ compact }: { compact: boolean }) {
+  const { t } = useI18n();
+  return (
+    <div className="space-y-2">
+      <p className={cn("text-gray-600", fit(compact, "text-xs", "text-sm"))}>{t("rulesv2.powersIntro")}</p>
+      <ul className={cn("grid gap-2", fit(compact, "grid-cols-2", "sm:grid-cols-2"))}>
+        {POWERS.map(({ ranks, id, Icon }) => (
+          <li key={id} className="flex items-start gap-2.5 rounded-xl border border-amber-200/80 bg-amber-50/70 p-2">
+            <IconBadge Icon={Icon} compact={compact} />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="rounded-md bg-white px-1.5 py-0.5 font-mono text-[11px] font-bold text-amber-900 ring-1 ring-amber-300">
+                  {ranks}
+                </span>
+                <span className={cn("font-bold text-gray-900", fit(compact, "text-xs", "text-sm"))}>{t(`rulesv2.power.${id}.name`)}</span>
+              </div>
+              <p className={cn("mt-0.5 leading-snug text-gray-600", fit(compact, "text-[11px]", "text-xs"))}>
+                {t(`rulesv2.power.${id}.body`)}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PointsTab({ compact }: { compact: boolean }) {
+  const { t } = useI18n();
+  return (
+    <div className="space-y-3">
+      <p className={cn("text-gray-600", fit(compact, "text-xs", "text-sm"))}>{t("rulesv2.pointsIntro")}</p>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        {VALUES.map(({ rank, value, highlight }) => (
+          <div
+            key={rank}
+            className={cn(
+              "flex flex-col items-center justify-center rounded-xl border-2 bg-white shadow-sm",
+              fit(compact, "py-1.5", "py-3"),
+              highlight === "good" && "border-emerald-400",
+              highlight === "bad" && "border-red-300",
+              !highlight && "border-gray-200",
+            )}
+          >
+            <span className={cn("font-display font-bold text-gray-900", fit(compact, "text-lg", "text-2xl"))}>{rank}</span>
+            <span
+              className={cn(
+                "text-xs font-bold",
+                highlight === "good" ? "text-emerald-700" : highlight === "bad" ? "text-red-600" : "text-gray-500",
+              )}
+            >
+              {t("rulesv2.points", { value })}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className={cn("rounded-xl bg-emerald-50 p-2 text-emerald-900", fit(compact, "text-xs", "text-sm"))}>{t("rulesv2.pointsTip")}</p>
     </div>
   );
 }
 
 export function RulesDialog({ compact = false }: { compact?: boolean }) {
   const { t } = useI18n();
+  const [tab, setTab] = useState<RulesTab>("play");
+  const tabs: { id: RulesTab; label: string }[] = [
+    { id: "play", label: t("rulesv2.tab.play") },
+    { id: "powers", label: t("rulesv2.tab.powers") },
+    { id: "points", label: t("rulesv2.tab.points") },
+  ];
 
   return (
-    <Dialog>
+    <Dialog onOpenChange={(open) => open && setTab("play")}>
       <DialogTrigger asChild>
         <Button
           variant="secondary"
           size="lg"
           className={cn(
             "w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold border-yellow-600",
-            fit(compact, "text-sm py-3 h-auto min-h-0", "text-lg py-6 h-auto sm:text-xl sm:py-8")
+            fit(compact, "text-sm py-3 h-auto min-h-0", "text-lg py-6 h-auto sm:text-xl sm:py-8"),
           )}
         >
           <BookOpen className={cn(fit(compact, "mr-2 w-4 h-4", "mr-3 w-5 h-5 sm:w-6 sm:h-6"))} /> {t("menu.rules")}
@@ -101,129 +183,44 @@ export function RulesDialog({ compact = false }: { compact?: boolean }) {
       <DialogContent
         className={cn(
           "sm:max-w-2xl overflow-hidden flex flex-col",
-          fit(compact, "max-h-[min(92dvh,26rem)] w-[min(96vw,40rem)] p-3 gap-2", "max-h-[90vh]")
+          fit(compact, "max-h-[min(94dvh,26rem)] w-[min(96vw,40rem)] p-3 gap-2", "max-h-[90vh] gap-3"),
         )}
       >
-        <DialogHeader className={cn(compact && "pr-6")}>
-          <DialogTitle
-            className={cn(
-              "font-display text-indigo-900",
-              fit(compact, "text-xl", "text-3xl")
-            )}
-          >
-            {t("rules.title")}
-          </DialogTitle>
+        <DialogHeader className={cn("space-y-0", compact && "pr-6")}>
+          <DialogTitle className={cn("font-display text-indigo-900", fit(compact, "text-xl", "text-3xl"))}>{t("rules.title")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("rulesv2.step.goal.body")}</DialogDescription>
         </DialogHeader>
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-2">
-          <div className={cn(fit(compact, "space-y-3 py-1", "space-y-6 py-4"))}>
-            <div>
-              <h3 className={cn("font-bold text-indigo-900", fit(compact, "text-base mb-1", "text-xl mb-3"))}>
-                {t("rules.objective")}
-              </h3>
-            </div>
 
-            <div>
-              <h4 className={cn("font-semibold text-gray-800", fit(compact, "text-sm mb-1", "text-lg mb-2"))}>
-                {t("rules.cardValues")}
-              </h4>
-              <ul className={cn("text-gray-700", fit(compact, "space-y-1 text-sm", "space-y-2"))}>
-                <li>• {t("rules.queen")}</li>
-                <li>• {t("rules.ace")}</li>
-                <li>• {t("rules.jack")}</li>
-                <li>• {t("rules.king")}</li>
-                <li>• {t("rules.joker")}</li>
-              </ul>
-            </div>
+        <div role="tablist" aria-label={t("rules.title")} className="grid shrink-0 grid-cols-3 gap-1 rounded-xl bg-indigo-50 p-1">
+          {tabs.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`rules-tab-${id}`}
+              aria-selected={tab === id}
+              aria-controls={`rules-panel-${id}`}
+              onClick={() => setTab(id)}
+              className={cn(
+                "rounded-lg font-bold transition-colors",
+                fit(compact, "py-1 text-xs", "py-2 text-sm"),
+                tab === id ? "bg-white text-indigo-900 shadow" : "text-indigo-700/70 hover:text-indigo-900",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-            <div>
-              <h4 className={cn("font-semibold text-gray-800", fit(compact, "text-sm mb-1", "text-lg mb-3"))}>
-                {t("rules.cardAbilities")}
-              </h4>
-              <p className={cn("text-gray-500", fit(compact, "text-xs mb-2", "text-sm mb-4"))}>
-                {t("rules.abilityIconsLegend")}
-              </p>
-
-              {/* Legenda rápida dos ícones */}
-              <div
-                className={cn(
-                  "flex flex-wrap rounded-xl bg-amber-50/80 border border-amber-200/60",
-                  fit(compact, "gap-2 mb-3 p-2", "gap-3 mb-5 p-3")
-                )}
-              >
-                {ABILITY_RULES.map(({ ranksKey, shortKey, Icon }) => (
-                  <div
-                    key={ranksKey}
-                    className="flex items-center gap-2 bg-white/80 rounded-full pl-1.5 pr-3 py-1 border border-amber-200/80 shadow-sm"
-                  >
-                    <AbilityIconBadge Icon={Icon} compact={compact} />
-                    <div className="leading-tight">
-                      <div className="text-xs font-bold text-amber-900">{t(ranksKey)}</div>
-                      <div className="text-[11px] text-gray-600">{t(shortKey)}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <ul className={cn("text-gray-700", fit(compact, "space-y-2", "space-y-4"))}>
-                {ABILITY_RULES.map(({ ranksKey, descKey, shortKey, Icon }) => (
-                  <li key={descKey} className="flex gap-3 items-start">
-                    <AbilityIconBadge Icon={Icon} compact={compact} />
-                    <div className="min-w-0 pt-0.5">
-                      <div className={cn("font-semibold text-gray-900", compact && "text-sm")}>
-                        {t(ranksKey)}
-                        <span className="font-normal text-amber-700"> — {t(shortKey)}</span>
-                      </div>
-                      <p className={cn("text-gray-600 leading-relaxed", fit(compact, "text-xs mt-0.5", "text-sm mt-1"))}>
-                        {t(descKey)}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <h4 className={cn("font-semibold text-gray-800", fit(compact, "text-sm mb-1", "text-lg mb-2"))}>
-                {t("rules.discard")}
-              </h4>
-            </div>
-
-            <div>
-              <h4 className={cn("font-semibold text-gray-800", fit(compact, "text-sm mb-1", "text-lg mb-2"))}>
-                {t("rules.draw")}
-              </h4>
-            </div>
-
-            <div>
-              <h4 className={cn("font-semibold text-gray-800", fit(compact, "text-sm mb-1", "text-lg mb-2"))}>
-                {t("rules.endGame")}
-              </h4>
-            </div>
-
-            <div>
-              <h4 className={cn("font-semibold text-gray-800", fit(compact, "text-sm mb-1", "text-lg mb-2"))}>
-                {t("rules.punishment")}
-              </h4>
-            </div>
-
-            <div>
-              <h4 className={cn("font-semibold text-gray-800", fit(compact, "text-sm mb-1", "text-lg mb-2"))}>
-                {t("rules.punishmentSix")}
-              </h4>
-            </div>
-
-            <div>
-              <h4 className={cn("font-semibold text-gray-800", fit(compact, "text-sm mb-1", "text-lg mb-2"))}>
-                {t("rules.mainActions")}
-              </h4>
-            </div>
-
-            <div className={cn("border-t border-gray-200", fit(compact, "pt-2", "pt-4"))}>
-              <p className="text-sm text-gray-600">{t("rules.maxPlayers")}</p>
-              <p className="text-sm text-gray-600 mt-2">{t("rules.theme")}</p>
-              <p className="text-sm text-gray-600 mt-2">{t("rules.playersDisplay")}</p>
-            </div>
-          </div>
+        <div
+          role="tabpanel"
+          id={`rules-panel-${tab}`}
+          aria-labelledby={`rules-tab-${tab}`}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
+        >
+          {tab === "play" && <PlayTab compact={compact} />}
+          {tab === "powers" && <PowersTab compact={compact} />}
+          {tab === "points" && <PointsTab compact={compact} />}
         </div>
       </DialogContent>
     </Dialog>

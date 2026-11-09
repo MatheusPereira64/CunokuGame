@@ -21,5 +21,3 @@ export { useGameAnimations } from './useGameAnimations';
 export { AnimationRenderer } from './AnimationRenderer';
 
 // Exporta notificações de ações de oponentes
-export { OpponentActionNotification } from './OpponentActionNotification';
-export type { OpponentActionType } from './OpponentActionNotification';

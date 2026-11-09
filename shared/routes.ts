@@ -169,8 +169,8 @@ export const api = {
       method: 'POST' as const,
       path: '/api/rank/register',
       input: z.object({
-        nickname: z.string().min(3).max(16),
-        pin: z.string().regex(/^\d{4,6}$/),
+        email: z.string().max(254),
+        password: z.string().max(128),
         displayName: z.string().max(24).optional(),
         iconId: z.string().max(32).optional(),
         accent: z.string().max(32).optional(),
@@ -180,8 +180,8 @@ export const api = {
       method: 'POST' as const,
       path: '/api/rank/login',
       input: z.object({
-        nickname: z.string().min(3).max(16),
-        pin: z.string().regex(/^\d{4,6}$/),
+        email: z.string().max(254),
+        password: z.string().max(128),
       }),
     },
     me: {
@@ -192,12 +192,22 @@ export const api = {
       method: 'PATCH' as const,
       path: '/api/rank/me',
       input: z.object({
+        nickname: z.string().max(32).optional(),
         displayName: z.string().max(24).optional(),
         iconId: z.string().max(32).optional(),
         accent: z.string().max(32).optional(),
         frameId: z.string().max(32).optional(),
         titleId: z.string().max(32).optional(),
         bannerId: z.string().max(32).optional(),
+      }),
+    },
+    /** Conta antiga (apelido + PIN), ainda logada: passa a entrar por e-mail e senha. */
+    linkEmail: {
+      method: 'POST' as const,
+      path: '/api/rank/me/email',
+      input: z.object({
+        email: z.string().max(254),
+        password: z.string().max(128),
       }),
     },
     matchResult: {

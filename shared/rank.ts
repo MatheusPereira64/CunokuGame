@@ -18,7 +18,10 @@ export type RankTier = (typeof RANK_TIERS)[number];
 
 export type PublicRankProfile = {
   playerId: string;
+  /** Nome de usuário; "" enquanto a conta nova não escolheu um. */
   nickname: string;
+  /** Só no perfil do próprio jogador. null nas contas antigas de PIN. */
+  email?: string | null;
   displayName: string;
   iconId: string;
   accent: string;
@@ -90,4 +93,18 @@ export function normalizeNickname(raw: string): string | null {
 
 export function isValidPin(pin: string): boolean {
   return /^\d{4,6}$/.test(pin);
+}
+
+export const PASSWORD_MIN = 8;
+export const PASSWORD_MAX = 128;
+
+/** E-mail em minúsculas, para login e unicidade; null se não parece um e-mail. */
+export function normalizeEmail(raw: string): string | null {
+  const e = raw.trim().toLowerCase();
+  if (e.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return null;
+  return e;
+}
+
+export function isValidPassword(password: string): boolean {
+  return password.length >= PASSWORD_MIN && password.length <= PASSWORD_MAX;
 }

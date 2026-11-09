@@ -3,16 +3,12 @@ import { GameState, GameAction, Player } from "@shared/schema";
 import { processOfflineAction } from "@/utils/offlineGameLogic";
 import { applyBotReactions } from "@shared/cardPowers";
 import { BotPlayer } from "@/utils/botPlayer";
-import { useToast } from "@/hooks/use-toast";
-import { useI18n } from "@/contexts/i18n-context";
 
 export function useOfflineGame(
   initialGameState: GameState | null,
   playerId: string,
   botDifficulty: "easy" | "medium" | "hard"
 ) {
-  const { toast } = useToast();
-  const { translateBotMessage } = useI18n();
   const [gameState, setGameState] = useState<GameState | null>(initialGameState);
   const [botPlayers, setBotPlayers] = useState<Map<string, BotPlayer>>(new Map());
   const processingRef = useRef(false);
@@ -79,16 +75,6 @@ export function useOfflineGame(
         const action = bot.decideTurn(before, before.currentPlayerIndex);
         const after = processOfflineAction(before, action, currentPlayer.id);
 
-        // Detecta novos logs e mostra notificação
-        const lastLog = after.logs.slice(before.logs.length).at(-1);
-        if (lastLog?.includes(currentPlayer.name)) {
-          toast({
-            title: currentPlayer.name,
-            description: translateBotMessage(lastLog.replace(`${currentPlayer.name} `, "")),
-            duration: 4000,
-          });
-        }
-
         commitState(after);
         scheduleBotReactions();
 
@@ -98,7 +84,7 @@ export function useOfflineGame(
     };
 
     processNextBot();
-  }, [playerId, toast, translateBotMessage, commitState, scheduleBotReactions]);
+  }, [playerId, commitState, scheduleBotReactions]);
 
   // Inicializa bots quando o estado do jogo é carregado
   useEffect(() => {

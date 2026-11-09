@@ -6,11 +6,14 @@ const TOKEN_KEY = "cunoku_rank_token";
 const PLAYER_KEY = "cunoku_rank_player_id";
 const SAVED_ACCOUNTS_KEY = "cunoku_saved_accounts";
 
-/** Conta usada neste aparelho. Sem token, o jogador volta só digitando o PIN. */
+/** Conta usada neste aparelho. Sem token, o jogador volta digitando a senha. */
 export interface SavedAccount {
   playerId: string;
+  /** Nome de usuário; "" enquanto a conta não escolheu um. */
   nickname: string;
   displayName: string;
+  /** E-mail de login; ausente nas contas antigas de PIN. */
+  email?: string | null;
   token: string | null;
 }
 
@@ -45,9 +48,9 @@ export function getSavedAccounts(): SavedAccount[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(SAVED_ACCOUNTS_KEY) || "[]");
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (a): a is SavedAccount => typeof a?.playerId === "string" && typeof a?.nickname === "string",
-    );
+    return parsed
+      .filter((a) => typeof a?.playerId === "string" && (typeof a?.nickname === "string" || typeof a?.email === "string"))
+      .map((a) => ({ ...a, nickname: typeof a.nickname === "string" ? a.nickname : "" }) as SavedAccount);
   } catch {
     return [];
   }
@@ -63,9 +66,17 @@ function writeSavedAccounts(accounts: SavedAccount[]) {
 
 /** A conta entrada por último fica no topo da lista. */
 function rememberAccount(profile: PublicRankProfile, token: string) {
-  const others = getSavedAccounts().filter((a) => a.playerId !== profile.playerId);
+  const all = getSavedAccounts();
+  const previous = all.find((a) => a.playerId === profile.playerId);
+  const others = all.filter((a) => a.playerId !== profile.playerId);
   writeSavedAccounts([
-    { playerId: profile.playerId, nickname: profile.nickname, displayName: profile.displayName || profile.nickname, token },
+    {
+      playerId: profile.playerId,
+      nickname: profile.nickname,
+      displayName: profile.displayName || profile.nickname,
+      email: profile.email !== undefined ? profile.email : previous?.email ?? null,
+      token,
+    },
     ...others,
   ]);
 }
@@ -76,8 +87,8 @@ export function forgetSavedAccount(playerId: string): void {
 }
 
 /**
- * Entra em uma conta salva sem digitar o PIN.
- * Devolve null se a sessão expirou; a conta continua na lista para entrar com o PIN.
+ * Entra em uma conta salva sem digitar a senha.
+ * Devolve null se a sessão expirou; a conta continua na lista para entrar com a senha.
  */
 export async function switchToSavedAccount(playerId: string): Promise<PublicRankProfile | null> {
   const account = getSavedAccounts().find((a) => a.playerId === playerId);
@@ -89,7 +100,8 @@ export async function switchToSavedAccount(playerId: string): Promise<PublicRank
 /** A conta do ranking é a fonte do nome/ícone: o aparelho guarda uma cópia. */
 function rememberRankProfile(profile: PublicRankProfile): PublicRankProfile {
   saveProfile({
-    displayName: profile.displayName || profile.nickname,
+    // Conta nova ainda sem nome: mantém o nome que o aparelho já usava
+    displayName: profile.displayName || profile.nickname || undefined,
     iconId: profile.iconId as ProfileIconId,
     accent: profile.accent as ProfileAccent,
   });
@@ -135,8 +147,8 @@ async function parseError(res: Response): Promise<string> {
 }
 
 export async function registerRankAccount(input: {
-  nickname: string;
-  pin: string;
+  email: string;
+  password: string;
   displayName?: string;
   iconId?: string;
   accent?: string;
@@ -154,8 +166,8 @@ export async function registerRankAccount(input: {
 }
 
 export async function loginRankAccount(input: {
-  nickname: string;
-  pin: string;
+  email: string;
+  password: string;
 }): Promise<PublicRankProfile> {
   const res = await fetch(apiUrl("/api/rank/login"), {
     method: "POST",
@@ -176,7 +188,7 @@ export async function fetchRankMe(): Promise<PublicRankProfile | null> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (res.status === 401) {
-    // Sessão inválida: mantém a conta na lista, sem o token, para entrar de novo com o PIN
+    // Sessão inválida: mantém a conta na lista, sem o token, para entrar de novo com a senha
     const playerId = getRankPlayerId();
     writeSavedAccounts(getSavedAccounts().map((a) => (a.playerId === playerId ? { ...a, token: null } : a)));
     logoutRank();
@@ -188,7 +200,27 @@ export async function fetchRankMe(): Promise<PublicRankProfile | null> {
   return rememberRankProfile(data.profile);
 }
 
+/** Conta antiga (apelido + PIN), ainda logada aqui: passa a entrar por e-mail e senha. */
+export async function linkRankEmail(input: { email: string; password: string }): Promise<PublicRankProfile | null> {
+  const token = getRankToken();
+  if (!token) return null;
+  const res = await fetch(apiUrl("/api/rank/me/email"), {
+    method: "POST",
+    headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 401) {
+    logoutRank();
+    return null;
+  }
+  if (!res.ok) throw new Error(await parseError(res));
+  const data = await parseJson<{ profile: PublicRankProfile }>(res);
+  rememberAccount(data.profile, token);
+  return data.profile;
+}
+
 export async function syncRankProfile(patch: {
+  nickname?: string;
   displayName?: string;
   iconId?: string;
   accent?: string;
@@ -212,6 +244,7 @@ export async function syncRankProfile(patch: {
   }
   if (!res.ok) throw new Error(await parseError(res));
   const data = await parseJson<{ profile: PublicRankProfile }>(res);
+  rememberAccount(data.profile, token);
   return data.profile;
 }
 

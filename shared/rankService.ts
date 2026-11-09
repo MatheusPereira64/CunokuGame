@@ -1,10 +1,11 @@
-import { asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { rankPlayers, rankSessions, type RankPlayer } from "./schema";
 import {
   effectiveRank,
   ENTITY_TOP_N,
   normalizeNickname,
-  isValidPin,
+  normalizeEmail,
+  isValidPassword,
   type PublicRankProfile,
   type LeaderboardEntry,
   type RankTier,
@@ -42,8 +43,8 @@ function toPublic(
 ): PublicRankProfile {
   const profile: PublicRankProfile = {
     playerId: row.id,
-    nickname: row.nickname,
-    displayName: row.displayName || row.nickname,
+    nickname: row.nickname ?? "",
+    displayName: row.displayName || row.nickname || "",
     iconId: row.iconId,
     accent: row.accent,
     frameId: (row as any).frameId || "none",
@@ -58,6 +59,7 @@ function toPublic(
   };
   if (opts?.includeProgress) {
     profile.progress = rowProgress(row);
+    profile.email = row.email ?? null;
   }
   if (opts?.newlyUnlocked?.length) {
     profile.newlyUnlocked = opts.newlyUnlocked;
@@ -71,10 +73,12 @@ async function findPosition(db: any, playerId: string): Promise<number | null> {
   return idx >= 0 ? idx + 1 : null;
 }
 
+/** Só entra no ranking quem já escolheu o nome de usuário. */
 async function listLeaderboardRows(db: any, limit: number): Promise<RankPlayer[]> {
   const rows = await db
     .select()
     .from(rankPlayers)
+    .where(isNotNull(rankPlayers.nickname))
     .orderBy(
       sql`${rankPlayers.wins} DESC`,
       sql`${rankPlayers.bestScore} ASC NULLS LAST`,
@@ -84,69 +88,112 @@ async function listLeaderboardRows(db: any, limit: number): Promise<RankPlayer[]
   return rows;
 }
 
+type AuthResult = { token: string; profile: PublicRankProfile } | { error: string; status: number };
+
+/** Violação de UNIQUE do Postgres (duas contas criadas ao mesmo tempo com o mesmo dado). */
+function isUniqueViolation(err: unknown): boolean {
+  const e = err as { code?: string; cause?: { code?: string } } | null;
+  return e?.code === "23505" || e?.cause?.code === "23505";
+}
+
+async function openSession(db: any, playerId: string): Promise<string> {
+  const token = randomHex(32);
+  await db.insert(rankSessions).values({ tokenHash: await hashToken(token), playerId });
+  return token;
+}
+
+async function emailOwner(db: any, email: string): Promise<RankPlayer | null> {
+  const [row] = await db.select().from(rankPlayers).where(eq(rankPlayers.email, email)).limit(1);
+  return row ?? null;
+}
+
+/** Cria a conta só com e-mail e senha; o nome de usuário é escolhido depois. */
 export async function registerRankPlayer(
   db: any,
-  input: { nickname: string; pin: string; displayName?: string; iconId?: string; accent?: string },
-): Promise<{ token: string; profile: PublicRankProfile } | { error: string; status: number }> {
-  const nickname = normalizeNickname(input.nickname);
-  if (!nickname) return { error: "invalid_nickname", status: 400 };
-  if (!isValidPin(input.pin)) return { error: "invalid_pin", status: 400 };
+  input: { email: string; password: string; displayName?: string; iconId?: string; accent?: string },
+): Promise<AuthResult> {
+  const email = normalizeEmail(input.email);
+  if (!email) return { error: "invalid_email", status: 400 };
+  if (!isValidPassword(input.password)) return { error: "invalid_password", status: 400 };
+  if (await emailOwner(db, email)) return { error: "email_taken", status: 409 };
 
-  const existing = await db.select().from(rankPlayers).where(eq(rankPlayers.nickname, nickname)).limit(1);
-  if (existing.length) return { error: "nickname_taken", status: 409 };
-
-  const { hash, salt } = await hashPin(input.pin);
-  const token = randomHex(32);
-  const tokenHash = await hashToken(token);
+  const { hash, salt } = await hashPin(input.password);
   const id = newPlayerUuid();
-  const displayName = (input.displayName || nickname).trim().slice(0, 24) || nickname;
-
-  const [row] = await db
-    .insert(rankPlayers)
-    .values({
-      id,
-      nickname,
-      pinHash: hash,
-      pinSalt: salt,
-      displayName,
-      iconId: input.iconId || "spade",
-      accent: input.accent || "indigo",
-      frameId: "none",
-      titleId: "none",
-      bannerId: "default",
-      wins: 0,
-      gamesPlayed: 0,
-      bestScore: null,
-      progress: {},
-      achievements: [],
-      updatedAt: new Date(),
-    })
-    .returning();
-  await db.insert(rankSessions).values({ tokenHash, playerId: id });
-
+  let row: RankPlayer;
+  try {
+    [row] = await db
+      .insert(rankPlayers)
+      .values({
+        id,
+        nickname: null,
+        email,
+        passwordHash: hash,
+        passwordSalt: salt,
+        displayName: (input.displayName || "").trim().slice(0, 24),
+        iconId: input.iconId || "spade",
+        accent: input.accent || "indigo",
+        frameId: "none",
+        titleId: "none",
+        bannerId: "default",
+        wins: 0,
+        gamesPlayed: 0,
+        bestScore: null,
+        progress: {},
+        achievements: [],
+        updatedAt: new Date(),
+      })
+      .returning();
+  } catch (err) {
+    if (isUniqueViolation(err)) return { error: "email_taken", status: 409 };
+    throw err;
+  }
+  const token = await openSession(db, id);
   return { token, profile: toPublic(row, null, { includeProgress: true }) };
 }
 
-export async function loginRankPlayer(
-  db: any,
-  input: { nickname: string; pin: string },
-): Promise<{ token: string; profile: PublicRankProfile } | { error: string; status: number }> {
-  const nickname = normalizeNickname(input.nickname);
-  if (!nickname) return { error: "invalid_nickname", status: 400 };
-  if (!isValidPin(input.pin)) return { error: "invalid_pin", status: 400 };
+export async function loginRankPlayer(db: any, input: { email: string; password: string }): Promise<AuthResult> {
+  const email = normalizeEmail(input.email);
+  if (!email) return { error: "invalid_email", status: 400 };
 
-  const [row] = await db.select().from(rankPlayers).where(eq(rankPlayers.nickname, nickname)).limit(1);
-  if (!row) return { error: "invalid_credentials", status: 401 };
-
-  const ok = await verifyPin(input.pin, row.pinSalt, row.pinHash);
+  const row = await emailOwner(db, email);
+  // Mesma resposta para e-mail desconhecido e senha errada
+  if (!row?.passwordHash || !row.passwordSalt) return { error: "invalid_credentials", status: 401 };
+  const ok = await verifyPin(input.password, row.passwordSalt, row.passwordHash);
   if (!ok) return { error: "invalid_credentials", status: 401 };
 
-  const token = randomHex(32);
-  const tokenHash = await hashToken(token);
-  await db.insert(rankSessions).values({ tokenHash, playerId: row.id });
-
+  const token = await openSession(db, row.id);
   const position = await findPosition(db, row.id);
   return { token, profile: toPublic(row, position, { includeProgress: true }) };
+}
+
+/** Conta antiga, ainda logada neste aparelho, ganha e-mail e senha e mantém vitórias e conquistas. */
+export async function linkRankEmail(
+  db: any,
+  token: string,
+  input: { email: string; password: string },
+): Promise<{ profile: PublicRankProfile } | { error: string; status: number }> {
+  const row = await getPlayerByToken(db, token);
+  if (!row) return { error: "unauthorized", status: 401 };
+  if (row.email) return { error: "email_already_linked", status: 409 };
+  const email = normalizeEmail(input.email);
+  if (!email) return { error: "invalid_email", status: 400 };
+  if (!isValidPassword(input.password)) return { error: "invalid_password", status: 400 };
+  if (await emailOwner(db, email)) return { error: "email_taken", status: 409 };
+
+  const { hash, salt } = await hashPin(input.password);
+  let updated: RankPlayer;
+  try {
+    [updated] = await db
+      .update(rankPlayers)
+      .set({ email, passwordHash: hash, passwordSalt: salt, updatedAt: new Date() })
+      .where(eq(rankPlayers.id, row.id))
+      .returning();
+  } catch (err) {
+    if (isUniqueViolation(err)) return { error: "email_taken", status: 409 };
+    throw err;
+  }
+  const position = await findPosition(db, updated.id);
+  return { profile: toPublic(updated, position, { includeProgress: true }) };
 }
 
 export async function getPlayerByToken(db: any, token: string): Promise<RankPlayer | null> {
@@ -176,6 +223,7 @@ export async function updateRankProfile(
   db: any,
   token: string,
   patch: {
+    nickname?: string;
     displayName?: string;
     iconId?: string;
     accent?: string;
@@ -198,19 +246,41 @@ export async function updateRankProfile(
     return { error: "cosmetic_locked", status: 400 };
   }
 
-  const [updated] = await db
-    .update(rankPlayers)
-    .set({
-      displayName: patch.displayName !== undefined ? patch.displayName.trim().slice(0, 24) : row.displayName,
-      iconId: patch.iconId ?? row.iconId,
-      accent: patch.accent ?? row.accent,
-      frameId: patch.frameId ?? (row as any).frameId ?? "none",
-      titleId: patch.titleId ?? (row as any).titleId ?? "none",
-      bannerId: patch.bannerId ?? (row as any).bannerId ?? "default",
-      updatedAt: new Date(),
-    })
-    .where(eq(rankPlayers.id, row.id))
-    .returning();
+  let nickname = row.nickname;
+  if (patch.nickname !== undefined) {
+    const wanted = normalizeNickname(patch.nickname);
+    if (!wanted) return { error: "invalid_nickname", status: 400 };
+    if (wanted !== row.nickname) {
+      const [owner] = await db
+        .select({ id: rankPlayers.id })
+        .from(rankPlayers)
+        .where(and(eq(rankPlayers.nickname, wanted), sql`${rankPlayers.id} <> ${row.id}`))
+        .limit(1);
+      if (owner) return { error: "nickname_taken", status: 409 };
+      nickname = wanted;
+    }
+  }
+
+  let updated: RankPlayer;
+  try {
+    [updated] = await db
+      .update(rankPlayers)
+      .set({
+        nickname,
+        displayName: patch.displayName !== undefined ? patch.displayName.trim().slice(0, 24) : row.displayName,
+        iconId: patch.iconId ?? row.iconId,
+        accent: patch.accent ?? row.accent,
+        frameId: patch.frameId ?? (row as any).frameId ?? "none",
+        titleId: patch.titleId ?? (row as any).titleId ?? "none",
+        bannerId: patch.bannerId ?? (row as any).bannerId ?? "default",
+        updatedAt: new Date(),
+      })
+      .where(eq(rankPlayers.id, row.id))
+      .returning();
+  } catch (err) {
+    if (isUniqueViolation(err)) return { error: "nickname_taken", status: 409 };
+    throw err;
+  }
 
   const position = await findPosition(db, updated.id);
   return { profile: toPublic(updated, position, { includeProgress: true }) };
@@ -332,8 +402,8 @@ export async function getLeaderboard(db: any, limit = 50): Promise<LeaderboardEn
     const position = i + 1;
     return {
       position,
-      nickname: row.nickname,
-      displayName: row.displayName || row.nickname,
+      nickname: row.nickname ?? "",
+      displayName: row.displayName || row.nickname || "",
       wins: row.wins,
       bestScore: row.bestScore,
       rank: effectiveRank(row.wins, position),
@@ -358,7 +428,7 @@ export async function getRankSummaries(
   for (const row of rows) {
     const index = top.findIndex((t) => t.id === row.id);
     summaries.set(row.id, {
-      displayName: row.displayName || row.nickname,
+      displayName: row.displayName || row.nickname || "",
       rank: effectiveRank(row.wins, index >= 0 ? index + 1 : null),
     });
   }

@@ -3,6 +3,7 @@ import {
   bearerToken,
   getLeaderboard,
   getMe,
+  linkRankEmail,
   loginRankPlayer,
   recordRankMatch,
   registerRankPlayer,
@@ -66,6 +67,13 @@ async function dispatchAuthedRankRoute(
     if (!token) return json({ message: "unauthorized" }, 401);
     const body = api.rank.profile.input.parse(await request.json());
     const result = await updateRankProfile(db, token, body);
+    if ("error" in result) return json({ message: result.error }, result.status);
+    return json(result);
+  }
+  if (method === "POST" && path === api.rank.linkEmail.path) {
+    if (!token) return json({ message: "unauthorized" }, 401);
+    const body = api.rank.linkEmail.input.parse(await request.json());
+    const result = await linkRankEmail(db, token, body);
     if ("error" in result) return json({ message: result.error }, result.status);
     return json(result);
   }

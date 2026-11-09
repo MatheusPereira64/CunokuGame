@@ -5,6 +5,7 @@ import { APP_VERSION } from "@/lib/appVersion";
 import "./index.css";
 
 const NATIVE_SW_KEY = "cunoku_native_sw_cleared";
+const UPDATE_CHECK_MS = 10 * 60 * 1000;
 
 /** No app nativo o service worker guarda o bundle antigo e a tela fica na versão anterior. */
 async function clearNativeServiceWorker(): Promise<boolean> {
@@ -36,7 +37,21 @@ async function boot() {
       if (reloading) return;
     } else {
       void import("virtual:pwa-register").then(({ registerSW }) => {
-        registerSW({ immediate: true });
+        registerSW({
+          immediate: true,
+          // O navegador só procura versão nova ao carregar a página: uma aba aberta há dias ficaria na antiga.
+          // Procura de tempos em tempos e ao voltar para a aba; achando, a página recarrega sozinha.
+          onRegisteredSW(_url, registration) {
+            if (!registration) return;
+            const check = () => {
+              if (navigator.onLine) void registration.update().catch(() => undefined);
+            };
+            window.setInterval(check, UPDATE_CHECK_MS);
+            document.addEventListener("visibilitychange", () => {
+              if (document.visibilityState === "visible") check();
+            });
+          },
+        });
       });
     }
   } catch {

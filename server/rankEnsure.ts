@@ -29,6 +29,14 @@ export async function ensureRankSchema(): Promise<any | null> {
     await database.execute(sql`ALTER TABLE rank_players ADD COLUMN IF NOT EXISTS banner_id TEXT NOT NULL DEFAULT 'default'`);
     await database.execute(sql`ALTER TABLE rank_players ADD COLUMN IF NOT EXISTS progress JSONB NOT NULL DEFAULT '{}'::jsonb`);
     await database.execute(sql`ALTER TABLE rank_players ADD COLUMN IF NOT EXISTS achievements JSONB NOT NULL DEFAULT '[]'::jsonb`);
+    await database.execute(sql`ALTER TABLE rank_players ADD COLUMN IF NOT EXISTS email TEXT`);
+    await database.execute(sql`ALTER TABLE rank_players ADD COLUMN IF NOT EXISTS password_hash TEXT`);
+    await database.execute(sql`ALTER TABLE rank_players ADD COLUMN IF NOT EXISTS password_salt TEXT`);
+    await database.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS rank_players_email_key ON rank_players (email)`);
+    // Contas novas escolhem o nome depois e não têm PIN
+    await database.execute(sql`ALTER TABLE rank_players ALTER COLUMN nickname DROP NOT NULL`);
+    await database.execute(sql`ALTER TABLE rank_players ALTER COLUMN pin_hash DROP NOT NULL`);
+    await database.execute(sql`ALTER TABLE rank_players ALTER COLUMN pin_salt DROP NOT NULL`);
     await database.execute(sql`
       CREATE TABLE IF NOT EXISTS rank_sessions (
         token_hash TEXT PRIMARY KEY,

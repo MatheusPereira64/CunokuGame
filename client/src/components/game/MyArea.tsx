@@ -4,6 +4,7 @@ import { GameState, Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
 import { EmoteBubble } from "./EmotePicker";
+import { PersonalAlertBubble } from "./seatNotice";
 import { swapCardStyle, useSwapHighlights } from "./swapHighlight";
 import { SwapBadge } from "./SwapBadge";
 import { seatDetail } from "./helpers";
@@ -91,6 +92,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
             : "ring-transparent"
         )}
       >
+      <PersonalAlertBubble className={cn("bottom-full left-1/2 -translate-x-1/2", fit(isCompact, "mb-1.5", "mb-3"))} />
       <div
         className={cn(
           "flex items-end justify-center",

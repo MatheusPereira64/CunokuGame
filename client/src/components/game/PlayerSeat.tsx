@@ -10,6 +10,7 @@ import type { ProfileAccent, ProfileIconId } from "@/lib/playerProfile";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import type { SeatSide } from "./seatPositions";
 import { EmoteBubble } from "./EmotePicker";
+import { SeatNoticeChip, useSeatNotice } from "./seatNotice";
 import { swapCardStyle, useSwapHighlights } from "./swapHighlight";
 import { SwapBadge } from "./SwapBadge";
 import { seatDetail } from "./helpers";
@@ -53,6 +54,12 @@ function seatHandWidth(isCompact: boolean, compact: boolean) {
 /** No tamanho compacto (w-7) o número da carta não cabe e fica cortado. */
 function revealedCardSize(cardSize: string, isCompact: boolean) {
   return isCompact ? "w-11 h-16" : cardSize;
+}
+
+function noticePlacement(side: SeatSide) {
+  if (side === "right") return "right-full bottom-0 mr-1";
+  if (side === "left") return "left-full bottom-0 ml-1";
+  return "top-full left-1/2 -translate-x-1/2 mt-0.5";
 }
 
 /** Avatar ao lado das cartas também no topo: em pé, o assento ocuparia o centro da mesa. */
@@ -107,6 +114,7 @@ export function PlayerSeat({
   const { t } = useI18n();
   const swapHighlights = useSwapHighlights();
   const targetingSpread = useTargetingSpread();
+  const notice = useSeatNotice(player.id);
   const previousRevealedState = useRef<Map<string, boolean>>(new Map());
 
   const compact = compactProp ?? (opponentCount >= 4 || isCompact);
@@ -199,6 +207,8 @@ export function PlayerSeat({
       />
       {/* Sempre ao lado do ícone; no lado direito da mesa abre para dentro, sem sair da tela */}
       <EmoteBubble emoteId={emoteId} className={side === "right" ? "right-full top-0 mr-1" : "left-full top-0 ml-1"} />
+      {/* Última jogada: logo abaixo do avatar no topo; nas laterais abre para dentro da mesa */}
+      <SeatNoticeChip notice={notice} className={noticePlacement(side)} />
     </div>
   );
 

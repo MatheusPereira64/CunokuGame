@@ -93,14 +93,14 @@ describe("contas salvas no aparelho", () => {
 
   it("guarda a conta ao criar e ao entrar, com a mais recente no topo", async () => {
     serverReplies({ status: 201, body: { token: "t1", profile: profile("1") } }, { status: 200, body: { token: "t2", profile: profile("2") } });
-    await registerRankAccount({ nickname: "nick1", pin: "1234" });
-    await loginRankAccount({ nickname: "nick2", pin: "1234" });
+    await registerRankAccount({ email: "a@b.com", password: "segredo123" });
+    await loginRankAccount({ email: "c@d.com", password: "segredo123" });
     expect(getSavedAccounts().map((a) => a.nickname)).toEqual(["nick2", "nick1"]);
   });
 
-  it("sair mantém a conta salva e dá para voltar sem PIN", async () => {
+  it("sair mantém a conta salva e dá para voltar sem senha", async () => {
     serverReplies({ status: 200, body: { token: "t1", profile: profile("1") } }, { status: 200, body: { profile: profile("1") } });
-    await loginRankAccount({ nickname: "nick1", pin: "1234" });
+    await loginRankAccount({ email: "a@b.com", password: "segredo123" });
     logoutRank();
     expect(isRankLoggedIn()).toBe(false);
     expect(getSavedAccounts()).toHaveLength(1);
@@ -118,9 +118,9 @@ describe("contas salvas no aparelho", () => {
     expect(getSavedAccounts()[0]).toMatchObject({ playerId: "9", nickname: "nick9", token: "antigo" });
   });
 
-  it("sessão inválida mantém a conta na lista para entrar com o PIN", async () => {
+  it("sessão inválida mantém a conta na lista para entrar com a senha", async () => {
     serverReplies({ status: 200, body: { token: "t1", profile: profile("1") } }, { status: 401, body: {} });
-    await loginRankAccount({ nickname: "nick1", pin: "1234" });
+    await loginRankAccount({ email: "a@b.com", password: "segredo123" });
     expect(await fetchRankMe()).toBeNull();
     expect(isRankLoggedIn()).toBe(false);
     expect(getSavedAccounts()[0]).toMatchObject({ nickname: "nick1", token: null });
@@ -129,7 +129,7 @@ describe("contas salvas no aparelho", () => {
 
   it("falha de rede não encerra a sessão nem apaga a conta", async () => {
     serverReplies({ status: 200, body: { token: "t1", profile: profile("1") } }, { status: 500, body: {} });
-    await loginRankAccount({ nickname: "nick1", pin: "1234" });
+    await loginRankAccount({ email: "a@b.com", password: "segredo123" });
     await expect(fetchRankMe()).rejects.toThrow();
     expect(getRankToken()).toBe("t1");
     expect(getSavedAccounts()).toHaveLength(1);
@@ -137,10 +137,16 @@ describe("contas salvas no aparelho", () => {
 
   it("esquecer remove a conta e encerra a sessão dela", async () => {
     serverReplies({ status: 200, body: { token: "t1", profile: profile("1") } });
-    await loginRankAccount({ nickname: "nick1", pin: "1234" });
+    await loginRankAccount({ email: "a@b.com", password: "segredo123" });
     forgetSavedAccount("1");
     expect(getSavedAccounts()).toEqual([]);
     expect(isRankLoggedIn()).toBe(false);
+  });
+
+  it("conta nova sem nome de usuário fica salva pelo e-mail", async () => {
+    serverReplies({ status: 201, body: { token: "t1", profile: { ...profile("1"), nickname: "", displayName: "", email: "a@b.com" } } });
+    await registerRankAccount({ email: "a@b.com", password: "segredo123" });
+    expect(getSavedAccounts()[0]).toMatchObject({ playerId: "1", nickname: "", email: "a@b.com", token: "t1" });
   });
 
   it("ignora lista corrompida", () => {

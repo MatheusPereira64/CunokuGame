@@ -6,7 +6,8 @@ import { GameState, Card } from "@shared/schema";
 import { WIND_EFFECT_ID, type EmoteId } from "@shared/emotes";
 import { JOKER_REVEAL_MS, KING_REVEAL_MS, revealCards, type CardReveal } from "@shared/cardPowers";
 import { START_COUNTDOWN_MS } from "@shared/matchQueue";
-import { useGameAnimations, OpponentActionType } from "@/components/animations";
+import { useGameAnimations } from "@/components/animations";
+import { useActionFeed } from "@/hooks/use-action-feed";
 import { useToast } from "@/hooks/use-toast";
 import { audioManager } from "@/utils/audioManager";
 import { vibrate } from "@/lib/haptics";
@@ -103,10 +104,6 @@ export default function Game() {
   // Cartas de oponentes reveladas só neste cliente (habilidade 5/6): chave → face real
   const [revealedOpponentCardsInHand, setRevealedOpponentCardsInHand] = useState<Record<string, Card>>({});
   const [gameOverModalOpen, setGameOverModalOpen] = useState(false);
-  const [opponentActionNotification, setOpponentActionNotification] = useState<{
-    playerName: string;
-    actionType: OpponentActionType;
-  } | null>(null);
 
   // Emote visível por jogador; some sozinho depois de alguns segundos
   const [activeEmotes, setActiveEmotes] = useState<Record<string, string>>({});
@@ -242,7 +239,6 @@ export default function Game() {
         playerId,
         animationTriggeredRef.current,
         { animateDraw, animateDiscard, animateReplace, animatePenalty, animateDeal },
-        (notice) => setOpponentActionNotification(notice),
       );
       prevGameStateRef.current = JSON.parse(JSON.stringify(gameState));
     }, 100);
@@ -402,7 +398,10 @@ export default function Game() {
   }, [gameState, animateSwap]);
   useEffect(() => () => clearTimeout(swapHighlightTimer.current), []);
 
-  // Vento: todos veem quem foi atingido. O anúncio de bots já vem pelo aviso da jogada deles.
+  // Quem jogou o quê aparece no assento dele; o que mexe nas suas cartas vira alerta
+  const { seatNotices, personalAlert } = useActionFeed(gameState, playerId, t);
+
+  // Vento: o efeito fica no assento atingido; o texto vem do aviso da jogada.
   const lastWindCount = useRef<number | null>(null);
   useEffect(() => {
     if (!gameState) return;
@@ -412,19 +411,7 @@ export default function Game() {
     lastWindCount.current = count;
     if (previous === null || !wind || count === previous) return;
     showEmote(wind.targetId, WIND_EFFECT_ID);
-    const by = gameState.players.find((p) => p.id === wind.byId);
-    const target = gameState.players.find((p) => p.id === wind.targetId);
-    if (by && target && !by.isBot) {
-      toast({
-        title: t("game.windTitle"),
-        description:
-          wind.targetId === playerId
-            ? t("game.windOnYou", { player: by.name })
-            : t("game.windOnPlayer", { player: by.name, target: target.name }),
-        duration: 4000,
-      });
-    }
-  }, [gameState, playerId, showEmote, toast, t]);
+  }, [gameState, showEmote]);
 
   // Detecta declaração de Cunoku; null até o primeiro estado, para não repetir o anúncio ao reconectar
   const prevFinalRound = useRef<boolean | null>(null);
@@ -743,8 +730,8 @@ export default function Game() {
       }}
       currentAnimation={currentAnimation}
       onAnimationComplete={completeCurrentAnimation}
-      opponentNotice={opponentActionNotification}
-      onNoticeDone={() => setOpponentActionNotification(null)}
+      seatNotices={seatNotices}
+      personalAlert={personalAlert}
       cunokuCaller={cunokuCaller}
       onCunokuCallDone={finishCunokuCall}
       revealedCards={revealedOpponentCardsInHand}

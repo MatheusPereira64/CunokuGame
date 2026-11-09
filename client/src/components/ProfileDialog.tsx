@@ -30,6 +30,7 @@ import {
 import {
   fetchRankMe,
   isRankLoggedIn,
+  linkRankEmail,
   loginRankAccount,
   logoutRank,
   registerRankAccount,
@@ -70,12 +71,18 @@ interface ProfileDialogProps {
 
 const StatsChart = lazy(() => import("@/components/StatsChart"));
 
+const AUTH_ERRORS: Record<string, string> = {
+  nickname_taken: "rank.error.nicknameTaken",
+  invalid_credentials: "rank.error.credentials",
+  invalid_nickname: "rank.error.nickname",
+  invalid_email: "rank.error.email",
+  invalid_password: "rank.error.password",
+  email_taken: "rank.error.emailTaken",
+  email_already_linked: "rank.error.emailLinked",
+};
+
 function authErrorKey(code: string) {
-  if (code === "nickname_taken") return "rank.error.nicknameTaken";
-  if (code === "invalid_credentials") return "rank.error.credentials";
-  if (code === "invalid_nickname") return "rank.error.nickname";
-  if (code === "invalid_pin") return "rank.error.pin";
-  return "rank.error.generic";
+  return AUTH_ERRORS[code] ?? "rank.error.generic";
 }
 
 export function ProfileDialog({ compact = false, highlight = false, onSaved }: ProfileDialogProps) {
@@ -102,8 +109,11 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
   const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
   const [switchingId, setSwitchingId] = useState<string | null>(null);
-  const [nickname, setNickname] = useState("");
-  const [pin, setPin] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [usernameBusy, setUsernameBusy] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -127,7 +137,8 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
     setAccountTab("look");
     setAuthError(null);
     setCosmeticError(null);
-    setPin("");
+    setUsernameError(null);
+    setPassword("");
     const saved = getSavedAccounts();
     setSavedAccounts(saved);
     // Quem já teve conta aqui quase sempre quer entrar nela, não criar outra
@@ -195,22 +206,53 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
       const rp =
         authMode === "register"
           ? await registerRankAccount({
-              nickname,
-              pin,
+              email,
+              password,
               displayName: name || local.displayName || undefined,
               iconId,
               accent,
             })
-          : await loginRankAccount({ nickname, pin });
+          : await loginRankAccount({ email, password });
       applyRankProfile(rp);
       syncFormFromProfile();
       setSavedAccounts(getSavedAccounts());
-      setPin("");
+      setPassword("");
+      setUsername(rp.nickname || "");
       setAccountTab("look");
     } catch (err: any) {
       setAuthError(t(authErrorKey(String(err?.message || ""))));
     } finally {
       setAuthBusy(false);
+    }
+  };
+
+  /** Conta nova escolhe o nome de usuário; conta antiga sem e-mail ganha e-mail e senha. */
+  const handleChooseUsername = async () => {
+    setUsernameBusy(true);
+    setUsernameError(null);
+    try {
+      const rp = await syncRankProfile({ nickname: username });
+      if (rp) applyRankProfile(rp);
+      setSavedAccounts(getSavedAccounts());
+    } catch (err: any) {
+      setUsernameError(t(authErrorKey(String(err?.message || ""))));
+    } finally {
+      setUsernameBusy(false);
+    }
+  };
+
+  const handleLinkEmail = async () => {
+    setUsernameBusy(true);
+    setUsernameError(null);
+    try {
+      const rp = await linkRankEmail({ email, password });
+      if (rp) applyRankProfile(rp);
+      setPassword("");
+      setSavedAccounts(getSavedAccounts());
+    } catch (err: any) {
+      setUsernameError(t(authErrorKey(String(err?.message || ""))));
+    } finally {
+      setUsernameBusy(false);
     }
   };
 
@@ -232,10 +274,11 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
 
   const handleUseSaved = async (account: SavedAccount) => {
     setAuthError(null);
-    // Sessão expirada: basta o PIN para voltar à mesma conta
+    // Sessão expirada: basta a senha para voltar à mesma conta
     if (!account.token) {
       setAuthMode("login");
-      setNickname(account.nickname);
+      setEmail(account.email ?? "");
+      if (!account.email) setAuthError(t("rank.legacyNoEmail"));
       return;
     }
     setSwitchingId(account.playerId);
@@ -244,8 +287,8 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
       setSavedAccounts(getSavedAccounts());
       if (!rp) {
         setAuthMode("login");
-        setNickname(account.nickname);
-        setAuthError(t("rank.sessionExpired"));
+        setEmail(account.email ?? "");
+        setAuthError(t(account.email ? "rank.sessionExpired" : "rank.legacyNoEmail"));
         return;
       }
       applyRankProfile(rp);
@@ -472,7 +515,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                     </div>
                     <div className="text-[11px] text-indigo-700/80 truncate">
                       {rankProfile
-                        ? `@${rankProfile.nickname}${rankProfile.position ? ` · #${rankProfile.position}` : ""} · ${rankProfile.wins}W`
+                        ? [rankProfile.nickname ? `@${rankProfile.nickname}` : t("rank.noUsername"), rankProfile.position ? `#${rankProfile.position}` : "", `${rankProfile.wins}W`].filter(Boolean).join(" · ")
                         : t("rank.openAccount")}
                     </div>
                   </div>
@@ -504,7 +547,10 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                     )}
                   >
                     <div className="min-w-0">
-                      <div className="font-bold truncate">@{rankProfile.nickname}</div>
+                      <div className="font-bold truncate">
+                        {rankProfile.nickname ? `@${rankProfile.nickname}` : rankProfile.displayName || t("rank.noUsername")}
+                      </div>
+                      {rankProfile.email && <div className="text-[11px] opacity-70 truncate">{rankProfile.email}</div>}
                       {titleId !== "none" && (
                         <div className="text-xs opacity-80 truncate">{t(`cosmetic.title.${titleId}`)}</div>
                       )}
@@ -522,6 +568,87 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                       <RankBadge rank={rankProfile.rank} compact />
                     </div>
                   </div>
+
+                  {!rankProfile.nickname && (
+                    <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 space-y-2">
+                      <div>
+                        <div className="text-sm font-bold text-amber-950">{t("rank.chooseUsername")}</div>
+                        <p className="text-xs text-amber-900/80">{t("rank.chooseUsernameHint")}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="relative min-w-0 flex-1">
+                          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-400">@</span>
+                          <Input
+                            id="rankUsername"
+                            aria-label={t("rank.username")}
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, "_").slice(0, 16))}
+                            onKeyDown={(e) => e.key === "Enter" && void handleChooseUsername()}
+                            placeholder={t("profile.nicknamePlaceholder")}
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            maxLength={16}
+                            className="h-9 pl-6 text-sm"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          size="sm"
+                          className="h-9 shrink-0"
+                          isLoading={usernameBusy}
+                          disabled={username.trim().length < 3}
+                          onClick={() => void handleChooseUsername()}
+                        >
+                          {t("rank.usernameSave")}
+                        </Button>
+                      </div>
+                      <p className="text-[11px] text-amber-900/70">{t("rank.usernameRules")}</p>
+                      {usernameError && <p className="text-xs text-red-600">{usernameError}</p>}
+                    </div>
+                  )}
+
+                  {rankProfile.nickname && rankProfile.email === null && (
+                    <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 space-y-2">
+                      <div>
+                        <div className="text-sm font-bold text-amber-950">{t("rank.linkEmailTitle")}</div>
+                        <p className="text-xs text-amber-900/80">{t("rank.linkEmailHint")}</p>
+                      </div>
+                      <div className={cn(fit(isLandscapeMenu, "grid grid-cols-2 gap-2", "space-y-2"))}>
+                        <Input
+                          type="email"
+                          aria-label={t("rank.email")}
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder={t("rank.emailPlaceholder")}
+                          autoComplete="email"
+                          autoCapitalize="none"
+                          className="h-9 text-sm"
+                        />
+                        <Input
+                          type="password"
+                          aria-label={t("rank.password")}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder={t("rank.passwordPlaceholder")}
+                          autoComplete="new-password"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        className="w-full"
+                        isLoading={usernameBusy}
+                        onClick={() => void handleLinkEmail()}
+                      >
+                        {t("rank.linkEmailSubmit")}
+                      </Button>
+                      {usernameError && <p className="text-xs text-red-600">{usernameError}</p>}
+                    </div>
+                  )}
 
                   <div className="flex gap-2">
                     <Button
@@ -708,7 +835,7 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                               <span className="block min-w-0">
                                 <span className="block truncate font-bold">{account.displayName}</span>
                                 <span className="block truncate text-[11px] font-normal">
-                                  @{account.nickname}
+                                  {account.email || (account.nickname ? `@${account.nickname}` : "")}
                                   {account.token ? "" : ` · ${t("rank.needsPin")}`}
                                 </span>
                               </span>
@@ -716,8 +843,8 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                             <button
                               type="button"
                               className="shrink-0 rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-red-600"
-                              aria-label={t("rank.forgetAccount", { nickname: account.nickname })}
-                              title={t("rank.forgetAccount", { nickname: account.nickname })}
+                              aria-label={t("rank.forgetAccount", { nickname: account.displayName || account.email || account.nickname })}
+                              title={t("rank.forgetAccount", { nickname: account.displayName || account.email || account.nickname })}
                               onClick={() => handleForgetSaved(account)}
                             >
                               <X className="h-4 w-4" />
@@ -749,29 +876,36 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                   </div>
                   <div className={cn(fit(isLandscapeMenu, "grid grid-cols-2 gap-2", "space-y-3"))}>
                     <div className="space-y-1.5">
-                      <Label htmlFor="rankNick">{t("rank.nickname")}</Label>
+                      <Label htmlFor="rankEmail">{t("rank.email")}</Label>
                       <Input
-                        id="rankNick"
-                        value={nickname}
-                        onChange={(e) => setNickname(e.target.value)}
-                        placeholder={t("profile.nicknamePlaceholder")}
-                        maxLength={16}
+                        id="rankEmail"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder={t("rank.emailPlaceholder")}
+                        autoComplete="email"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        maxLength={254}
                         className="h-9 text-sm"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="rankPin">{t("rank.pin")}</Label>
+                      <Label htmlFor="rankPassword">{t("rank.password")}</Label>
                       <Input
-                        id="rankPin"
+                        id="rankPassword"
                         type="password"
-                        inputMode="numeric"
-                        value={pin}
-                        onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                        placeholder="****"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && void handleAuth()}
+                        placeholder={authMode === "register" ? t("rank.passwordPlaceholder") : "••••••••"}
+                        autoComplete={authMode === "register" ? "new-password" : "current-password"}
+                        maxLength={128}
                         className="h-9 text-sm"
                       />
                     </div>
                   </div>
+                  {authMode === "register" && <p className="text-[11px] text-gray-500">{t("rank.registerHint")}</p>}
                   {authError && <p className="text-xs text-red-600">{authError}</p>}
                 </div>
               )}

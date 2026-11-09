@@ -3,7 +3,7 @@ import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 
 const STORAGE_KEY = "cunoku_haptics";
 
-export type HapticMoment = "turn" | "penalty" | "cunoku";
+export type HapticMoment = "turn" | "penalty" | "cunoku" | "alert";
 
 /** Ligado por padrão: o jogador desliga nas configurações de som. */
 export function hapticsEnabled(): boolean {
@@ -27,6 +27,7 @@ const WEB_PATTERNS: Record<HapticMoment, number[]> = {
   turn: [30],
   penalty: [60, 60, 60],
   cunoku: [40, 50, 120],
+  alert: [25, 40, 25],
 };
 
 /** Toque leve na vez, mais forte na punição e no Cunoku. Nunca falha em voz alta. */
@@ -36,6 +37,7 @@ export function vibrate(moment: HapticMoment): void {
     if (Capacitor.isNativePlatform()) {
       if (moment === "turn") void Haptics.impact({ style: ImpactStyle.Light });
       else if (moment === "penalty") void Haptics.notification({ type: NotificationType.Error });
+      else if (moment === "alert") void Haptics.notification({ type: NotificationType.Warning });
       else void Haptics.impact({ style: ImpactStyle.Heavy });
       return;
     }

@@ -86,7 +86,7 @@ export class DrizzleCompetitionStore implements CompetitionStore {
 
   async getAccountByToken(token: string): Promise<RankAccount | null> {
     const row = await getPlayerByToken(await this.db(), token);
-    return row ? { id: row.id, displayName: row.displayName || row.nickname } : null;
+    return row ? { id: row.id, displayName: row.displayName || row.nickname || "" } : null;
   }
 
   async getAccountSummaries(ids: string[]): Promise<Map<string, RankSummary>> {

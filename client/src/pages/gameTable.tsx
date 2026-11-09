@@ -4,7 +4,8 @@ import type { EmoteId } from "@shared/emotes";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Button } from "@/components/Button";
 import { motion, AnimatePresence } from "framer-motion";
-import { AnimationRenderer, CunokuCallOverlay, OpponentActionNotification, OpponentActionType } from "@/components/animations";
+import { AnimationRenderer, CunokuCallOverlay } from "@/components/animations";
+import { PersonalAlertContext, SeatNoticeContext, type PersonalAlert, type SeatNotice } from "@/components/game/seatNotice";
 import { ArrowLeft, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VolumeControl } from "@/components/VolumeControl";
@@ -524,8 +525,8 @@ export function ActiveTable(props: {
   onRematch: () => void;
   currentAnimation: AnimationEvent | null;
   onAnimationComplete: () => void;
-  opponentNotice: { playerName: string; actionType: OpponentActionType } | null;
-  onNoticeDone: () => void;
+  seatNotices: Record<string, SeatNotice>;
+  personalAlert: PersonalAlert | null;
   cunokuCaller: string | null;
   onCunokuCallDone: () => void;
   revealedCards: Record<string, Card>;
@@ -556,9 +557,6 @@ export function ActiveTable(props: {
       {props.isPortrait ? <LandscapePrompt /> : null}
       {props.cunokuCaller ? <CunokuCallOverlay playerName={props.cunokuCaller} onComplete={props.onCunokuCallDone} /> : null}
       <AnimationRenderer currentAnimation={props.currentAnimation} onComplete={props.onAnimationComplete} playerId={props.playerId} />
-      {props.opponentNotice ? (
-        <OpponentActionNotification playerName={props.opponentNotice.playerName} actionType={props.opponentNotice.actionType} onComplete={props.onNoticeDone} duration={2000} />
-      ) : null}
       <GameTopBar
         isDaily={!!gameState.dailyDay}
         canEmote={!gameState.winnerId}
@@ -572,6 +570,8 @@ export function ActiveTable(props: {
         status={<StatusLine isCompact={isCompact} gameState={gameState} graceSeconds={graceSeconds} graceName={graceName} isMyTurn={props.isMyTurn} phase={props.phase} t={t} />}
         t={t}
       />
+      <PersonalAlertContext.Provider value={props.personalAlert}>
+      <SeatNoticeContext.Provider value={props.seatNotices}>
       <SwapHighlightContext.Provider value={props.swapHighlights}>
       <FeltTable
         isCompact={isCompact}
@@ -593,6 +593,8 @@ export function ActiveTable(props: {
         me={props.me}
       />
       </SwapHighlightContext.Provider>
+      </SeatNoticeContext.Provider>
+      </PersonalAlertContext.Provider>
       <AbilityTargeting
         open={props.abilityOpen}
         onOpenChange={props.onAbilityOpenChange}

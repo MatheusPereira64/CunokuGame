@@ -1,7 +1,6 @@
 import { GameState, Card } from "@shared/schema";
 import { audioManager } from "@/utils/audioManager";
 import { vibrate } from "@/lib/haptics";
-import { OpponentActionType } from "@/components/animations";
 import {
   hasRecordedMatchStats,
   markMatchStatsRecorded,
@@ -11,7 +10,6 @@ import { isRankLoggedIn, reportRankMatchResult, countsForGlobalRank } from "@/li
 
 type Difficulty = "easy" | "medium" | "hard";
 type DiscardKind = "from_hand" | "matched" | "drawn";
-type Notify = (notice: { playerName: string; actionType: OpponentActionType }) => void;
 
 type MotionApi = {
   animateDraw: (card: Card, source: "deck" | "discard", playerId: string) => void;
@@ -50,7 +48,6 @@ function playReplace(
   playerId: string,
   triggered: Set<string>,
   animateReplace: MotionApi["animateReplace"],
-  notify: Notify,
 ) {
   const currentPlayer = current.players[current.currentPlayerIndex];
   const prevPlayer = prev.players[prev.currentPlayerIndex];
@@ -62,8 +59,7 @@ function playReplace(
   const isOpponent = currentPlayer.id !== playerId;
   remember(triggered, `replace_${currentPlayer.id}_${handIndex}_${Date.now()}`, 2000, () => {
     audioManager.playCardFlip();
-    if (isOpponent) notify({ playerName: currentPlayer.name, actionType: "replace" });
-    else animateReplace(drawnCard, discardedCard, handIndex, currentPlayer.id);
+    if (!isOpponent) animateReplace(drawnCard, discardedCard, handIndex, currentPlayer.id);
   });
   return true;
 }
@@ -74,7 +70,6 @@ function playDiscardDrawn(
   playerId: string,
   triggered: Set<string>,
   animateDiscard: MotionApi["animateDiscard"],
-  notify: Notify,
 ) {
   const currentPlayer = current.players[current.currentPlayerIndex];
   const discardedCard = prev.drawnCard;
@@ -82,8 +77,7 @@ function playDiscardDrawn(
   const isOpponent = currentPlayer.id !== playerId;
   remember(triggered, `discard_drawn_${currentPlayer.id}_${discardedCard.id}`, 2000, () => {
     audioManager.playCardSlide();
-    if (isOpponent) notify({ playerName: currentPlayer.name, actionType: "discard" });
-    else animateDiscard(discardedCard, "drawn", currentPlayer.id);
+    if (!isOpponent) animateDiscard(discardedCard, "drawn", currentPlayer.id);
   });
 }
 
@@ -93,13 +87,12 @@ function playReplaceOrDiscard(
   playerId: string,
   triggered: Set<string>,
   api: Pick<MotionApi, "animateReplace" | "animateDiscard">,
-  notify: Notify,
 ) {
   const drewThenCleared = prev.drawnCard && !current.drawnCard && prev.discardPile.length < current.discardPile.length;
   if (!drewThenCleared) return;
-  const replaced = playReplace(prev, current, playerId, triggered, api.animateReplace, notify);
+  const replaced = playReplace(prev, current, playerId, triggered, api.animateReplace);
   if (replaced) return;
-  playDiscardDrawn(prev, current, playerId, triggered, api.animateDiscard, notify);
+  playDiscardDrawn(prev, current, playerId, triggered, api.animateDiscard);
 }
 
 function playOneHandDiscard(
@@ -110,7 +103,6 @@ function playOneHandDiscard(
   playerId: string,
   triggered: Set<string>,
   animateDiscard: MotionApi["animateDiscard"],
-  notify: Notify,
 ) {
   const prevPlayer = prev.players[playerIndex];
   const removedCard = prevPlayer.hand.find(
@@ -125,8 +117,7 @@ function playOneHandDiscard(
   const isOpponent = player.id !== playerId;
   remember(triggered, `discard_hand_${player.id}_${removedCard.id}_${Date.now()}`, 2000, () => {
     audioManager.playCardSlide();
-    if (isOpponent) notify({ playerName: player.name, actionType: "discard" });
-    else animateDiscard(topDiscard, discardType, player.id, cardIndex, isMatch);
+    if (!isOpponent) animateDiscard(topDiscard, discardType, player.id, cardIndex, isMatch);
   });
 }
 
@@ -136,13 +127,12 @@ function playHandDiscards(
   playerId: string,
   triggered: Set<string>,
   animateDiscard: MotionApi["animateDiscard"],
-  notify: Notify,
 ) {
   if (prev.drawnCard && !current.drawnCard) return;
   current.players.forEach((player, playerIndex) => {
     const prevPlayer = prev.players[playerIndex];
     if (!prevPlayer || player.hand.length >= prevPlayer.hand.length) return;
-    playOneHandDiscard(prev, current, player, playerIndex, playerId, triggered, animateDiscard, notify);
+    playOneHandDiscard(prev, current, player, playerIndex, playerId, triggered, animateDiscard);
   });
 }
 
@@ -187,11 +177,10 @@ export function playTableAnimations(
   playerId: string,
   triggered: Set<string>,
   api: MotionApi,
-  notify: Notify,
 ) {
   playDraw(prev, current, triggered, api.animateDraw);
-  playReplaceOrDiscard(prev, current, playerId, triggered, api, notify);
-  playHandDiscards(prev, current, playerId, triggered, api.animateDiscard, notify);
+  playReplaceOrDiscard(prev, current, playerId, triggered, api);
+  playHandDiscards(prev, current, playerId, triggered, api.animateDiscard);
   playPenalties(prev, current, playerId, triggered, api.animatePenalty);
 }
 

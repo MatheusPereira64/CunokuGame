@@ -34,9 +34,9 @@ export function processOfflineAction(
   const player = newState.players[playerIndex];
   switch (action.type) {
     case "draw_deck":
-      return drawFromDeck(newState);
+      return drawFromDeck(newState, player);
     case "draw_discard":
-      return drawFromDiscard(newState);
+      return drawFromDiscard(newState, player);
     case "discard_drawn":
       return discardDrawn(newState, player, playerId);
     case "replace_card":
@@ -71,7 +71,8 @@ function recycleDeck(newState: GameState): boolean {
   return true;
 }
 
-function drawFromDeck(newState: GameState): GameState {
+// Mesmas frases do servidor (server/game.ts): os avisos da mesa leem o log igual online e offline
+function drawFromDeck(newState: GameState, player: Player): GameState {
   if (newState.deck.length === 0) {
     if (!recycleDeck(newState)) return finishDeck(newState, "Baralho acabou! Jogo finalizado.");
     newState.logs.push("Baralho reciclado e embaralhado");
@@ -81,12 +82,14 @@ function drawFromDeck(newState: GameState): GameState {
   newState.drawnCard = drawnCard;
   newState.drawnFromDiscard = false;
   newState.turnPhase = "action";
+  newState.logs.push(`${player.name} comprou uma carta do baralho`);
   return newState;
 }
 
-function drawFromDiscard(newState: GameState): GameState {
+function drawFromDiscard(newState: GameState, player: Player): GameState {
   const discardCard = newState.discardPile.pop();
   if (!discardCard) return newState;
+  newState.logs.push(`${player.name} comprou a carta ${discardCard.rank} de ${discardCard.suit} da pilha de descarte`);
   newState.drawnCard = discardCard;
   newState.drawnFromDiscard = true;
   newState.turnPhase = "action";
@@ -109,7 +112,7 @@ function discardDrawn(newState: GameState, player: Player, playerId: string): Ga
   newState.forcedReplace = false;
   newState.jokerRevealed = false;
   newState.turnPhase = "draw";
-  newState.logs.push(`${player.name} discarded ${discardedCard.rank}`);
+  newState.logs.push(`${player.name} descartou a carta ${discardedCard.rank} de ${discardedCard.suit}`);
   advanceTurn(newState);
   return newState;
 }
@@ -122,7 +125,7 @@ function replaceDrawn(newState: GameState, player: Player, handIndex: number | u
   player.hand[handIndex] = newState.drawnCard;
   if (oldCard) {
     newState.discardPile.push(oldCard);
-    newState.logs.push(`${player.name} replaced a card`);
+    newState.logs.push(`${player.name} substituiu a carta ${handIndex + 1} da mão`);
   }
   newState.drawnCard = null;
   newState.drawnFromDiscard = false;
@@ -153,8 +156,14 @@ function useDrawnAbility(newState: GameState, player: Player, action: AbilityAct
     if (!target) return newState;
     newState.logs.push(`${player.name} usou o Rei para ver as cartas de ${target.name}`);
   }
-  if (rank === "7" || rank === "8") peekOwnCard(player, action, playerId);
-  if (rank === "5" || rank === "6") peekOpponentCard(newState, action, playerId);
+  if (rank === "7" || rank === "8") {
+    peekOwnCard(player, action, playerId);
+    newState.logs.push(`${player.name} usou habilidade para ver uma de suas cartas`);
+  }
+  if (rank === "5" || rank === "6") {
+    peekOpponentCard(newState, action, playerId);
+    if (target && target.id !== playerId) newState.logs.push(`${player.name} usou habilidade para ver uma carta de ${target.name}`);
+  }
   if (rank === "9" || rank === "10") swapCards(newState, player, action, playerId);
   if (rank === "A" || rank === "2") windOnOpponent(newState, player, action, playerId);
   newState.discardPile.push(newState.drawnCard);
@@ -227,6 +236,7 @@ function swapCards(newState: GameState, player: Player, action: AbilityAction, p
   delete first.knownCards[firstIndex.toString()];
   delete second.knownCards[secondIndex.toString()];
   recordSwap(newState, first, firstIndex, second, secondIndex);
+  newState.logs.push(`${player.name} trocou a carta ${firstIndex + 1} de ${first.name} com a carta ${secondIndex + 1} de ${second.name}`);
 }
 
 function windOnOpponent(newState: GameState, player: Player, action: AbilityAction, playerId: string) {
@@ -260,7 +270,7 @@ function freeDiscard(newState: GameState, player: Player, cardIndex: number | un
   const [card] = player.hand.splice(index, 1);
   newState.discardPile.push(card);
   reindexKnownCards(player, index);
-  newState.logs.push(`${player.name} discarded ${card.rank}`);
+  newState.logs.push(`${player.name} descartou a carta ${card.rank} de ${card.suit}`);
   return newState;
 }
 
@@ -274,20 +284,20 @@ function declareFinish(newState: GameState, player: Player, playerId: string): G
   newState.isFinalRound = true;
   newState.finalRoundsLeft = FINAL_ROUNDS;
   newState.turnPhase = "draw";
-  newState.logs.push(`${player.name} declared CUNOKU! Final round begins.`);
+  newState.logs.push(`${player.name} declarou CUNOKU! Faltam ${FINAL_ROUNDS} rodadas.`);
   return newState;
 }
 
 function punishWrongDiscard(newState: GameState, player: Player): GameState {
   if (player.hand.length >= HAND_LIMIT) {
-    newState.logs.push(`${player.name} tried to discard wrong card! Loses turn (has ${HAND_LIMIT} cards).`);
+    newState.logs.push(`${player.name} tentou descartar carta errada! Perde a vez (tem ${HAND_LIMIT} cartas).`);
     if (newState.players[newState.currentPlayerIndex] === player) advanceTurn(newState);
     else skipNextTurn(newState, player.id);
     return newState;
   }
   const cardsDrawn = drawPenaltyCards(newState, player);
   if (cardsDrawn == null) return newState;
-  newState.logs.push(`${player.name} tried to discard wrong card! Draws ${cardsDrawn} card${cardsDrawn > 1 ? "s" : ""}.`);
+  newState.logs.push(`${player.name} tentou descartar carta errada! Compra ${cardsDrawn} carta${cardsDrawn > 1 ? "s" : ""}.`);
   return newState;
 }
 

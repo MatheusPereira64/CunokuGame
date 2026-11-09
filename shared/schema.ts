@@ -138,12 +138,19 @@ export type DailyEntry = typeof dailyEntries.$inferSelect;
 export type MatchResult = typeof matchResults.$inferSelect;
 export type InsertMatchResult = typeof matchResults.$inferInsert;
 
-/** Contas leves para ranking global (apelido + PIN). */
+/**
+ * Contas do ranking global: entram com e-mail e senha e escolhem o nome de usuário depois.
+ * pin_hash/pin_salt são das contas antigas (apelido + PIN), que não entram mais por PIN.
+ */
 export const rankPlayers = pgTable("rank_players", {
   id: text("id").primaryKey(),
-  nickname: text("nickname").notNull().unique(),
-  pinHash: text("pin_hash").notNull(),
-  pinSalt: text("pin_salt").notNull(),
+  /** Nome de usuário público; vazio até o jogador escolher. */
+  nickname: text("nickname").unique(),
+  email: text("email").unique(),
+  passwordHash: text("password_hash"),
+  passwordSalt: text("password_salt"),
+  pinHash: text("pin_hash"),
+  pinSalt: text("pin_salt"),
   displayName: text("display_name").notNull().default(""),
   iconId: text("icon_id").notNull().default("spade"),
   accent: text("accent").notNull().default("indigo"),

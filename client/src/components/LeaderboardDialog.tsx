@@ -163,7 +163,7 @@ export function LeaderboardDialog({ compact = false }: LeaderboardDialogProps) {
             <div className="min-w-0">
               <div className="text-xs text-indigo-600 font-medium">{t("rank.yourRank")}</div>
               <div className="font-bold text-indigo-900 truncate">
-                @{me.nickname}
+                {me.nickname ? `@${me.nickname}` : ""}
                 {me.position ? ` · #${me.position}` : ""}
               </div>
             </div>

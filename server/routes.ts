@@ -30,6 +30,7 @@ import {
   getLeaderboard,
   getMe,
   loginRankPlayer,
+  linkRankEmail,
   recordRankMatch,
   registerRankPlayer,
   updateRankProfile,
@@ -206,6 +207,21 @@ export async function registerRoutes(
       if (!token) return res.status(401).json({ message: "unauthorized" });
       const input = api.rank.profile.input.parse(req.body);
       const result = await updateRankProfile(db, token, input);
+      if ("error" in result) return res.status(result.status).json({ message: result.error });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.post(api.rank.linkEmail.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const token = bearerToken(req.header("authorization"));
+      if (!token) return res.status(401).json({ message: "unauthorized" });
+      const input = api.rank.linkEmail.input.parse(req.body);
+      const result = await linkRankEmail(db, token, input);
       if ("error" in result) return res.status(result.status).json({ message: result.error });
       res.json(result);
     } catch (err: any) {
