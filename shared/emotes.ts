@@ -8,6 +8,9 @@ export const EMOTES = [
   { id: "sad", emoji: "😢" },
   { id: "angry", emoji: "😡" },
   { id: "fire", emoji: "🔥" },
+  { id: "hot", emoji: "🥵" },
+  { id: "clown", emoji: "🤡" },
+  { id: "smirk", emoji: "😏" },
 ] as const;
 
 export type EmoteId = (typeof EMOTES)[number]["id"];
