@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useMemo } from "react";
+import { useLatest } from "./useLatest";
 import { PlayingCard } from "../PlayingCard";
 import { DealAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
 import { useI18n } from "@/contexts/i18n-context";
@@ -55,6 +56,7 @@ export function CardDealAnimation({
 
   const totalDuration = dealingSequence.length * duration + 500; // +500ms buffer
 
+  const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
     // Distribui cada carta em sequência
     const timers = dealingSequence.map((card, index) => {
@@ -71,14 +73,14 @@ export function CardDealAnimation({
     const completeTimer = setTimeout(() => {
       setPhase('complete');
       setIsVisible(false);
-      setTimeout(onComplete, 100);
+      setTimeout(() => onCompleteRef.current(), 100);
     }, totalDuration);
 
     return () => {
       timers.forEach(t => clearTimeout(t));
       clearTimeout(completeTimer);
     };
-  }, [dealingSequence, totalDuration, onComplete]);
+  }, [dealingSequence, totalDuration, onCompleteRef]);
 
   if (!isVisible) return null;
 

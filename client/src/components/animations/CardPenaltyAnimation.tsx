@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useLatest } from "./useLatest";
 import { AlertTriangle } from "lucide-react";
 import { PlayingCard } from "../PlayingCard";
 import { PenaltyAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
@@ -28,6 +29,7 @@ export function CardPenaltyAnimation({
 
   const cardDelay = duration * 0.3 / cards.length; // Tempo entre cada carta
 
+  const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
     // Fase 1: Shake/aviso de erro
     const shakeTimer = setTimeout(() => {
@@ -45,7 +47,7 @@ export function CardPenaltyAnimation({
     const completeTimer = setTimeout(() => {
       setPhase('complete');
       setIsVisible(false);
-      setTimeout(onComplete, 100);
+      setTimeout(() => onCompleteRef.current(), 100);
     }, duration);
 
     return () => {
@@ -53,7 +55,7 @@ export function CardPenaltyAnimation({
       cardTimers.forEach(t => clearTimeout(t));
       clearTimeout(completeTimer);
     };
-  }, [duration, cards.length, cardDelay, onComplete]);
+  }, [duration, cards.length, cardDelay, onCompleteRef]);
 
   if (!isVisible) return null;
 

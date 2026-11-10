@@ -98,14 +98,27 @@ export function useAnimationQueue(options: UseAnimationQueueOptions = {}) {
     events.forEach(event => enqueue(event));
   }, [enqueue]);
 
-  // Completa a animação atual
+  // Identidade estável: online a partida redesenha a cada segundo (relógio da vez) e um
+  // completar novo a cada render reiniciava os timers das animações, que nunca terminavam
+  const currentRef = useRef<AnimationEvent | null>(null);
+  currentRef.current = state.currentAnimation;
+  const onCompleteRef = useRef(onAnimationComplete);
+  onCompleteRef.current = onAnimationComplete;
+  const processNextRef = useRef(processNext);
+  processNextRef.current = processNext;
+  const completedIdRef = useRef<string | null>(null);
+
+  // Completa a animação atual (uma vez só por animação)
   const completeCurrentAnimation = useCallback(() => {
-    const current = state.currentAnimation;
+    const current = currentRef.current;
     if (current) {
-      onAnimationComplete?.(current);
+      // Completar duas vezes a mesma animação pularia a próxima da fila
+      if (completedIdRef.current === current.id) return;
+      completedIdRef.current = current.id;
+      onCompleteRef.current?.(current);
       current.onComplete?.();
     }
-    
+
     setState(prev => ({
       ...prev,
       currentAnimation: null,
@@ -113,8 +126,8 @@ export function useAnimationQueue(options: UseAnimationQueueOptions = {}) {
     }));
 
     // Processa próxima após pequeno delay
-    setTimeout(processNext, 50);
-  }, [state.currentAnimation, onAnimationComplete, processNext]);
+    setTimeout(() => processNextRef.current(), 50);
+  }, []);
 
   // Limpa toda a fila
   const clearQueue = useCallback(() => {

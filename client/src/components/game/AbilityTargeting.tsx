@@ -73,6 +73,7 @@ export function AbilityTargeting({
   const [picks, setPicks] = useState<TargetPick[]>([]);
   const [targets, setTargets] = useState<HitTarget[]>([]);
   const spec = abilityTargeting(drawnCard?.rank, jokerRevealed);
+  const sealedKey = sealedCardIds.join(",");
 
   useEffect(() => {
     if (!open) setPicks([]);
@@ -113,7 +114,8 @@ export function AbilityTargeting({
       window.clearTimeout(settle);
       window.removeEventListener("resize", measure);
     };
-  }, [open, spec?.pick, spec?.who, players, playerId, sealedCardIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seladas comparadas pelo conteúdo: o array é novo a cada render
+  }, [open, spec?.pick, spec?.who, players, playerId, sealedKey]);
 
   useEffect(() => {
     if (!open) return;

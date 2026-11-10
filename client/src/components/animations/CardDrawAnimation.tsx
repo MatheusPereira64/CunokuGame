@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useLatest } from "./useLatest";
 import { PlayingCard } from "../PlayingCard";
 import { DrawAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
 import { useI18n } from "@/contexts/i18n-context";
@@ -26,6 +27,7 @@ export function CardDrawAnimation({
   const arcHeight = Math.max(120, Math.abs(targetPosition.y - sourcePosition.y) * 0.6);
   const midY = Math.min(sourcePosition.y, targetPosition.y) - arcHeight;
 
+  const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
     // Mostra a face da carta quando está no meio do caminho
     const showFaceTimer = setTimeout(() => {
@@ -35,14 +37,14 @@ export function CardDrawAnimation({
     // Completa a animação
     const completeTimer = setTimeout(() => {
       setIsVisible(false);
-      setTimeout(onComplete, 100);
+      setTimeout(() => onCompleteRef.current(), 100);
     }, duration);
 
     return () => {
       clearTimeout(showFaceTimer);
       clearTimeout(completeTimer);
     };
-  }, [duration, onComplete]);
+  }, [duration, onCompleteRef]);
 
   if (!isVisible) return null;
 

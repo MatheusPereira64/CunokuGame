@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useId, useMemo } from "react";
+import { useLatest } from "./useLatest";
 import { PlayingCard } from "../PlayingCard";
 import { useI18n } from "@/contexts/i18n-context";
 import { SWAP_COLORS } from "@/components/game/swapHighlight";
@@ -51,10 +52,11 @@ export function CardSwapAnimation({ data, onComplete, duration = DEFAULT_DURATIO
     [player1Position, player2Position],
   );
 
+  const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
-    const timer = setTimeout(onComplete, duration);
+    const timer = setTimeout(() => onCompleteRef.current(), duration);
     return () => clearTimeout(timer);
-  }, [onComplete, duration]);
+  }, [onCompleteRef, duration]);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">

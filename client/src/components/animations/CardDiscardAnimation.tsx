@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useLatest } from "./useLatest";
 import { PlayingCard } from "../PlayingCard";
 import { DiscardAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
 import { randomFloat } from "@shared/secureRandom";
@@ -32,14 +33,15 @@ export function CardDiscardAnimation({
   const midX = (sourcePosition.x + targetPosition.x) / 2;
   const midY = Math.min(sourcePosition.y, targetPosition.y) - 60;
 
+  const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsVisible(false);
-      setTimeout(onComplete, 100);
+      setTimeout(() => onCompleteRef.current(), 100);
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [duration, onComplete]);
+  }, [duration, onCompleteRef]);
 
   if (!isVisible) return null;
 

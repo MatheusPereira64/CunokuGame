@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useLatest } from "./useLatest";
 import { Eye, EyeOff } from "lucide-react";
 import { PlayingCard } from "../PlayingCard";
 import { PeekAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
@@ -26,6 +27,7 @@ export function CardPeekAnimation({
     abilityRank 
   } = data;
 
+  const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
     // Fase 1: Carta levanta
     const liftTimer = setTimeout(() => {
@@ -50,7 +52,7 @@ export function CardPeekAnimation({
     // Fase 5: Completa
     const completeTimer = setTimeout(() => {
       setIsVisible(false);
-      setTimeout(onComplete, 100);
+      setTimeout(() => onCompleteRef.current(), 100);
     }, duration);
 
     return () => {
@@ -60,7 +62,7 @@ export function CardPeekAnimation({
       clearTimeout(hideTimer);
       clearTimeout(completeTimer);
     };
-  }, [duration, onComplete]);
+  }, [duration, onCompleteRef]);
 
   if (!isVisible) return null;
 

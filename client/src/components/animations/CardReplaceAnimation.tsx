@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useLatest } from "./useLatest";
 import { PlayingCard } from "../PlayingCard";
 import { ReplaceAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
 import { useI18n } from "@/contexts/i18n-context";
@@ -39,6 +40,7 @@ export function CardReplaceAnimation({
     playerName 
   } = data;
 
+  const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
     // Fase 1: Destacar cartas
     const liftTimer = setTimeout(() => {
@@ -58,7 +60,7 @@ export function CardReplaceAnimation({
     // Fase 4: Finalização
     const endTimer = setTimeout(() => {
       setIsVisible(false);
-      setTimeout(onComplete, 100);
+      setTimeout(() => onCompleteRef.current(), 100);
     }, duration);
 
     return () => {
@@ -67,7 +69,7 @@ export function CardReplaceAnimation({
       clearTimeout(completeTimer);
       clearTimeout(endTimer);
     };
-  }, [duration, onComplete]);
+  }, [duration, onCompleteRef]);
 
   if (!isVisible) return null;
 

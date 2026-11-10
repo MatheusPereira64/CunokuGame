@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useLatest } from "./useLatest";
 import { useI18n } from "@/contexts/i18n-context";
 
 /** Mantém a tela de `.cunoku-shake` (index.css) no mesmo instante do impacto. */
@@ -16,10 +17,11 @@ export function CunokuCallOverlay({ playerName, onComplete }: { playerName: stri
   const reducedMotion = useReducedMotion();
   const [impacted, setImpacted] = useState(false);
 
+  const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
-    const timer = setTimeout(onComplete, SECONDS * 1000);
+    const timer = setTimeout(() => onCompleteRef.current(), SECONDS * 1000);
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, [onCompleteRef]);
 
   useEffect(() => {
     const timer = setTimeout(() => setImpacted(true), IMPACT_SECONDS * 1000);
