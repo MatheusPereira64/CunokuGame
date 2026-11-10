@@ -1,5 +1,5 @@
 /** Versão embutida do app — mantenha alinhada com package.json / tags de Release. */
-export const APP_VERSION = "1.4.1";
+export const APP_VERSION = "1.4.2";
 
 export const GITHUB_OWNER = "MatheusPereira64";
 export const GITHUB_REPO = "CunokuGame";
