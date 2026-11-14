@@ -146,14 +146,9 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
-export async function registerRankAccount(input: {
-  email: string;
-  password: string;
-  displayName?: string;
-  iconId?: string;
-  accent?: string;
-}): Promise<PublicRankProfile> {
-  const res = await fetch(apiUrl("/api/rank/register"), {
+/** Cadastro e login respondem igual: guarda a sessão e a conta neste aparelho. */
+async function openRankSession(path: string, input: object): Promise<PublicRankProfile> {
+  const res = await fetch(apiUrl(path), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),
@@ -165,20 +160,21 @@ export async function registerRankAccount(input: {
   return rememberRankProfile(data.profile);
 }
 
+export async function registerRankAccount(input: {
+  email: string;
+  password: string;
+  displayName?: string;
+  iconId?: string;
+  accent?: string;
+}): Promise<PublicRankProfile> {
+  return openRankSession("/api/rank/register", input);
+}
+
 export async function loginRankAccount(input: {
   email: string;
   password: string;
 }): Promise<PublicRankProfile> {
-  const res = await fetch(apiUrl("/api/rank/login"), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) throw new Error(await parseError(res));
-  const data = await parseJson<{ token: string; profile: PublicRankProfile }>(res);
-  saveSession(data.token, data.profile.playerId);
-  rememberAccount(data.profile, data.token);
-  return rememberRankProfile(data.profile);
+  return openRankSession("/api/rank/login", input);
 }
 
 export async function fetchRankMe(): Promise<PublicRankProfile | null> {

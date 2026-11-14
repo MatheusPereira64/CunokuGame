@@ -50,6 +50,7 @@ app.use((req, res, next) => {
 
 async function ensureRoomsTable(db: { execute: (query: unknown) => Promise<unknown> }) {
   const { sql } = await import("drizzle-orm");
+  const { CREATE_ROOMS_TABLE } = await import("@shared/schemaSql");
   try {
     await db.execute(sql`SELECT 1 FROM rooms LIMIT 1`);
     log("Database tables verified");
@@ -64,20 +65,7 @@ async function ensureRoomsTable(db: { execute: (query: unknown) => Promise<unkno
     log(`Warning: Could not drop existing table: ${dropErr.message}`, "db-init");
   }
 
-  await db.execute(sql`
-    CREATE TABLE rooms (
-      id SERIAL PRIMARY KEY,
-      code TEXT NOT NULL UNIQUE,
-      host_id TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'waiting',
-      game_mode TEXT NOT NULL DEFAULT 'multiplayer',
-      bot_difficulty TEXT DEFAULT 'medium',
-      max_players INTEGER DEFAULT 4,
-      bot_count INTEGER DEFAULT 0,
-      game_state JSONB,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-  `);
+  await db.execute(CREATE_ROOMS_TABLE);
   log("Database tables created successfully");
 
   try {
