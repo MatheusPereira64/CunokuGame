@@ -214,7 +214,7 @@ export function CardDealAnimation({
           </div>
 
           {/* Linhas de conexão para cada jogador */}
-          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }}>
+          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }} aria-hidden="true">
             {players.map((player, playerIndex) => {
               // Calcula posição média das cartas do jogador
               const avgX = player.positions.reduce((sum, p) => sum + p.x, 0) / player.positions.length;

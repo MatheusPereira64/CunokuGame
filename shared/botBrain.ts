@@ -23,7 +23,7 @@ function pickWindTarget(state: GameState, playerIndex: number): string | null {
 function pickQueenTarget(state: GameState, playerIndex: number): string | null {
   const others = state.players.filter((p, i) => i !== playerIndex && p.hand.length < HAND_LIMIT);
   if (others.length === 0) return null;
-  return others.reduce((fewest, p) => (p.hand.length < fewest.hand.length ? p : fewest)).id;
+  return others.reduce((fewest, p) => (p.hand.length < fewest.hand.length ? p : fewest), others[0]).id;
 }
 
 /** Valete obriga a substituir: escolhe a pior carta conhecida ou a primeira livre. */

@@ -100,7 +100,7 @@ export function CardDrawAnimation({
           </motion.div>
 
           {/* Linha de trajetória para melhor clareza */}
-          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }}>
+          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }} aria-hidden="true">
             <motion.path
               d={`M ${sourcePosition.x} ${sourcePosition.y} Q ${midX} ${midY} ${targetPosition.x} ${targetPosition.y}`}
               fill="none"

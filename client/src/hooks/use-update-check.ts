@@ -15,7 +15,7 @@ export function useUpdateCheck() {
   /** Versão já oferecida nesta sessão: novas consultas não reabrem nem interrompem o download. */
   const offeredTagRef = useRef<string | null>(null);
 
-  const runCheckRef = useRef<() => Promise<void>>(async () => undefined);
+  const runCheckRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
   const runCheck = useCallback(async (signal?: AbortSignal) => {
     if (typeof navigator !== "undefined" && !navigator.onLine) {

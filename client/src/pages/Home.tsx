@@ -41,7 +41,7 @@ import {
 type Notice = (opts: { title: string; description?: string; variant?: "destructive" }) => void;
 type Translate = (key: string) => string;
 
-async function startOfflineBots(args: {
+function startOfflineBots(args: {
   name: string;
   botCount: number;
   botDifficulty: "easy" | "medium" | "hard";
@@ -198,7 +198,7 @@ export default function Home() {
   const handleCreate = async () => {
     if (!name) return toast({ title: t("error.nameRequired"), description: t("error.nameRequiredDesc"), variant: "destructive" });
     if (gameMode === "vs_bots") {
-      await startOfflineBots({ name, botCount, botDifficulty, setLocation, toast, t });
+      startOfflineBots({ name, botCount, botDifficulty, setLocation, toast, t });
       return;
     }
     const mode: NetworkMode = networkChoice || "server";

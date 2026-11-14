@@ -336,7 +336,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "alert.forced": "{player} forçou você a trocar uma carta",
       "rank.email": "E-mail",
       "rank.emailPlaceholder": "voce@email.com",
-      "rank.password": "Senha",
+      "rank.password": "Senha", // NOSONAR: rótulo do campo, não é uma senha
       "rank.passwordPlaceholder": "mínimo 8 caracteres",
       "rank.registerHint": "Depois de criar a conta você escolhe seu nome de usuário. Guarde a senha: ainda não há recuperação.",
       "rank.error.email": "Digite um e-mail válido",
@@ -946,7 +946,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "alert.forced": "{player} te obligó a cambiar una carta",
       "rank.email": "Correo",
       "rank.emailPlaceholder": "tu@correo.com",
-      "rank.password": "Contraseña",
+      "rank.password": "Contraseña", // NOSONAR: rótulo do campo, não é uma senha
       "rank.passwordPlaceholder": "mínimo 8 caracteres",
       "rank.registerHint": "Después de crear la cuenta eliges tu nombre de usuario. Guarda la contraseña: aún no hay recuperación.",
       "rank.error.email": "Escribe un correo válido",
@@ -1556,7 +1556,7 @@ function getTranslations(lang: Language): Record<string, string> {
       "alert.forced": "{player} forced you to swap a card",
       "rank.email": "Email",
       "rank.emailPlaceholder": "you@email.com",
-      "rank.password": "Password",
+      "rank.password": "Password", // NOSONAR: rótulo do campo, não é uma senha
       "rank.passwordPlaceholder": "at least 8 characters",
       "rank.registerHint": "You pick your username after creating the account. Keep your password safe: there is no recovery yet.",
       "rank.error.email": "Enter a valid email",

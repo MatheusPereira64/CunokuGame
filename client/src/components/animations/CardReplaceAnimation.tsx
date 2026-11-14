@@ -172,7 +172,7 @@ export function CardReplaceAnimation({
           </motion.div>
 
           {/* Linhas de conexão animadas mais visíveis */}
-          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }}>
+          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }} aria-hidden="true">
             {/* Linha da carta da mão para descarte (vermelha) */}
             <motion.path
               d={`M ${handCardPosition.x} ${handCardPosition.y} Q ${centerX} ${centerY - 40} ${discardPosition.x} ${discardPosition.y}`}
@@ -249,7 +249,7 @@ export function CardReplaceAnimation({
                 <div className="w-48 h-48 bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 rounded-full blur-3xl" />
               </motion.div>
               {/* Partículas de troca */}
-              {[...Array(8)].map((_, i) => {
+              {Array.from({ length: 8 }).map((_, i) => {
                 const angle = (i * 45) * Math.PI / 180;
                 return (
                   <motion.div

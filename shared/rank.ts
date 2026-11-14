@@ -101,7 +101,12 @@ export const PASSWORD_MAX = 128;
 /** E-mail em minúsculas, para login e unicidade; null se não parece um e-mail. */
 export function normalizeEmail(raw: string): string | null {
   const e = raw.trim().toLowerCase();
-  if (e.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return null;
+  if (e.length > 254 || /\s/.test(e)) return null;
+  // Exatamente um @, algo antes dele e um ponto no meio do domínio
+  const at = e.indexOf("@");
+  if (at < 1 || at !== e.lastIndexOf("@")) return null;
+  const domain = e.slice(at + 1);
+  if (!domain.slice(1, -1).includes(".")) return null;
   return e;
 }
 

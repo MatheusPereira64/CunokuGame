@@ -131,7 +131,7 @@ export function CardDiscardAnimation({
           </motion.div>
 
           {/* Linha de trajetória */}
-          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }}>
+          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }} aria-hidden="true">
             <motion.path
               d={`M ${sourcePosition.x} ${sourcePosition.y} Q ${midX} ${midY} ${targetPosition.x} ${targetPosition.y}`}
               fill="none"
@@ -183,7 +183,7 @@ export function CardDiscardAnimation({
           {/* Partículas de sucesso melhoradas para matched_discard */}
           {discardType === 'matched' && isSuccess && (
             <>
-              {[...Array(12)].map((_, i) => {
+              {Array.from({ length: 12 }).map((_, i) => {
                 const angle = (i * 30) * Math.PI / 180;
                 const distance = 100 + (i % 3) * 20;
                 return (
@@ -215,7 +215,7 @@ export function CardDiscardAnimation({
                 );
               })}
               {/* Estrelas de sucesso */}
-              {[...Array(5)].map((_, i) => (
+              {Array.from({ length: 5 }).map((_, i) => (
                 <motion.div
                   key={`star-${i}`}
                   initial={{

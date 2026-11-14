@@ -42,7 +42,7 @@ type RoomLive = {
   botTimer?: ReturnType<typeof setTimeout>;
 };
 
-export async function registerRoutes(
+export function registerRoutes(
   httpServer: Server,
   app: Express,
 ): Promise<Server> {
@@ -444,5 +444,5 @@ export async function registerRoutes(
     });
   });
 
-  return httpServer;
+  return Promise.resolve(httpServer);
 }

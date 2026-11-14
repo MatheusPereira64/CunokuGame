@@ -4,12 +4,12 @@ import { randomFloat } from "./secureRandom";
 export function seededRandom(seed: string): () => number {
   let hash = 1779033703 ^ seed.length;
   for (let i = 0; i < seed.length; i++) {
-    hash = Math.imul(hash ^ seed.charCodeAt(i), 3432918353);
+    hash = Math.imul(hash ^ seed.codePointAt(i)!, 3432918353);
     hash = (hash << 13) | (hash >>> 19);
   }
   let a = hash >>> 0;
   return () => {
-    a = (a + 0x6d2b79f5) | 0;
+    a = (a + 0x6d2b79f5) >>> 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;

@@ -42,7 +42,7 @@ function curveBetween(from: Position, to: Position, side: 1 | -1) {
  */
 export function CardSwapAnimation({ data, onComplete, duration = DEFAULT_DURATIONS.swap }: CardSwapAnimationProps) {
   const { t } = useI18n();
-  const markerId = useId().replace(/:/g, "");
+  const markerId = useId().replaceAll(":", "");
   const { player1Position, player2Position } = data;
   const trails = useMemo(
     () => [
@@ -60,7 +60,7 @@ export function CardSwapAnimation({ data, onComplete, duration = DEFAULT_DURATIO
 
   return (
     <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
-      <svg className="absolute inset-0 h-full w-full">
+      <svg className="absolute inset-0 h-full w-full" aria-hidden="true">
         <defs>
           {trails.map((trail, i) => (
             <marker key={i} id={`${markerId}-${i}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
