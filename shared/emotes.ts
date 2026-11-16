@@ -11,6 +11,8 @@ export const EMOTES = [
   { id: "hot", emoji: "🥵" },
   { id: "clown", emoji: "🤡" },
   { id: "smirk", emoji: "😏" },
+  { id: "woozy", emoji: "🥴" },
+  { id: "monocle", emoji: "🧐" },
 ] as const;
 
 export type EmoteId = (typeof EMOTES)[number]["id"];
