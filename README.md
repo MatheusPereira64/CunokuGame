@@ -9,33 +9,39 @@ Termine a partida com a **menor soma de cartas**, mesmo sem poder ver a própria
 [![Última versão](https://img.shields.io/github/v/release/MatheusPereira64/CunokuGame?label=vers%C3%A3o)](https://github.com/MatheusPereira64/CunokuGame/releases/latest)
 [![CI](https://github.com/MatheusPereira64/CunokuGame/actions/workflows/ci.yml/badge.svg)](https://github.com/MatheusPereira64/CunokuGame/actions/workflows/ci.yml)
 
-[**Jogar no navegador**](https://cunoku.cunokugame.workers.dev) · [**Baixar para Android**](https://github.com/MatheusPereira64/CunokuGame/releases/latest) · [Regras](#como-jogar) · [Rodar localmente](#rodar-localmente)
+[**Jogar no navegador**](https://cunoku.cunokugame.workers.dev) · [**Baixar o app**](https://github.com/MatheusPereira64/CunokuGame/releases/latest) · [Regras](#como-jogar) · [Rodar localmente](#rodar-localmente)
 
-<img src="docs/screenshots/mesa.jpg" alt="Mesa de jogo com dois bots, o baralho e a pilha de descarte" width="720">
+<img src="docs/screenshots/mesa.jpg" alt="Mesa com dois bots: uma carta de oponente aparece revelada, só para quem usou o poder" width="720">
 
 </div>
 
 ## O que tem no jogo
 
 - **Jogue como quiser:** sala com amigos por código ou link, fila rápida, partida contra bots (fácil, médio ou difícil) e Wi‑Fi local
-- **Competição:** desafio diário, liga semanal e ranking com contas salvas no aparelho
-- **Seu estilo:** ícones e cores de perfil, temas de mesa e emotes durante a partida
+- **Partidas online:** tempo de 60 segundos por vez, revanche com os mesmos jogadores e amigos e jogadores recentes para convidar direto da sala
+- **Competição:** desafio diário, liga semanal e ranking global com conta de e-mail e senha
+- **Aprenda jogando:** tutorial na primeira partida, uma dica na primeira vez que cada poder aparece e um aviso curto com a jogada de cada um
+- **Seu estilo:** ícones e cores de perfil, versos de carta e tapetes de mesa, e emotes durante a partida
 - **Três idiomas:** português, espanhol e inglês
-- **Em qualquer tela:** navegador e app Android, com layout próprio para celular deitado
+- **Em qualquer tela:** navegador, Android (APK) e iPhone (IPA sem assinatura, para instalar por sideload), com layout próprio para celular deitado
 
 ## Telas
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/menu.jpg" alt="Menu inicial do Cunoku"><br><sub>Menu inicial</sub></td>
-    <td width="50%"><img src="docs/screenshots/lobby.jpg" alt="Sala de espera com o código da sala e os assentos dos jogadores"><br><sub>Sala de espera, com um assento para cada jogador</sub></td>
+    <td width="50%"><img src="docs/screenshots/menu.jpg" alt="Menu inicial do Cunoku com os modos de jogo"><br><sub>Menu inicial</sub></td>
+    <td width="50%"><img src="docs/screenshots/lobby.jpg" alt="Sala de espera com o código da sala e dois jogadores sentados"><br><sub>Sala de espera, com um assento para cada jogador</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/habilidade.jpg" alt="Janela para usar a habilidade de troca de cartas"><br><sub>Janela de habilidade</sub></td>
-    <td><img src="docs/screenshots/troca.jpg" alt="Setas ligando a carta 1 do jogador à carta 4 do oponente"><br><sub>Troca: as setas ligam as duas cartas trocadas</sub></td>
+    <td><img src="docs/screenshots/dica.jpg" alt="Dica explicando o poder do 9 ao lado da carta comprada"><br><sub>Dica na primeira vez que cada poder aparece</sub></td>
+    <td><img src="docs/screenshots/habilidade.jpg" alt="Escolha das duas cartas da troca, ligadas por uma linha tracejada"><br><sub>Escolha do alvo direto na mesa</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/revelada.jpg" alt="Carta de um oponente revelada na mão aberta"><br><sub>Carta de oponente revelada, só para quem usou o poder</sub></td>
+    <td><img src="docs/screenshots/troca.jpg" alt="Setas ligando a carta 1 do jogador à carta 4 do oponente"><br><sub>Troca: as setas mostram para onde cada carta foi</sub></td>
+    <td><img src="docs/screenshots/aviso.jpg" alt="Aviso Baralho para Bot Alpha e balão comprou do baralho junto ao avatar"><br><sub>A jogada de cada um aparece num aviso curto</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/emotes.jpg" alt="Roda de emotes aberta sobre a mesa"><br><sub>Emotes durante a partida</sub></td>
     <td><img src="docs/screenshots/cunoku.jpg" alt="Anúncio de tela cheia com o texto CUNOKU"><br><sub>Quando alguém declara Cunoku, as rodadas finais começam</sub></td>
   </tr>
 </table>
@@ -64,6 +70,8 @@ Ter a **menor soma de cartas** quando a partida acabar. Cada jogador começa com
    - substituir uma carta da sua mão, descartando a antiga;
    - descartá-la direto na pilha;
    - usar o poder dela, se a carta veio do baralho. Carta pega do descarte não usa poder.
+
+Nas partidas online com 2 ou mais pessoas, cada vez tem **60 segundos**. Se o tempo acabar, o jogo compra e descarta pelo jogador.
 
 ### Poderes
 
@@ -95,7 +103,7 @@ As regras também ficam em [`docs/Rules.md`](docs/Rules.md) e dentro do próprio
 
 - **Desafio diário:** a mesma seed para todos contra 3 bots, com uma tentativa por dia (UTC), streak e ranking do dia
 - **Liga semanal:** soma os pontos do desafio e de partidas online com 2 ou mais pessoas com conta, e zera toda segunda (UTC)
-- **Contas:** apelido e PIN, com os resultados calculados no servidor e ligados à conta pelo token
+- **Contas:** e-mail e senha, com o nome de usuário escolhido depois do cadastro. Os resultados são calculados no servidor. Ainda não há recuperação de senha
 
 O desafio, a liga e as contas precisam de um servidor com banco de dados. Sem `DATABASE_URL`, eles ficam indisponíveis.
 
