@@ -1,0 +1,31 @@
+name: Discord announce
+
+# Reenvia o aviso de uma versão já publicada (ex.: para testar o webhook ou anunciar de novo).
+# O aviso automático de cada versão nova sai no fim do workflow Release.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versão já publicada, sem o v (ex.: 1.4.5)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    name: Avisar no Discord
+    runs-on: ubuntu-latest
+    steps:
+      - # actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Post release to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          export VERSION="${INPUT_VERSION#v}"
+          export ASSETS="$(gh release view "v$VERSION" --json assets -q '.assets[].name' | tr '\n' ' ')"
+          node script/discord-release.mjs
