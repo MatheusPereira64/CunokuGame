@@ -109,6 +109,18 @@ export function useGameAnimations({
     return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   }, []);
 
+  // Carta comprada: a sua fica no centro da mesa; a do oponente, junto da mão dele
+  const getDrawnPosition = useCallback((owner: string, fallback: () => Position): Position => {
+    if (owner === playerId) {
+      const el = document.querySelector('[data-drawn-card]');
+      if (el?.isConnected) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0) return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      }
+    }
+    return fallback();
+  }, [playerId]);
+
   // Obtém nome de jogador
   const getPlayerName = useCallback((playerIdArg: string): string => {
     if (!gameState) return 'Jogador';
@@ -141,7 +153,9 @@ export function useGameAnimations({
       card,
       source,
       sourcePosition: source === 'deck' ? getDeckPosition() : getDiscardPosition(),
-      targetPosition: getCardPosition(targetPlayer, cardIndex),
+      targetPosition: targetCardIndex === undefined
+        ? getDrawnPosition(targetPlayer, () => getCardPosition(targetPlayer, cardIndex))
+        : getCardPosition(targetPlayer, cardIndex),
       playerId: targetPlayer,
       playerName: getPlayerName(targetPlayer),
     };
@@ -151,7 +165,7 @@ export function useGameAnimations({
       data,
       priority: 1,
     });
-  }, [playerId, getDeckPosition, getDiscardPosition, getCardPosition, getPlayerName, enqueue]);
+  }, [playerId, getDeckPosition, getDiscardPosition, getCardPosition, getDrawnPosition, getPlayerName, enqueue]);
 
   // Animação de descarte
   const animateDiscard = useCallback((
@@ -167,8 +181,8 @@ export function useGameAnimations({
     const data: DiscardAnimationData = {
       card,
       discardType,
-      sourcePosition: discardType === 'drawn' 
-        ? getDeckPosition() // Carta comprada vem do centro
+      sourcePosition: discardType === 'drawn'
+        ? getDrawnPosition(sourcePlayer, () => getCardPosition(sourcePlayer, 0))
         : getCardPosition(sourcePlayer, cardIndex),
       targetPosition: getDiscardPosition(),
       playerId: sourcePlayer,
@@ -181,7 +195,7 @@ export function useGameAnimations({
       data,
       priority: 2,
     });
-  }, [playerId, getDeckPosition, getDiscardPosition, getCardPosition, getPlayerName, enqueue]);
+  }, [playerId, getDeckPosition, getDiscardPosition, getCardPosition, getDrawnPosition, getPlayerName, enqueue]);
 
   // Animação de substituição
   const animateReplace = useCallback((
@@ -195,7 +209,7 @@ export function useGameAnimations({
     const data: ReplaceAnimationData = {
       drawnCard,
       handCard,
-      drawnCardPosition: getDeckPosition(), // Posição central onde a carta comprada está
+      drawnCardPosition: getDrawnPosition(targetPlayer, getDeckPosition),
       handCardPosition: getCardPosition(targetPlayer, handIndex),
       discardPosition: getDiscardPosition(),
       playerId: targetPlayer,
@@ -208,7 +222,7 @@ export function useGameAnimations({
       data,
       priority: 2,
     });
-  }, [playerId, getDeckPosition, getDiscardPosition, getCardPosition, getPlayerName, enqueue]);
+  }, [playerId, getDeckPosition, getDiscardPosition, getCardPosition, getDrawnPosition, getPlayerName, enqueue]);
 
   // Animação de troca
   const animateSwap = useCallback((

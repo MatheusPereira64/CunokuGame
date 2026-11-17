@@ -1,7 +1,13 @@
 import type { GameState, InsertMatchResult, MatchReward, Player, Room } from "@shared/schema";
 import {
   aggregateLeague,
+  computeDivisions,
   computeStreak,
+  DIVISIONS,
+  divisionMoves,
+  divisionZone,
+  standingsByDivision,
+  type Division,
   DAILY_BOT_COUNT,
   DAILY_BOT_DIFFICULTY,
   dailyPoints,
@@ -134,6 +140,7 @@ function toLeagueRow(
   standing: LeagueStanding,
   summaries: Map<string, RankSummary>,
   accountId: string | null,
+  division?: { id: Division; count: number },
 ) {
   const { rankPlayerId, ...row } = standing;
   const summary = summaries.get(rankPlayerId);
@@ -142,6 +149,7 @@ function toLeagueRow(
     name: summary?.displayName ?? row.name,
     tier: summary?.rank ?? ("bronze" as const),
     isMe: rankPlayerId === accountId,
+    ...(division ? { division: division.id, zone: divisionZone(division.id, standing.rank, division.count) } : {}),
   };
 }
 
@@ -154,20 +162,36 @@ export async function getLeagueStandings(
   const accountId = (await accountIdFor(store, token))?.id ?? null;
   const week = weekKey(now);
   const lastWeek = previousWeekKey(now);
-  const standings = aggregateLeague(await store.getResultsForWeek(week));
+  const weekRows = await store.getResultsForWeek(week);
+  const standings = aggregateLeague(weekRows);
   const podium = aggregateLeague(await store.getResultsForWeek(lastWeek)).slice(0, 3);
   const top = standings.slice(0, LEAGUE_TOP_SIZE);
-  const me = accountId ? standings.find((s) => s.rankPlayerId === accountId) : undefined;
 
-  const visible = [...top, ...podium, ...(me ? [me] : [])].map((s) => s.rankPlayerId);
+  // Divisões: cada conta disputa a semana só com quem está na mesma divisão
+  const divisions = computeDivisions(await store.getResultsBeforeWeek(week), week);
+  const divisionOf = (id: string): Division => divisions.get(id) ?? "bronze";
+  const tables = standingsByDivision(weekRows, divisionOf);
+  const myDivision = accountId ? divisionOf(accountId) : "bronze";
+  const me = accountId ? tables[myDivision].find((s) => s.rankPlayerId === accountId) : undefined;
+  const divisionTops = DIVISIONS.map((id) => ({ id, rows: tables[id].slice(0, LEAGUE_TOP_SIZE) }));
+
+  const visible = [...top, ...podium, ...(me ? [me] : []), ...divisionTops.flatMap((d) => d.rows)].map((s) => s.rankPlayerId);
   const summaries = await store.getAccountSummaries(Array.from(new Set(visible)));
+  const inDivision = (id: Division) => ({ id, count: tables[id].length });
 
   return {
     week,
     resetsAt: nextWeekStart(now).toISOString(),
     totalPlayers: standings.length,
     top: top.map((s) => toLeagueRow(s, summaries, accountId)),
-    me: me ? toLeagueRow(me, summaries, accountId) : null,
+    me: me ? toLeagueRow(me, summaries, accountId, inDivision(myDivision)) : null,
+    myDivision,
+    divisions: divisionTops.map((d) => ({
+      id: d.id,
+      totalPlayers: tables[d.id].length,
+      ...divisionMoves(d.id, tables[d.id].length),
+      top: d.rows.map((s) => toLeagueRow(s, summaries, accountId, inDivision(d.id))),
+    })),
     lastWeek: {
       week: lastWeek,
       podium: podium.map((s) => toLeagueRow(s, summaries, accountId)),

@@ -4,6 +4,7 @@ import { GameState, Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
 import { EmoteBubble } from "./EmotePicker";
+import { DeclarerBadge } from "./PlayerSeat";
 import { PersonalAlertBubble } from "./seatNotice";
 import { swapCardStyle, useSwapHighlights } from "./swapHighlight";
 import { SwapBadge } from "./SwapBadge";
@@ -242,6 +243,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
 
       <div className={cn("absolute right-full bottom-0", fit(isCompact, "mr-1", "mr-3"))} data-player-target={me.id}>
         <Avatar name={me.name} detail={seatDetail(me, gameState.skipNextTurnIds, t)} isActive={isMyTurn} position="left" compact={isCompact} iconId={profile.iconId} accent={profile.accent} />
+        <DeclarerBadge show={!gameState.winnerId && !!gameState.isFinalRound && gameState.finalRoundDeclarerId === me.id} />
         <EmoteBubble emoteId={emoteId} className="right-full top-0 mr-1" />
       </div>
 

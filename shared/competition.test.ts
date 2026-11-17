@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   aggregateLeague,
+  computeDivisions,
+  divisionMoves,
+  divisionZone,
   computeStreak,
   dailyPoints,
   nextDayStart,
@@ -95,5 +98,46 @@ describe("seededRandom", () => {
     expect(sequence("a")).toEqual(sequence("a"));
     expect(sequence("a")).not.toEqual(sequence("b"));
     expect(sequence("a").every((n) => n >= 0 && n < 1)).toBe(true);
+  });
+});
+
+describe("divisões da liga", () => {
+  const at = new Date("2026-11-02T12:00:00Z");
+  const row = (id: string, week: string, points: number) => ({
+    rankPlayerId: id,
+    displayName: id,
+    won: points > 5,
+    score: 5,
+    points,
+    createdAt: at,
+    week,
+  });
+
+  it("quem fica no topo sobe e quem fica no fim desce ao fechar a semana", () => {
+    const players = ["a", "b", "c", "d", "e"];
+    // Semana 1: todos no bronze, os primeiros 20% (1 conta) sobem para a prata
+    const week1 = players.map((id, i) => row(id, "2026-W40", 50 - i * 10));
+    const after1 = computeDivisions(week1, "2026-W41");
+    expect(after1.get("a")).toBe("silver");
+    expect(after1.get("b")).toBe("bronze");
+    // Semana 2: "a" sozinho na prata sobe de novo; no bronze sobe o melhor
+    const week2 = [row("a", "2026-W41", 1), row("e", "2026-W41", 40), row("b", "2026-W41", 3)];
+    const after2 = computeDivisions([...week1, ...week2], "2026-W42");
+    expect(after2.get("a")).toBe("gold");
+    expect(after2.get("e")).toBe("silver");
+    expect(after2.get("b")).toBe("bronze");
+  });
+
+  it("a semana atual não conta para a divisão", () => {
+    expect(computeDivisions([row("a", "2026-W41", 99)], "2026-W41").get("a")).toBeUndefined();
+  });
+
+  it("marca as zonas de subida e queda", () => {
+    expect(divisionMoves("silver", 10)).toEqual({ promote: 2, demote: 2 });
+    expect(divisionZone("silver", 1, 10)).toBe("promote");
+    expect(divisionZone("silver", 9, 10)).toBe("demote");
+    expect(divisionZone("silver", 5, 10)).toBeNull();
+    expect(divisionMoves("bronze", 2)).toEqual({ promote: 1, demote: 0 });
+    expect(divisionMoves("gold", 2)).toEqual({ promote: 0, demote: 0 });
   });
 });

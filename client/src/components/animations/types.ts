@@ -150,8 +150,8 @@ export interface AnimationConfig {
 
 // Durações padrão para cada tipo de animação (em ms)
 export const DEFAULT_DURATIONS: Record<AnimationType, number> = {
-  draw: 500,
-  discard: 400,
+  draw: 650,
+  discard: 650,
   replace: 600,
   swap: 2000,
   peek: 1500,

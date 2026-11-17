@@ -1,208 +1,108 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, useAnimate } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useLatest } from "./useLatest";
 import { PlayingCard } from "../PlayingCard";
 import { DrawAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
 import { useI18n } from "@/contexts/i18n-context";
+import { useIsCompactGame } from "@/hooks/use-landscape";
+import { cn } from "@/lib/utils";
+import { flyingCardSize, measureCenter } from "./flyingCard";
 
 interface CardDrawAnimationProps extends BaseAnimationProps {
   data: DrawAnimationData;
-  isOwnPlayer?: boolean; // Se é o jogador atual (para mostrar a carta)
+  isOwnPlayer?: boolean;
 }
 
-export function CardDrawAnimation({
-  data,
-  onComplete,
-  duration = DEFAULT_DURATIONS.draw,
-  isOwnPlayer = false
-}: CardDrawAnimationProps) {
+/**
+ * Compra: a carta desliza do topo da pilha, sobe em arco e pousa onde quem comprou vai usá-la
+ * (o espaço da carta comprada, para você; a mão, para o oponente).
+ * A face só aparece para quem comprou do baralho; do descarte ela já era pública.
+ */
+export function CardDrawAnimation({ data, onComplete, duration = DEFAULT_DURATIONS.draw, isOwnPlayer = false }: CardDrawAnimationProps) {
   const { t } = useI18n();
-  const [isVisible, setIsVisible] = useState(true);
-  const [showCardFace, setShowCardFace] = useState(false);
-
-  const { card, source, sourcePosition, targetPosition, playerName } = data;
-
-  // Calcula o ponto médio para o arco (mais alto para melhor visibilidade)
-  const midX = (sourcePosition.x + targetPosition.x) / 2;
-  const arcHeight = Math.max(120, Math.abs(targetPosition.y - sourcePosition.y) * 0.6);
-  const midY = Math.min(sourcePosition.y, targetPosition.y) - arcHeight;
+  const isCompact = useIsCompactGame();
+  const { card, source, sourcePosition, playerName } = data;
+  const size = flyingCardSize(isCompact);
+  const fromDeck = source === "deck";
+  const [scope, animate] = useAnimate();
+  const [faceUp, setFaceUp] = useState(!fromDeck);
 
   const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
-    // Mostra a face da carta quando está no meio do caminho
-    const showFaceTimer = setTimeout(() => {
-      setShowCardFace(true);
-    }, duration * 0.3);
-
-    // Completa a animação
-    const completeTimer = setTimeout(() => {
-      setIsVisible(false);
-      setTimeout(() => onCompleteRef.current(), 100);
-    }, duration);
-
-    return () => {
-      clearTimeout(showFaceTimer);
-      clearTimeout(completeTimer);
+    let cancelled = false;
+    const seconds = duration / 1000;
+    const start = { x: sourcePosition.x - size.halfW, y: sourcePosition.y - size.halfH };
+    const run = async () => {
+      const guess = data.targetPosition;
+      const peak = {
+        x: (sourcePosition.x + guess.x) / 2 - size.halfW,
+        y: Math.min(sourcePosition.y, guess.y) - (isCompact ? 45 : 80) - size.halfH,
+      };
+      // 1) Desliza do topo da pilha e sobe
+      await animate(
+        scope.current,
+        { x: [start.x, start.x + (fromDeck ? 10 : -10), peak.x], y: [start.y, start.y - 10, peak.y], scale: [1, 1.06, 1.15], rotate: [0, fromDeck ? 6 : -6, fromDeck ? 12 : -12] },
+        { duration: seconds * 0.5, ease: "easeOut" },
+      );
+      if (cancelled) return;
+      if (isOwnPlayer) setFaceUp(true);
+      // 2) Mede o destino agora: o espaço da carta comprada aparece durante o voo
+      const landing = (isOwnPlayer ? measureCenter("[data-drawn-card]") : null) ?? guess;
+      await animate(scope.current, { x: landing.x - size.halfW, y: landing.y - size.halfH, scale: 1, rotate: 0 }, { duration: seconds * 0.45, ease: [0.4, 0, 0.2, 1] });
+      if (cancelled) return;
+      onCompleteRef.current();
     };
-  }, [duration, onCompleteRef]);
-
-  if (!isVisible) return null;
-
-  const sourceLabel = source === 'deck' ? `🃏 ${t("anim.fromDeck")}` : `📤 ${t("anim.fromDiscard")}`;
-  const sourceColor = source === 'deck' ? 'blue' : 'amber';
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // A animação roda uma vez por evento de compra
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <div className="fixed inset-0 pointer-events-none z-[9999]">
-          {/* Overlay sutil */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.2 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black"
-          />
+    <div className="fixed inset-0 pointer-events-none z-[9999]">
+      {/* Brilho curto no topo da pilha de onde a carta saiu */}
+      <motion.div
+        initial={{ scale: 0.7, opacity: 0.7 }}
+        animate={{ scale: 1.6, opacity: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className={cn("absolute rounded-2xl border-4", fromDeck ? "border-sky-300" : "border-amber-300")}
+        style={{ left: sourcePosition.x - size.halfW, top: sourcePosition.y - size.halfH, width: size.halfW * 2, height: size.halfH * 2 }}
+      />
 
-          {/* Carta animada com movimento suave em arco */}
-          <motion.div
-            initial={{
-              x: sourcePosition.x - 48,
-              y: sourcePosition.y - 68,
-              scale: 0.8,
-              rotate: 0,
-              opacity: 0,
-            }}
-            animate={{
-              x: [sourcePosition.x - 48, midX - 48, targetPosition.x - 48],
-              y: [sourcePosition.y - 68, midY - 68, targetPosition.y - 68],
-              scale: [0.8, 1.3, 1],
-              rotate: [0, source === 'deck' ? 15 : -15, 0],
-              opacity: [0, 1, 1],
-            }}
-            transition={{
-              duration: duration / 1000,
-              ease: [0.25, 0.1, 0.25, 1], // easeInOut mais suave
-              times: [0, 0.5, 1],
-            }}
-            style={{
-              position: 'absolute',
-              zIndex: 10000,
-              filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.6))',
-            }}
-          >
-            <PlayingCard 
-              card={showCardFace && isOwnPlayer ? card : undefined} 
-              hidden={!showCardFace || !isOwnPlayer} 
-              className="w-24 h-36" 
-              animate={false}
-            />
-          </motion.div>
+      <div
+        ref={scope}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          zIndex: 10000,
+          transform: `translate(${sourcePosition.x - size.halfW}px, ${sourcePosition.y - size.halfH}px)`,
+          filter: "drop-shadow(0 16px 24px rgba(0,0,0,0.55))",
+        }}
+      >
+        <PlayingCard card={card} hidden={!faceUp} className={size.className} animate={false} />
+      </div>
 
-          {/* Linha de trajetória para melhor clareza */}
-          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }} aria-hidden="true">
-            <motion.path
-              d={`M ${sourcePosition.x} ${sourcePosition.y} Q ${midX} ${midY} ${targetPosition.x} ${targetPosition.y}`}
-              fill="none"
-              stroke={`rgba(59, 130, 246, 0.4)`}
-              strokeWidth="3"
-              strokeDasharray="10,5"
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: 1, opacity: 0.6 }}
-              transition={{ duration: duration / 1000 * 0.8, ease: "easeOut" }}
-            />
-          </svg>
-
-          {/* Indicador de origem melhorado */}
-          <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="absolute top-8 left-1/2 transform -translate-x-1/2 z-[10001]"
-          >
-            <div className={`bg-gradient-to-r ${
-              source === 'deck' 
-                ? 'from-blue-600 to-indigo-600' 
-                : 'from-amber-600 to-orange-600'
-            } backdrop-blur-md rounded-xl px-6 py-3 shadow-xl border-2 ${
-              source === 'deck' 
-                ? 'border-blue-400' 
-                : 'border-amber-400'
-            }`}>
-              <div className="text-white font-bold text-lg flex items-center gap-3">
-                <motion.span
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.5 }}
-                  className="text-2xl"
-                >
-                  {sourceLabel}
-                </motion.span>
-                <motion.span
-                  animate={{ x: [0, 5, 0] }}
-                  transition={{ duration: 0.8, repeat: Infinity }}
-                  className="text-xl"
-                >
-                  →
-                </motion.span>
-                <span className="font-semibold">{playerName}</span>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Efeito de brilho pulsante na origem */}
-          <motion.div
-            animate={{ 
-              scale: [1, 1.3, 1],
-              opacity: [0.4, 0.7, 0.4]
-            }}
-            transition={{ 
-              duration: 0.8,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            style={{
-              position: 'absolute',
-              left: sourcePosition.x,
-              top: sourcePosition.y,
-              x: '-50%',
-              y: '-50%',
-            }}
-          >
-            <div className={`w-32 h-32 rounded-full blur-2xl ${
-              source === 'deck' 
-                ? 'bg-blue-400' 
-                : 'bg-amber-400'
-            }`} />
-          </motion.div>
-
-          {/* Efeito de brilho no destino */}
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ 
-              scale: [0, 1.2, 1],
-              opacity: [0, 0.6, 0]
-            }}
-            transition={{ 
-              duration: duration / 1000,
-              times: [0, 0.7, 1]
-            }}
-            style={{
-              position: 'absolute',
-              left: targetPosition.x,
-              top: targetPosition.y,
-              x: '-50%',
-              y: '-50%',
-            }}
-          >
-            <div className={`w-28 h-28 rounded-full blur-xl ${
-              source === 'deck' 
-                ? 'bg-blue-400' 
-                : 'bg-amber-400'
-            }`} />
-          </motion.div>
+      {/* Aviso curto junto da pilha de origem */}
+      <motion.div
+        initial={{ opacity: 0, y: 8, scale: 0.9 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 380, damping: 26 }}
+        className="absolute z-[10001]"
+        style={{ left: sourcePosition.x, top: sourcePosition.y - size.halfH - (isCompact ? 30 : 44) }}
+      >
+        <div
+          className={cn(
+            "-translate-x-1/2 whitespace-nowrap rounded-full border-2 font-bold text-white shadow-lg",
+            fromDeck ? "bg-sky-700 border-sky-300" : "bg-amber-600 border-amber-300",
+            isCompact ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-xs",
+          )}
+        >
+          {fromDeck ? t("anim.fromDeck") : t("anim.fromDiscard")} · {playerName}
         </div>
-      )}
-    </AnimatePresence>
+      </motion.div>
+    </div>
   );
 }

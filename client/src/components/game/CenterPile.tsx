@@ -84,10 +84,11 @@ export function CenterPile({
           <motion.div
             initial={{ scale: 0, y: -30 }}
             animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0, opacity: 0 }}
+            transition={{ delay: 0.55 }}
+            exit={{ scale: 0, opacity: 0, transition: { duration: 0.12 } }}
             className={cn("relative z-20 flex items-center", fit(isCompact, "gap-1", "gap-2"))}
           >
-            <div className="relative">
+            <div className="relative" data-drawn-card>
               {!isCompact && (
                 <div className="absolute -top-7 left-0 right-0 text-center font-bold text-yellow-400 drop-shadow-md whitespace-nowrap text-xs">
                   {t("game.drawnCard")}
@@ -153,7 +154,7 @@ export function CenterPile({
       </AnimatePresence>
 
       {/* Pilha de descarte */}
-      <div className="relative" ref={discardRef}>
+      <div className="relative" ref={discardRef} data-discard-pile>
         {gameState.discardPile.length > 0 ? (
           <div className="relative">
             <div className={cn(labelClass, "text-white/50")}>{isCompact ? t("game.discardPileShort") : t("game.discardPile")}</div>

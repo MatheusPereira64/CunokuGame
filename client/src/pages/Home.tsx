@@ -41,20 +41,29 @@ import {
 type Notice = (opts: { title: string; description?: string; variant?: "destructive" }) => void;
 type Translate = (key: string) => string;
 
+/** "professor" só existe no menu: os bots jogam no médio e o Professor comenta as jogadas. */
+type MenuDifficulty = "easy" | "medium" | "hard" | "professor";
+
+function botLevel(difficulty: MenuDifficulty): "easy" | "medium" | "hard" {
+  return difficulty === "professor" ? "medium" : difficulty;
+}
+
 function startOfflineBots(args: {
   name: string;
   botCount: number;
-  botDifficulty: "easy" | "medium" | "hard";
+  botDifficulty: MenuDifficulty;
   setLocation: (path: string) => void;
   toast: Notice;
   t: Translate;
 }) {
   try {
-    const { gameState, playerId } = createOfflineGame(args.name, args.botCount, args.botDifficulty);
+    const level = botLevel(args.botDifficulty);
+    const { gameState, playerId } = createOfflineGame(args.name, args.botCount, level);
     if (!gameState?.players?.length) throw new Error("Failed to create game state");
     sessionStorage.setItem(`offline_game_${playerId}`, JSON.stringify(gameState));
     sessionStorage.setItem(`offline_player_${playerId}`, playerId);
-    sessionStorage.setItem(`offline_difficulty_${playerId}`, args.botDifficulty);
+    sessionStorage.setItem(`offline_difficulty_${playerId}`, level);
+    if (args.botDifficulty === "professor") sessionStorage.setItem(`offline_professor_${playerId}`, "1");
     setTimeout(() => {
       args.setLocation(`/game/offline?player=${playerId}&mode=offline`);
     }, 100);
@@ -155,7 +164,7 @@ export default function Home() {
   const [roomCode, setRoomCode] = useState("");
   const [mode, setMode] = useState<"create" | "join" | "bots" | null>(null);
   const [gameMode, setGameMode] = useState<"multiplayer" | "vs_bots">("multiplayer");
-  const [botDifficulty, setBotDifficulty] = useState<"easy" | "medium" | "hard">("medium");
+  const [botDifficulty, setBotDifficulty] = useState<MenuDifficulty>("medium");
   const [botCount, setBotCount] = useState<number>(2);
   const [botCountOpen, setBotCountOpen] = useState(false);
   const [botDifficultyOpen, setBotDifficultyOpen] = useState(false);
@@ -210,7 +219,7 @@ export default function Home() {
         gameMode: "multiplayer",
         maxPlayers,
         botCount: includeBots ? botCount : 0,
-        botDifficulty: includeBots ? botDifficulty : undefined,
+        botDifficulty: includeBots ? botLevel(botDifficulty) : undefined,
       });
       sessionStorage.setItem(`player_${result.code}`, result.playerId);
       sessionStorage.setItem(`playerName_${result.code}`, name);
@@ -595,7 +604,7 @@ export default function Home() {
                       <Label htmlFor="createBotDifficulty">{t("create.botDifficulty")}</Label>
                       <Select 
                         value={botDifficulty} 
-                        onValueChange={(value: "easy" | "medium" | "hard") => {
+                        onValueChange={(value: MenuDifficulty) => {
                           setBotDifficulty(value);
                           setBotDifficultyOpen(false);
                         }}
@@ -710,7 +719,7 @@ export default function Home() {
                     <Label htmlFor="botDifficulty">{t("bots.botDifficulty")}</Label>
                     <Select 
                       value={botDifficulty} 
-                      onValueChange={(value: "easy" | "medium" | "hard") => {
+                      onValueChange={(value: MenuDifficulty) => {
                         setBotDifficulty(value);
                         setBotDifficultyOpen(false);
                       }}
@@ -731,6 +740,7 @@ export default function Home() {
                         <SelectItem value="easy">{t("create.difficulty.easy")}</SelectItem>
                         <SelectItem value="medium">{t("create.difficulty.medium")}</SelectItem>
                         <SelectItem value="hard">{t("create.difficulty.hard")}</SelectItem>
+                        <SelectItem value="professor">{t("create.difficulty.professor")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -106,9 +106,76 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36'%3E%3Ccircle cx='18' cy='18' r='10' fill='none' stroke='%23d4af37' stroke-opacity='0.14' stroke-width='1'/%3E%3C/svg%3E");
 }
 
+/* Washi (tema claro): papel creme com borda de madeira clara */
+.felt-washi {
+  background-color: #e8dcc2;
+  border-color: #a07c55;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 44 44'%3E%3Cg fill='none' stroke='%237a5a3a' stroke-opacity='0.13' stroke-width='1'%3E%3Cpath d='M22 2 L42 22 L22 42 L2 22 Z'/%3E%3Ccircle cx='22' cy='22' r='5'/%3E%3C/g%3E%3C/svg%3E");
+}
+/* No papel claro, os textos brancos e amarelos da mesa ficam escuros para dar leitura */
+.felt-washi .text-white\/50,
+.felt-washi .text-white\/20 {
+  color: rgba(60, 38, 18, 0.65);
+}
+.felt-washi .text-yellow-400 {
+  color: #9a5b00;
+}
+.felt-washi::before {
+  background: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(80, 50, 20, 0.22) 100%);
+}
+
+/* Kin: laca preta com folha de ouro */
+.felt-kin {
+  background-color: #1d1606;
+  border-color: #5a4310;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M16 0 L32 16 L16 32 L0 16 Z' fill='none' stroke='%23f2c94c' stroke-opacity='0.16' stroke-width='1'/%3E%3C/svg%3E");
+}
+
+/* Natal: verde-pinheiro com flocos de neve (só em dezembro) */
+.felt-natal {
+  background-color: #14432c;
+  border-color: #6e1420;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='46' height='46' viewBox='0 0 46 46'%3E%3Cg stroke='%23ffffff' stroke-opacity='0.13' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M12 5 V19 M5 12 H19 M7 7 L17 17 M17 7 L7 17'/%3E%3Cpath d='M34 27 V39 M28 33 H40 M30 29 L38 37 M38 29 L30 37'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Rodadas finais depois do Cunoku: a luz se fecha no centro e a borda pulsa em vermelho */
+.felt-final::before {
+  background:
+    radial-gradient(ellipse 50% 40% at 50% 46%, rgba(255, 236, 200, 0.08), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.12) 30%, rgba(0, 0, 0, 0.6) 100%);
+  transition: background 0.6s ease;
+}
+@keyframes felt-final-pulse {
+  0%, 100% { outline-color: rgba(239, 68, 68, 0.25); }
+  50% { outline-color: rgba(239, 68, 68, 0.75); }
+}
+.felt-final {
+  outline: 3px solid rgba(239, 68, 68, 0.45);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .felt-final { animation: felt-final-pulse 1.6s ease-in-out infinite; }
+}
+
+/* Emotes animados: cada emoji tem um jeito de se mexer no balão */
+@keyframes emote-bounce { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-7px); } 60% { transform: translateY(-4px); } }
+@keyframes emote-wobble { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-14deg); } 75% { transform: rotate(14deg); } }
+@keyframes emote-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
+@keyframes emote-shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
+@keyframes emote-spin { 0% { transform: rotateY(0); } 100% { transform: rotateY(360deg); } }
+@keyframes emote-drip { 0%, 100% { transform: translateY(0) scaleY(1); } 50% { transform: translateY(2px) scaleY(0.92); } }
+@media (prefers-reduced-motion: no-preference) {
+  .emote-bounce { animation: emote-bounce 0.8s ease-in-out infinite; }
+  .emote-wobble { animation: emote-wobble 0.7s ease-in-out infinite; }
+  .emote-pulse { animation: emote-pulse 0.7s ease-in-out infinite; }
+  .emote-shake { animation: emote-shake 0.4s linear infinite; }
+  .emote-spin { animation: emote-spin 1.2s linear infinite; }
+  .emote-drip { animation: emote-drip 1s ease-in-out infinite; }
+}
+
 @media (max-width: 768px), (max-height: 500px) {
   .felt-table {
-    border: 8px solid #3b2420;
+    border-width: 8px;
     border-radius: 24px;
   }
 }
@@ -147,6 +214,19 @@ button, [role="button"], .felt-table {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Giro 3D da carta: entra de lado, passa da frente e assenta (a face troca no meio do giro) */
+@keyframes card-flip-reveal {
+  0% { transform: perspective(700px) rotateY(-90deg) scale(1.08); }
+  60% { transform: perspective(700px) rotateY(12deg) scale(1.08); }
+  100% { transform: perspective(700px) rotateY(0deg) scale(1); }
+}
+@keyframes card-flip-hide {
+  0% { transform: perspective(700px) rotateY(90deg); }
+  100% { transform: perspective(700px) rotateY(0deg); }
+}
+.card-flip-reveal { animation: card-flip-reveal 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.card-flip-hide { animation: card-flip-hide 0.3s ease-out both; }
 
 .card-shadow {
   box-shadow: 0 1px 2px rgba(0,0,0,0.35), 0 6px 14px rgba(0,0,0,0.35);

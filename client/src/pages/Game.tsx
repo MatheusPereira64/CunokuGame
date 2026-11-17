@@ -2,7 +2,11 @@ import { useEffect, useState, useRef, useCallback, useSyncExternalStore } from "
 import { useRoute, useLocation } from "wouter";
 import { useGameSocket } from "@/hooks/use-game-socket";
 import { useOfflineGame } from "@/hooks/use-offline-game";
-import { GameState, Card } from "@shared/schema";
+import { useTurnWarning } from "@/hooks/use-turn-warning";
+import { GameState, Card, type GameAction } from "@shared/schema";
+import { EMPTY_TALLY, evaluateFeats, tallyAction, type FeatId, type MatchTally } from "@shared/matchFeats";
+import { coachTip, type CoachTip } from "@shared/coach";
+import { addFeats, loadFeats } from "@/lib/feats";
 import { WIND_EFFECT_ID, type EmoteId } from "@shared/emotes";
 import { JOKER_REVEAL_MS, KING_REVEAL_MS, revealCards, type CardReveal } from "@shared/cardPowers";
 import { START_COUNTDOWN_MS } from "@shared/matchQueue";
@@ -183,7 +187,46 @@ export default function Game() {
     const id = window.setInterval(tick, 200);
     return () => window.clearInterval(id);
   }, [fromQueue, isOffline, gameState, socketRef]);
-  const sendAction = isOffline ? sendOfflineAction : sendOnlineAction;
+  const rawSendAction = isOffline ? sendOfflineAction : sendOnlineAction;
+
+  // Professor: partida offline criada com a dificuldade "professor" (os bots jogam no médio)
+  const vsProfessor = isOffline && sessionStorage.getItem(`offline_professor_${playerId}`) === "1";
+  const [professorTip, setProfessorTip] = useState<(CoachTip & { id: number }) | null>(null);
+  const clearProfessorTip = useCallback(() => setProfessorTip(null), []);
+
+  // Cada jogada enviada conta para as conquistas e, contra o Professor, ganha um comentário
+  const tallyRef = useRef<MatchTally>(EMPTY_TALLY);
+  const gameStateRef = useRef(gameState);
+  gameStateRef.current = gameState;
+  const sendAction = useCallback(
+    (action: GameAction) => {
+      const state = gameStateRef.current;
+      if (state) {
+        tallyRef.current = tallyAction(tallyRef.current, state, playerId, action);
+        const myIndex = state.players.findIndex((p) => p.id === playerId);
+        const tip = vsProfessor && myIndex === state.currentPlayerIndex ? coachTip(state, myIndex, action) : null;
+        if (tip) setProfessorTip({ ...tip, id: Date.now() });
+      }
+      rawSendAction(action);
+    },
+    [rawSendAction, playerId, vsProfessor],
+  );
+
+  // Conquistas: avaliadas uma vez quando a partida termina; a revanche zera a contagem
+  const [newFeats, setNewFeats] = useState<readonly FeatId[]>([]);
+  useEffect(() => {
+    const state = gameStateRef.current;
+    if (!state?.winnerId) {
+      tallyRef.current = EMPTY_TALLY;
+      setNewFeats([]);
+      return;
+    }
+    const earned = evaluateFeats({ state, playerId, tally: tallyRef.current, vsProfessor, already: loadFeats() });
+    if (earned.length === 0) return;
+    addFeats(earned);
+    setNewFeats(earned);
+    setTimeout(() => audioManager.playAchievement(), 1200);
+  }, [gameState?.winnerId, playerId, vsProfessor]);
 
   const {
     deckRef,
@@ -444,6 +487,9 @@ export default function Game() {
     prevIsMyTurn.current = !!isMyTurn;
   }, [isMyTurn, gameState?.winnerId]);
 
+  // Faltando 10 segundos: som, vibração e notificação com o app em segundo plano
+  useTurnWarning(gameState, !!isMyTurn, { title: t("game.timeWarningTitle"), body: t("game.timeWarningBody") });
+
   // Música da partida
   useEffect(() => {
     if (gameState && !gameState.winnerId) {
@@ -650,6 +696,7 @@ export default function Game() {
       sessionStorage.setItem(`offline_game_${fresh.playerId}`, JSON.stringify(fresh.gameState));
       sessionStorage.setItem(`offline_player_${fresh.playerId}`, fresh.playerId);
       sessionStorage.setItem(`offline_difficulty_${fresh.playerId}`, difficulty);
+      if (vsProfessor) sessionStorage.setItem(`offline_professor_${fresh.playerId}`, "1");
       window.location.assign(`/game/offline?player=${fresh.playerId}&mode=offline`);
       return;
     }
@@ -750,6 +797,9 @@ export default function Game() {
       onEmote={handleSendEmote}
       matchReward={matchReward}
       swapHighlights={swapHighlights}
+      professorTip={professorTip}
+      onProfessorTipDone={clearProfessorTip}
+      newFeats={newFeats}
     />
   );
 }

@@ -1,8 +1,30 @@
-export type CardBackId = "seigaiha" | "asanoha" | "shippo";
-export type TableMatId = "tatami" | "urushi" | "night";
+import { isRewardUnlocked } from "@shared/matchFeats";
+import { loadFeats } from "./feats";
 
-export const CARD_BACKS: CardBackId[] = ["seigaiha", "asanoha", "shippo"];
-export const TABLE_MATS: TableMatId[] = ["tatami", "urushi", "night"];
+export type CardBackId = "seigaiha" | "asanoha" | "shippo" | "sakura" | "kin" | "murasaki" | "natal";
+export type TableMatId = "tatami" | "urushi" | "night" | "washi" | "kin" | "natal";
+
+export const CARD_BACKS: CardBackId[] = ["seigaiha", "asanoha", "shippo", "sakura", "kin", "murasaki", "natal"];
+export const TABLE_MATS: TableMatId[] = ["tatami", "urushi", "night", "washi", "kin", "natal"];
+
+/** Temas claros: tapete de papel washi e verso de sakura. */
+export const LIGHT_THEME = new Set<string>(["washi", "sakura"]);
+
+/** Itens da estação: só aparecem no mês deles. */
+const SEASONAL: Record<string, number> = { natal: 11 };
+
+export function isSeasonal(id: string): boolean {
+  return id in SEASONAL;
+}
+
+export function isInSeason(id: string, now = new Date()): boolean {
+  return !(id in SEASONAL) || SEASONAL[id] === now.getMonth();
+}
+
+/** Liberado pela conquista (se precisar de uma) e dentro da estação. */
+export function isThemeItemAvailable(kind: "back" | "mat", id: string, feats: readonly string[], now = new Date()): boolean {
+  return isInSeason(id, now) && isRewardUnlocked(kind, id, feats);
+}
 
 const STORAGE_KEY = "cunoku_table_theme";
 const EVENT = "cunoku-theme";
@@ -42,9 +64,11 @@ export function loadTableTheme(): TableTheme {
   }
   try {
     const parsed = JSON.parse(raw) as Partial<TableTheme>;
+    // Item fora da estação (ou de conquista que este aparelho não tem) volta ao padrão
+    const feats = loadFeats();
     const next: TableTheme = {
-      back: isBack(parsed.back) ? parsed.back : DEFAULT_THEME.back,
-      mat: isMat(parsed.mat) ? parsed.mat : DEFAULT_THEME.mat,
+      back: isBack(parsed.back) && isThemeItemAvailable("back", parsed.back, feats) ? parsed.back : DEFAULT_THEME.back,
+      mat: isMat(parsed.mat) && isThemeItemAvailable("mat", parsed.mat, feats) ? parsed.mat : DEFAULT_THEME.mat,
     };
     if (cachedTheme.back === next.back && cachedTheme.mat === next.mat) return cachedTheme;
     cachedTheme = next;

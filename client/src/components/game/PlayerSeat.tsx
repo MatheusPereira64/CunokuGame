@@ -1,5 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
+import { useRef, type ReactNode } from "react";
 import { Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
@@ -16,19 +15,20 @@ import { SwapBadge } from "./SwapBadge";
 import { seatDetail } from "./helpers";
 import { useTargetingSpread } from "./targetingRules";
 
-/** initial sempre é um objeto: trocar para `false` muda a quantidade de hooks do Framer Motion. */
-function FlippableCard({ flip, children }: { flip: boolean; children: ReactNode }) {
-  const [spin] = useState(flip);
+/** Selo de quem declarou Cunoku, sobre o avatar durante as rodadas finais. */
+export function DeclarerBadge({ show }: { show: boolean }) {
+  const { t } = useI18n();
+  if (!show) return null;
   return (
-    <motion.div
-      initial={{ rotateY: spin ? 180 : 0 }}
-      animate={{ rotateY: 0 }}
-      transition={{ duration: spin ? 0.6 : 0, ease: "easeInOut" }}
-      style={{ transformStyle: "preserve-3d" }}
-    >
-      {children}
-    </motion.div>
+    <span className="pointer-events-none absolute -top-2.5 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full border border-red-200 bg-red-600 px-1.5 text-[9px] font-black uppercase tracking-wider text-white shadow-[0_0_12px_rgba(239,68,68,0.8)] motion-safe:animate-pulse">
+      {t("game.cunokuShort")}
+    </span>
   );
+}
+
+/** O giro 3D ao revelar fica no próprio PlayingCard; aqui só marca a carta que acabou de virar. */
+function FlippableCard({ flip, children }: { flip: boolean; children: ReactNode }) {
+  return <div data-just-revealed={flip || undefined}>{children}</div>;
 }
 
 function seatCardSize(compact: boolean, isCompact: boolean) {
@@ -90,6 +90,8 @@ interface PlayerSeatProps {
   skipNextTurnIds?: string[];
   /** Emote ativo deste jogador */
   emoteId?: string;
+  /** Declarou Cunoku: destacado durante as rodadas finais */
+  isDeclarer?: boolean;
   style?: React.CSSProperties;
   className?: string;
 }
@@ -105,6 +107,7 @@ export function PlayerSeat({
   side = "top",
   compact: compactProp,
   emoteId,
+  isDeclarer = false,
   sealedCardIds = [],
   skipNextTurnIds,
   style,
@@ -206,6 +209,7 @@ export function PlayerSeat({
         className={isCompact ? "scale-[0.85] origin-center" : undefined}
       />
       {/* Sempre ao lado do ícone; no lado direito da mesa abre para dentro, sem sair da tela */}
+      <DeclarerBadge show={isDeclarer} />
       <EmoteBubble emoteId={emoteId} className={side === "right" ? "right-full top-0 mr-1" : "left-full top-0 ml-1"} />
       {/* Última jogada: logo abaixo do avatar no topo; nas laterais abre para dentro da mesa */}
       <SeatNoticeChip notice={notice} className={noticePlacement(side)} />
@@ -222,6 +226,7 @@ export function PlayerSeat({
         "flex rounded-2xl transition-all pointer-events-none",
         !player.isConnected && !player.isBot && "opacity-50",
         isActive && "bg-yellow-400/10 ring-2 ring-yellow-400/70 shadow-[0_0_24px_rgba(250,204,21,0.35)]",
+        isDeclarer && !isActive && "bg-red-500/10 ring-2 ring-red-500/60 shadow-[0_0_24px_rgba(239,68,68,0.35)]",
         layoutClass,
         isCompact ? "p-0.5" : "p-1",
         className,

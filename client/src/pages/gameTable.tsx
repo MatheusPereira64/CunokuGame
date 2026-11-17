@@ -1,4 +1,4 @@
-import { ReactNode, RefObject } from "react";
+import { ReactNode, RefObject, useEffect, useState } from "react";
 import { GameState, Card, Player, GameAction, MatchReward } from "@shared/schema";
 import type { EmoteId } from "@shared/emotes";
 import { PlayingCard } from "@/components/PlayingCard";
@@ -25,6 +25,9 @@ import { LandscapePrompt } from "@/components/game/LandscapePrompt";
 import { GameTutorial } from "@/components/game/GameTutorial";
 import { PowerTips } from "@/components/game/PowerTips";
 import { WaitingRoom } from "@/components/game/WaitingRoom";
+import { ProfessorTip } from "@/components/game/ProfessorTip";
+import type { CoachTip } from "@shared/coach";
+import type { FeatId } from "@shared/matchFeats";
 import { TableMatId } from "@/lib/tableTheme";
 import { AnimationEvent } from "@/components/animations/types";
 
@@ -82,6 +85,7 @@ function GameTopBar({
   connected,
   roomCode,
   isDaily,
+  hideCode,
   canEmote,
   onEmote,
   onExit,
@@ -95,6 +99,8 @@ function GameTopBar({
   connected: boolean;
   roomCode: string;
   isDaily: boolean;
+  /** Na escolha de alvo os botões Cancelar e Trocar ocupam o canto do código. */
+  hideCode: boolean;
   canEmote: boolean;
   onEmote: (emoteId: EmoteId) => void;
   onExit: () => void;
@@ -136,13 +142,15 @@ function GameTopBar({
       </div>
       <div className="flex min-w-0 flex-1 justify-center">{status}</div>
       {isDaily ? (
-        <div className={cn("shrink-0 bg-black/40 backdrop-blur-md rounded-full border border-white/10 font-bold", cx(isCompact, "px-2.5 py-1 text-[11px]", "px-4 py-1.5 text-base"))}>
+        <div className={cn(hideCode && "invisible", "shrink-0 bg-black/40 backdrop-blur-md rounded-full border border-white/10 font-bold", cx(isCompact, "px-2.5 py-1 text-[11px]", "px-4 py-1.5 text-base"))}>
           {t("daily.title")}
         </div>
       ) : (
         <button
           type="button"
+          tabIndex={hideCode ? -1 : undefined}
           className={cn(
+            hideCode && "invisible",
             "shrink-0 bg-black/40 backdrop-blur-md rounded-full border border-white/10 flex flex-col items-center cursor-pointer",
             cx(isCompact, "px-2.5 py-1", "px-4 py-1"),
           )}
@@ -332,6 +340,7 @@ function ArcSeat({
       side={pos.side}
       compact={opponents.length >= 3 || isCompact}
       emoteId={emoteId}
+      isDeclarer={isDeclarer(gameState, player.id)}
       sealedCardIds={sealedIds(gameState)}
       skipNextTurnIds={gameState.skipNextTurnIds}
       className="absolute z-20"
@@ -357,10 +366,46 @@ function RowSeats(props: Omit<Parameters<typeof ArcSeats>[0], "isCompact">) {
           side="top"
           compact
           emoteId={activeEmotes[p.id]}
+          isDeclarer={isDeclarer(gameState, p.id)}
           sealedCardIds={sealedIds(gameState)}
           skipNextTurnIds={gameState.skipNextTurnIds}
         />
       ))}
+    </div>
+  );
+}
+
+function inFinalRounds(gameState: GameState) {
+  return !!gameState.isFinalRound && !gameState.winnerId;
+}
+
+function isDeclarer(gameState: GameState, id: string) {
+  return inFinalRounds(gameState) && gameState.finalRoundDeclarerId === id;
+}
+
+/** Contador grande das rodadas finais, logo acima do baralho. */
+function FinalRoundsBanner({ gameState, isCompact, t }: { gameState: GameState; isCompact: boolean; t: Translate }) {
+  if (!inFinalRounds(gameState)) return null;
+  const left = gameState.finalRoundsLeft ?? 1;
+  const declarer = gameState.players.find((p) => p.id === gameState.finalRoundDeclarerId)?.name ?? "";
+  // O posicionamento fica num div comum: a escala do Framer Motion apagaria o translate de centralizar
+  return (
+    <div className={cn("pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2", cx(isCompact, "mb-4", "mb-8"))}>
+    <motion.div
+      key={left}
+      initial={{ scale: 1.4, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      className={cn(
+        "whitespace-nowrap rounded-full border-2 border-red-300 bg-red-700/90 text-center font-black uppercase tracking-wider text-white shadow-[0_0_24px_rgba(239,68,68,0.6)]",
+        cx(isCompact, "px-2.5 py-0.5 text-[10px]", "px-5 py-1.5 text-base"),
+      )}
+      role="status"
+    >
+      {left <= 1 ? t("game.lastRound") : t("game.finalRoundsLeft", { count: String(left) })}
+      {!isCompact && declarer ? (
+        <span className="block text-[10px] font-semibold normal-case tracking-normal text-red-100">{t("game.declaredBy", { name: declarer })}</span>
+      ) : null}
+    </motion.div>
     </div>
   );
 }
@@ -391,7 +436,9 @@ function FeltTable({
   sendAction,
   onUseAbility,
   me,
+  t,
 }: {
+  t: Translate;
   isCompact: boolean;
   mat: TableMatId;
   useArcSeats: boolean;
@@ -417,11 +464,13 @@ function FeltTable({
         className={cn(
           "w-full relative felt-table shadow-2xl",
           `felt-${mat}`,
+          inFinalRounds(gameState) && "felt-final",
           cx(isCompact, "max-w-none h-full rounded-xl", "max-w-6xl max-h-full aspect-[16/9] rounded-[100px]"),
         )}
       >
         {useArcSeats ? <ArcSeats {...seats} isCompact={isCompact} /> : <RowSeats {...seats} />}
         <div className={cn("absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto", cx(isCompact, "top-[47%]", "top-1/2"))}>
+          <FinalRoundsBanner gameState={gameState} isCompact={isCompact} t={t} />
           <CenterPile
             gameState={gameState}
             isMyTurn={isMyTurn}
@@ -456,6 +505,12 @@ function RevealOverlay({
 }) {
   // Landscape phones often have width > 768 (isMobile=false) but short height —
   // always size the overlay for the viewport when compact.
+  // A carta aparece de costas e gira em 3D logo depois que o painel abre
+  const [faceUp, setFaceUp] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setFaceUp(true), 250);
+    return () => clearTimeout(timer);
+  }, []);
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -490,7 +545,7 @@ function RevealOverlay({
         <div className="shrink-0">
           <PlayingCard
             card={revealed.card}
-            hidden={false}
+            hidden={!faceUp}
             animate={true}
             className={cx(isCompact, "w-20 h-[7.5rem]", "w-40 h-60")}
           />
@@ -545,6 +600,9 @@ export function ActiveTable(props: {
   onEmote: (emoteId: EmoteId) => void;
   matchReward: MatchReward | null;
   swapHighlights: Record<string, SwapHighlight>;
+  professorTip: (CoachTip & { id: number }) | null;
+  onProfessorTipDone: () => void;
+  newFeats: readonly FeatId[];
 }) {
   const { gameState, isCompact, t } = props;
   const opponents = opponentsInTurnOrder(gameState.players, props.playerId);
@@ -559,6 +617,7 @@ export function ActiveTable(props: {
       <AnimationRenderer currentAnimation={props.currentAnimation} onComplete={props.onAnimationComplete} playerId={props.playerId} />
       <GameTopBar
         isDaily={!!gameState.dailyDay}
+        hideCode={props.abilityOpen}
         canEmote={!gameState.winnerId}
         onEmote={props.onEmote}
         isCompact={isCompact}
@@ -591,6 +650,7 @@ export function ActiveTable(props: {
         sendAction={props.sendAction}
         onUseAbility={() => props.onAbilityOpenChange(true)}
         me={props.me}
+        t={t}
       />
       </SwapHighlightContext.Provider>
       </SeatNoticeContext.Provider>
@@ -610,6 +670,7 @@ export function ActiveTable(props: {
           <RevealOverlay revealed={props.revealedOpponentCard} isCompact={props.isCompact} isOffline={props.isOffline} t={t} onClose={props.onCloseReveal} />
         ) : null}
       </AnimatePresence>
+      <ProfessorTip tip={gameState.winnerId ? null : props.professorTip} onDone={props.onProfessorTipDone} />
       {showTutorial(gameState) ? (
         <>
           <GameTutorial />
@@ -628,6 +689,7 @@ export function ActiveTable(props: {
           onBackHome={props.onBackHome}
           onRematch={gameState.dailyDay ? undefined : props.onRematch}
           dailyDay={gameState.dailyDay ?? undefined}
+          newFeats={props.newFeats}
         />
       ) : null}
     </div>

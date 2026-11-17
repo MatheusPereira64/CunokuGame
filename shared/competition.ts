@@ -120,3 +120,74 @@ export function aggregateLeague(rows: ScoredResult[]): LeagueStanding[] {
       rank: i + 1,
     }));
 }
+
+/** Divisões da liga, da mais baixa à mais alta: toda conta começa no bronze. */
+export const DIVISIONS = ["bronze", "silver", "gold"] as const;
+export type Division = (typeof DIVISIONS)[number];
+
+/** Parte de cada divisão que sobe (ou desce) quando a semana fecha. */
+export const DIVISION_MOVE_SHARE = 0.2;
+
+/** Quantos sobem e quantos descem numa divisão com `count` jogadores na semana. */
+export function divisionMoves(division: Division, count: number): { promote: number; demote: number } {
+  const share = Math.max(1, Math.floor(count * DIVISION_MOVE_SHARE));
+  return {
+    promote: division === "gold" || count === 0 ? 0 : Math.min(share, count),
+    // Com menos de 3 na divisão ninguém desce: sobra pouca gente para comparar
+    demote: division === "bronze" || count < 3 ? 0 : share,
+  };
+}
+
+export type DivisionZone = "promote" | "demote" | null;
+
+export function divisionZone(division: Division, rank: number, count: number): DivisionZone {
+  const { promote, demote } = divisionMoves(division, count);
+  if (rank <= promote) return "promote";
+  if (rank > count - demote) return "demote";
+  return null;
+}
+
+function shiftDivision(division: Division, step: 1 | -1): Division {
+  const i = DIVISIONS.indexOf(division) + step;
+  return DIVISIONS[Math.max(0, Math.min(DIVISIONS.length - 1, i))];
+}
+
+type WeeklyResult = ScoredResult & { week: string };
+
+/** Classificação da semana separada por divisão (cada uma com a própria contagem de posições). */
+export function standingsByDivision(
+  rows: ScoredResult[],
+  divisionOf: (rankPlayerId: string) => Division,
+): Record<Division, LeagueStanding[]> {
+  const result = { bronze: [], silver: [], gold: [] } as Record<Division, LeagueStanding[]>;
+  for (const division of DIVISIONS) {
+    result[division] = aggregateLeague(rows.filter((r) => divisionOf(r.rankPlayerId) === division));
+  }
+  return result;
+}
+
+/**
+ * Divisão de cada conta no começo da semana `currentWeek`: repete o fechamento de cada
+ * semana anterior (sobe quem ficou na zona de subida, desce quem ficou na de queda).
+ * Quem não jogou numa semana fica onde estava.
+ */
+export function computeDivisions(rows: WeeklyResult[], currentWeek: string): Map<string, Division> {
+  const divisions = new Map<string, Division>();
+  const divisionOf = (id: string) => divisions.get(id) ?? "bronze";
+  const weeks = Array.from(new Set(rows.map((r) => r.week).filter((w) => w < currentWeek))).sort();
+  for (const week of weeks) {
+    const tables = standingsByDivision(
+      rows.filter((r) => r.week === week),
+      divisionOf,
+    );
+    for (const division of DIVISIONS) {
+      const table = tables[division];
+      for (const standing of table) {
+        const zone = divisionZone(division, standing.rank, table.length);
+        const next = zone === "promote" ? shiftDivision(division, 1) : zone === "demote" ? shiftDivision(division, -1) : division;
+        divisions.set(standing.rankPlayerId, next);
+      }
+    }
+  }
+  return divisions;
+}

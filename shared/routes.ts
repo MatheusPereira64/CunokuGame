@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { insertRoomSchema, rooms } from './schema';
 import { RANK_TIERS } from './rank';
+import { DIVISIONS } from './competition';
 
 export const errorSchemas = {
   validation: z.object({
@@ -31,6 +32,9 @@ const leagueRowSchema = z.object({
   games: z.number(),
   tier: z.enum(RANK_TIERS),
   isMe: z.boolean(),
+  /** Divisão da liga e se a posição está na zona de subida ou de queda */
+  division: z.enum(DIVISIONS).optional(),
+  zone: z.enum(["promote", "demote"]).nullable().optional(),
 });
 
 export const api = {
@@ -122,6 +126,18 @@ export const api = {
           totalPlayers: z.number(),
           top: z.array(leagueRowSchema),
           me: leagueRowSchema.nullable(),
+          myDivision: z.enum(DIVISIONS).optional(),
+          divisions: z
+            .array(
+              z.object({
+                id: z.enum(DIVISIONS),
+                totalPlayers: z.number(),
+                promote: z.number(),
+                demote: z.number(),
+                top: z.array(leagueRowSchema),
+              }),
+            )
+            .optional(),
           lastWeek: z.object({
             week: z.string(),
             podium: z.array(leagueRowSchema),

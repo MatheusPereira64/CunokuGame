@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import type { PgDatabase } from "drizzle-orm/pg-core";
 import {
   dailyEntries,
@@ -27,6 +27,8 @@ export interface CompetitionStore {
   insertMatchResults(rows: InsertMatchResult[]): Promise<MatchResult[]>;
   getResultsForDay(day: string, kind: string): Promise<MatchResult[]>;
   getResultsForWeek(week: string): Promise<MatchResult[]>;
+  /** Semanas anteriores a `week`: base para recalcular as divisões da liga. */
+  getResultsBeforeWeek(week: string): Promise<MatchResult[]>;
   getPlayerResults(rankPlayerId: string, filter?: PlayerResultFilter): Promise<MatchResult[]>;
 }
 
@@ -136,6 +138,11 @@ export class DrizzleCompetitionStore implements CompetitionStore {
     return await db.select().from(matchResults).where(eq(matchResults.week, week));
   }
 
+  async getResultsBeforeWeek(week: string): Promise<MatchResult[]> {
+    const db = await this.db();
+    return await db.select().from(matchResults).where(lt(matchResults.week, week));
+  }
+
   async getPlayerResults(rankPlayerId: string, filter: PlayerResultFilter = {}): Promise<MatchResult[]> {
     const db = await this.db();
     return await db
@@ -215,6 +222,10 @@ export class MemoryCompetitionStore implements CompetitionStore {
 
   async getResultsForWeek(week: string): Promise<MatchResult[]> {
     return this.results.filter((r) => r.week === week);
+  }
+
+  async getResultsBeforeWeek(week: string): Promise<MatchResult[]> {
+    return this.results.filter((r) => r.week < week);
   }
 
   async getPlayerResults(rankPlayerId: string, filter: PlayerResultFilter = {}): Promise<MatchResult[]> {

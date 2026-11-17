@@ -42,24 +42,30 @@ function playDraw(prev: GameState, current: GameState, triggered: Set<string>, a
   });
 }
 
+/**
+ * Quem jogou é quem tinha a vez no estado anterior: quando a jogada chega,
+ * a vez já pode ter passado para o próximo jogador.
+ */
+function actorOf(prev: GameState, current: GameState) {
+  const index = prev.currentPlayerIndex;
+  return { index, before: prev.players[index], after: current.players[index] };
+}
+
 function playReplace(
   prev: GameState,
   current: GameState,
-  playerId: string,
   triggered: Set<string>,
   animateReplace: MotionApi["animateReplace"],
 ) {
-  const currentPlayer = current.players[current.currentPlayerIndex];
-  const prevPlayer = prev.players[prev.currentPlayerIndex];
-  if (!currentPlayer || !prevPlayer || currentPlayer.hand.length !== prevPlayer.hand.length) return false;
+  const { before, after } = actorOf(prev, current);
+  if (!before || !after || after.hand.length !== before.hand.length) return false;
   const drawnCard = prev.drawnCard;
   const discardedCard = current.discardPile[current.discardPile.length - 1];
-  const handIndex = prevPlayer.hand.findIndex((c) => c.id === discardedCard?.id);
-  if (!drawnCard || !discardedCard || handIndex < 0) return true;
-  const isOpponent = currentPlayer.id !== playerId;
-  remember(triggered, `replace_${currentPlayer.id}_${handIndex}_${Date.now()}`, 2000, () => {
+  const handIndex = before.hand.findIndex((c) => c.id === discardedCard?.id);
+  if (!drawnCard || !discardedCard || handIndex < 0) return false;
+  remember(triggered, `replace_${after.id}_${discardedCard.id}`, 2000, () => {
     audioManager.playCardFlip();
-    if (!isOpponent) animateReplace(drawnCard, discardedCard, handIndex, currentPlayer.id);
+    animateReplace(drawnCard, discardedCard, handIndex, after.id);
   });
   return true;
 }
@@ -67,32 +73,30 @@ function playReplace(
 function playDiscardDrawn(
   prev: GameState,
   current: GameState,
-  playerId: string,
   triggered: Set<string>,
   animateDiscard: MotionApi["animateDiscard"],
 ) {
-  const currentPlayer = current.players[current.currentPlayerIndex];
-  const discardedCard = prev.drawnCard;
-  if (!discardedCard || !currentPlayer) return;
-  const isOpponent = currentPlayer.id !== playerId;
-  remember(triggered, `discard_drawn_${currentPlayer.id}_${discardedCard.id}`, 2000, () => {
+  const { after } = actorOf(prev, current);
+  // A carta descartada fica aberta na pilha: a face que vale é a do topo do descarte
+  const discardedCard = current.discardPile[current.discardPile.length - 1] ?? prev.drawnCard;
+  if (!discardedCard || !after) return;
+  remember(triggered, `discard_drawn_${after.id}_${discardedCard.id}`, 2000, () => {
     audioManager.playCardSlide();
-    if (!isOpponent) animateDiscard(discardedCard, "drawn", currentPlayer.id);
+    animateDiscard(discardedCard, "drawn", after.id);
   });
 }
 
 function playReplaceOrDiscard(
   prev: GameState,
   current: GameState,
-  playerId: string,
   triggered: Set<string>,
   api: Pick<MotionApi, "animateReplace" | "animateDiscard">,
 ) {
   const drewThenCleared = prev.drawnCard && !current.drawnCard && prev.discardPile.length < current.discardPile.length;
   if (!drewThenCleared) return;
-  const replaced = playReplace(prev, current, playerId, triggered, api.animateReplace);
+  const replaced = playReplace(prev, current, triggered, api.animateReplace);
   if (replaced) return;
-  playDiscardDrawn(prev, current, playerId, triggered, api.animateDiscard);
+  playDiscardDrawn(prev, current, triggered, api.animateDiscard);
 }
 
 function playOneHandDiscard(
@@ -100,7 +104,6 @@ function playOneHandDiscard(
   current: GameState,
   player: GameState["players"][number],
   playerIndex: number,
-  playerId: string,
   triggered: Set<string>,
   animateDiscard: MotionApi["animateDiscard"],
 ) {
@@ -114,17 +117,15 @@ function playOneHandDiscard(
   const discardType: "from_hand" | "matched" =
     prev.currentPlayerIndex === playerIndex && prev.turnPhase === "draw" ? "from_hand" : "matched";
   const cardIndex = prevPlayer.hand.findIndex((c) => c.id === removedCard.id);
-  const isOpponent = player.id !== playerId;
-  remember(triggered, `discard_hand_${player.id}_${removedCard.id}_${Date.now()}`, 2000, () => {
+  remember(triggered, `discard_hand_${player.id}_${removedCard.id}`, 2000, () => {
     audioManager.playCardSlide();
-    if (!isOpponent) animateDiscard(topDiscard, discardType, player.id, cardIndex, isMatch);
+    animateDiscard(topDiscard, discardType, player.id, cardIndex, isMatch);
   });
 }
 
 function playHandDiscards(
   prev: GameState,
   current: GameState,
-  playerId: string,
   triggered: Set<string>,
   animateDiscard: MotionApi["animateDiscard"],
 ) {
@@ -132,7 +133,7 @@ function playHandDiscards(
   current.players.forEach((player, playerIndex) => {
     const prevPlayer = prev.players[playerIndex];
     if (!prevPlayer || player.hand.length >= prevPlayer.hand.length) return;
-    playOneHandDiscard(prev, current, player, playerIndex, playerId, triggered, animateDiscard);
+    playOneHandDiscard(prev, current, player, playerIndex, triggered, animateDiscard);
   });
 }
 
@@ -179,8 +180,8 @@ export function playTableAnimations(
   api: MotionApi,
 ) {
   playDraw(prev, current, triggered, api.animateDraw);
-  playReplaceOrDiscard(prev, current, playerId, triggered, api);
-  playHandDiscards(prev, current, playerId, triggered, api.animateDiscard);
+  playReplaceOrDiscard(prev, current, triggered, api);
+  playHandDiscards(prev, current, triggered, api.animateDiscard);
   playPenalties(prev, current, playerId, triggered, api.animatePenalty);
 }
 

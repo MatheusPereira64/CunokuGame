@@ -1,4 +1,4 @@
-import { useId, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { motion } from "framer-motion";
 import { type Card } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,8 @@ interface PlayingCardProps {
   className?: string;
   selected?: boolean;
   animate?: boolean;
+  /** Mostra este verso em vez do escolhido no tema (prévia no seletor). */
+  backOverride?: CardBackId;
 }
 
 // Ícone da habilidade especial da carta (regras do Cunoku)
@@ -45,9 +47,77 @@ export function getAbilityIcon(rank?: string) {
   }
 }
 
+/** Versos novos: fundo, padrão repetido e selo central com um kanji. */
+const EXTRA_BACKS: Partial<Record<CardBackId, { bg: string; seal: string; ink: string; glyph: string; size: number; pattern: (ink: string) => JSX.Element }>> = {
+  // Claro: flores de sakura sobre papel creme
+  sakura: {
+    bg: "#f6efe4",
+    seal: "#fbe3e8",
+    ink: "#c2577a",
+    glyph: "桜",
+    size: 24,
+    pattern: (ink) => (
+      <g fill={ink} opacity="0.28">
+        {[0, 72, 144, 216, 288].map((a) => (
+          <ellipse key={a} cx="12" cy="7.5" rx="2.4" ry="4" transform={`rotate(${a} 12 12)`} />
+        ))}
+        <circle cx="12" cy="12" r="1.4" fill="#e6a23c" />
+      </g>
+    ),
+  },
+  // Ouro: conquista de vencer com zero pontos
+  kin: {
+    bg: "#3a2a08",
+    seal: "#2a1e05",
+    ink: "#f2c94c",
+    glyph: "金",
+    size: 16,
+    pattern: (ink) => <path d="M8 0 L16 8 L8 16 L0 8 Z" fill="none" stroke={ink} strokeWidth="1" opacity="0.5" />,
+  },
+  // Púrpura real: conquista das três Rainhas
+  murasaki: {
+    bg: "#2d1645",
+    seal: "#1d0d30",
+    ink: "#d9b8ff",
+    glyph: "王",
+    size: 20,
+    pattern: (ink) => <path d="M2 14 L6 6 L10 12 L14 6 L18 14 Z" fill="none" stroke={ink} strokeWidth="1" opacity="0.4" />,
+  },
+  // Natal: só em dezembro
+  natal: {
+    bg: "#7a1420",
+    seal: "#0f4d2c",
+    ink: "#f7f1e3",
+    glyph: "雪",
+    size: 22,
+    pattern: (ink) => (
+      <g stroke={ink} strokeWidth="1" opacity="0.45" strokeLinecap="round">
+        <path d="M11 4 V18 M4 11 H18 M6 6 L16 16 M16 6 L6 16" />
+      </g>
+    ),
+  },
+};
+
 function CardBack({ variant }: { variant: CardBackId }) {
   const rawId = useId().replaceAll(":", "");
   const patternId = `back-${variant}-${rawId}`;
+
+  const extra = EXTRA_BACKS[variant];
+  if (extra) {
+    return (
+      <svg viewBox="0 0 96 144" className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <pattern id={patternId} x="0" y="0" width={extra.size} height={extra.size} patternUnits="userSpaceOnUse">
+            {extra.pattern(extra.ink)}
+          </pattern>
+        </defs>
+        <rect width="96" height="144" fill={extra.bg} />
+        <rect width="96" height="144" fill={`url(#${patternId})`} />
+        <circle cx="48" cy="72" r="24" fill={extra.seal} stroke={extra.ink} strokeWidth="1.5" />
+        <text x="48" y="73" textAnchor="middle" dominantBaseline="central" fontSize="24" fill={extra.ink} fontFamily="'Noto Serif JP', serif" fontWeight="600">{extra.glyph}</text>
+      </svg>
+    );
+  }
 
   if (variant === "asanoha") {
     return (
@@ -108,7 +178,7 @@ function CardBack({ variant }: { variant: CardBackId }) {
   );
 }
 
-export function PlayingCard({ card, hidden, onClick, className, selected, animate = true }: PlayingCardProps) {
+export function PlayingCard({ card, hidden, onClick, className, selected, animate = true, backOverride }: PlayingCardProps) {
   const theme = useSyncExternalStore(subscribeTableTheme, loadTableTheme, loadTableTheme);
   const isRed = card?.suit === "hearts" || card?.suit === "diamonds";
 
@@ -130,6 +200,14 @@ export function PlayingCard({ card, hidden, onClick, className, selected, animat
   const isBack = hidden || !card || card.isHidden;
   const AbilityIcon = !isBack ? getAbilityIcon(card?.rank) : null;
 
+  // Virou de lado (espiada, revelação, fim da partida): gira em 3D em vez de só trocar a face
+  const wasBack = useRef(isBack);
+  const [flip, setFlip] = useState<"reveal" | "hide" | null>(null);
+  useEffect(() => {
+    if (wasBack.current !== isBack) setFlip(isBack ? "hide" : "reveal");
+    wasBack.current = isBack;
+  }, [isBack]);
+
   return (
     <motion.div
       whileHover={onClick ? { scale: 1.05, y: -5 } : {}}
@@ -137,15 +215,18 @@ export function PlayingCard({ card, hidden, onClick, className, selected, animat
       initial={animate ? { scale: 0.8, opacity: 0 } : { scale: 1, opacity: 1 }}
       animate={{ scale: 1, opacity: 1 }}
       onClick={onClick}
+      onAnimationEnd={() => setFlip(null)}
       className={cn(
         "relative w-24 h-36 rounded-xl border-2 cursor-pointer transition-all duration-300 select-none card-shadow overflow-hidden",
+        flip === "reveal" && "card-flip-reveal",
+        flip === "hide" && "card-flip-hide",
         isBack ? "bg-[#1c2340] border-[#d4af37]/40" : "bg-[#faf7f0] border-gray-200",
         selected && "ring-4 ring-yellow-400 ring-offset-2",
         className
       )}
     >
       {/* Verso da carta: padrão seigaiha + selo dourado */}
-      {isBack && <CardBack variant={theme.back} />}
+      {isBack && <CardBack variant={backOverride ?? theme.back} />}
 
       {/* Frente da carta */}
       {!isBack && card && (

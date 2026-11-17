@@ -13,11 +13,38 @@ export const EMOTES = [
   { id: "smirk", emoji: "😏" },
   { id: "woozy", emoji: "🥴" },
   { id: "monocle", emoji: "🧐" },
+  // Exclusivos: liberados por conquistas de jogada (shared/matchFeats.ts)
+  { id: "party", emoji: "🥳" },
+  { id: "ninja", emoji: "🥷" },
+  { id: "crown", emoji: "👑" },
+  { id: "grad", emoji: "🎓" },
 ] as const;
 
 export type EmoteId = (typeof EMOTES)[number]["id"];
 
 export const EMOTE_COOLDOWN_MS = 2000;
+
+/** Jeito de cada emote se mexer no balão (classes em index.css). */
+export const EMOTE_MOTION: Record<string, "bounce" | "wobble" | "pulse" | "shake" | "spin" | "drip"> = {
+  thumbs: "bounce",
+  clap: "pulse",
+  laugh: "wobble",
+  wow: "pulse",
+  think: "wobble",
+  sad: "drip",
+  angry: "shake",
+  fire: "pulse",
+  hot: "drip",
+  clown: "wobble",
+  smirk: "bounce",
+  woozy: "wobble",
+  monocle: "bounce",
+  party: "bounce",
+  ninja: "shake",
+  crown: "spin",
+  grad: "bounce",
+  wind_effect: "spin",
+};
 
 export function isEmoteId(value: unknown): value is EmoteId {
   return EMOTES.some((e) => e.id === value);

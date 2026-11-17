@@ -1,250 +1,148 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, useAnimate } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useLatest } from "./useLatest";
 import { PlayingCard } from "../PlayingCard";
 import { DiscardAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
-import { randomFloat } from "@shared/secureRandom";
 import { useI18n } from "@/contexts/i18n-context";
+import { useIsCompactGame } from "@/hooks/use-landscape";
+import { cn } from "@/lib/utils";
+import { flyingCardSize, measureCenter } from "./flyingCard";
 
 interface CardDiscardAnimationProps extends BaseAnimationProps {
   data: DiscardAnimationData;
-  isOwnPlayer?: boolean; // Se é o jogador atual (para mostrar a carta)
+  isOwnPlayer?: boolean;
 }
 
-export function CardDiscardAnimation({
-  data,
-  onComplete,
-  duration = DEFAULT_DURATIONS.discard,
-  isOwnPlayer = false
-}: CardDiscardAnimationProps) {
+/** Cor do anel de impacto e do aviso, por tipo de descarte. */
+function discardTone(discardType: DiscardAnimationData["discardType"], isSuccess?: boolean) {
+  if (discardType === "matched") return isSuccess ? "emerald" : "red";
+  if (discardType === "from_hand") return "orange";
+  return "violet";
+}
+
+const TONE = {
+  emerald: { ring: "border-emerald-300", pill: "bg-emerald-600 border-emerald-300", glow: "rgba(16,185,129,0.75)", dust: "bg-emerald-300" },
+  red: { ring: "border-red-300", pill: "bg-red-600 border-red-300", glow: "rgba(239,68,68,0.75)", dust: "bg-red-200" },
+  orange: { ring: "border-orange-300", pill: "bg-orange-600 border-orange-300", glow: "rgba(249,115,22,0.6)", dust: "bg-amber-100" },
+  violet: { ring: "border-violet-300", pill: "bg-violet-700 border-violet-300", glow: "rgba(167,139,250,0.6)", dust: "bg-amber-100" },
+} as const;
+
+/**
+ * Descarte: a carta sai de onde estava (carta comprada ou mão), faz um arco,
+ * vira de face no caminho quando estava escondida e cai na pilha com impacto.
+ * A face aparece para todos: carta descartada fica aberta na pilha.
+ */
+export function CardDiscardAnimation({ data, onComplete, duration = DEFAULT_DURATIONS.discard, isOwnPlayer = false }: CardDiscardAnimationProps) {
   const { t } = useI18n();
-  const [isVisible, setIsVisible] = useState(true);
+  const isCompact = useIsCompactGame();
+  const { card, discardType, sourcePosition, playerName, isSuccess } = data;
+  const size = flyingCardSize(isCompact);
+  const [scope, animate] = useAnimate();
 
-  const { 
-    card, 
-    discardType, 
-    sourcePosition, 
-    targetPosition, 
-    playerName,
-    isSuccess 
-  } = data;
-
-  // Calcula o arco da animação
-  const midX = (sourcePosition.x + targetPosition.x) / 2;
-  const midY = Math.min(sourcePosition.y, targetPosition.y) - 60;
+  // A sua carta comprada já está aberta; carta de mão ou de oponente vira durante o voo
+  const [faceUp, setFaceUp] = useState(isOwnPlayer && discardType === "drawn");
+  const [target, setTarget] = useState(data.targetPosition);
+  const [landed, setLanded] = useState(false);
+  const tone = TONE[discardTone(discardType, isSuccess)];
+  const spins = discardType === "matched" && isSuccess;
 
   const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(false);
-      setTimeout(() => onCompleteRef.current(), 100);
-    }, duration);
+    let cancelled = false;
+    const seconds = duration / 1000;
+    const start = { x: sourcePosition.x - size.halfW, y: sourcePosition.y - size.halfH };
+    const run = async () => {
+      // 1) Levanta e sobe em arco na direção da pilha
+      const guess = data.targetPosition;
+      const peak = {
+        x: (sourcePosition.x + guess.x) / 2 - size.halfW,
+        y: Math.min(sourcePosition.y, guess.y) - (isCompact ? 50 : 90) - size.halfH,
+      };
+      await animate(scope.current, { x: [start.x, start.x, peak.x], y: [start.y, start.y - 14, peak.y], scale: [1, 1.1, 1.18], rotate: [0, -4, spins ? 200 : -14] }, { duration: seconds * 0.45, ease: "easeOut" });
+      if (cancelled) return;
+      setFaceUp(true);
+      // 2) Mede a pilha agora (a mesa já se reorganizou) e desce até ela
+      const pile = measureCenter("[data-discard-pile]") ?? guess;
+      setTarget(pile);
+      await animate(scope.current, { x: pile.x - size.halfW, y: pile.y - size.halfH, scale: 1, rotate: spins ? 360 : 0 }, { duration: seconds * 0.4, ease: [0.5, 0, 0.75, 0] });
+      if (cancelled) return;
+      setLanded(true);
+      setTimeout(() => onCompleteRef.current(), 300);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // A animação roda uma vez por evento de descarte
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    return () => clearTimeout(timer);
-  }, [duration, onCompleteRef]);
-
-  if (!isVisible) return null;
-
-  // Determina cores e textos baseado no tipo de descarte
-  const getDiscardStyle = () => {
-    switch (discardType) {
-      case 'matched':
-        return {
-          gradient: isSuccess 
-            ? 'from-green-500 to-emerald-600' 
-            : 'from-red-500 to-rose-600',
-          icon: isSuccess ? '✓' : '✗',
-          text: isSuccess ? t("anim.matchOk") : t("anim.matchFail"),
-          glowColor: isSuccess ? 'bg-green-400' : 'bg-red-400',
-        };
-      case 'from_hand':
-        return {
-          gradient: 'from-orange-500 to-amber-600',
-          icon: '📤',
-          text: t("anim.discardHand"),
-          glowColor: 'bg-orange-400',
-        };
-      case 'drawn':
-      default:
-        return {
-          gradient: 'from-purple-500 to-violet-600',
-          icon: '↓',
-          text: t("anim.discardCard"),
-          glowColor: 'bg-purple-400',
-        };
-    }
-  };
-
-  const style = getDiscardStyle();
+  const label =
+    discardType === "matched"
+      ? isSuccess
+        ? t("anim.matchOk")
+        : t("anim.matchFail")
+      : discardType === "from_hand"
+        ? t("anim.discardHand")
+        : t("anim.discardCard");
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <div className="fixed inset-0 pointer-events-none z-[9999]">
-          {/* Overlay sutil */}
+    <div className="fixed inset-0 pointer-events-none z-[9999]">
+      <div
+        ref={scope}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          zIndex: 10000,
+          transform: `translate(${sourcePosition.x - size.halfW}px, ${sourcePosition.y - size.halfH}px)`,
+          filter: `drop-shadow(0 14px 22px rgba(0,0,0,0.5)) drop-shadow(0 0 14px ${tone.glow})`,
+        }}
+      >
+        <motion.div animate={landed ? { scaleY: [1, 0.88, 1], scaleX: [1, 1.07, 1] } : {}} transition={{ duration: 0.22, ease: "easeOut" }}>
+          <PlayingCard card={card} hidden={!faceUp} className={size.className} animate={false} />
+        </motion.div>
+      </div>
+
+      {/* Impacto na pilha: anel que se abre e poeirinha */}
+      {landed && (
+        <>
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.2 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="absolute inset-0 bg-black"
+            initial={{ scale: 0.7, opacity: 0.9 }}
+            animate={{ scale: 1.8, opacity: 0 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            className={cn("absolute rounded-2xl border-4", tone.ring)}
+            style={{ left: target.x - size.halfW, top: target.y - size.halfH, width: size.halfW * 2, height: size.halfH * 2 }}
           />
-
-          {/* Carta animada com movimento mais claro */}
-          <motion.div
-            initial={{
-              x: sourcePosition.x - 48,
-              y: sourcePosition.y - 68,
-              scale: 1,
-              rotate: 0,
-              opacity: 1,
-            }}
-            animate={{
-              x: [
-                sourcePosition.x - 48,
-                midX - 48,
-                targetPosition.x - 48,
-              ],
-              y: [
-                sourcePosition.y - 68,
-                midY - 68,
-                targetPosition.y - 68,
-              ],
-              scale: [1, 1.2, 0.9],
-              rotate: [0, discardType === 'matched' && isSuccess ? 360 : -20, 0],
-              opacity: [1, 1, 0.95],
-            }}
-            transition={{
-              duration: duration / 1000,
-              ease: [0.25, 0.1, 0.25, 1],
-              times: [0, 0.5, 1],
-            }}
-            style={{
-              position: 'absolute',
-              zIndex: 10000,
-              filter: discardType === 'matched' && isSuccess
-                ? 'drop-shadow(0 0 30px rgba(34, 197, 94, 0.8))'
-                : 'drop-shadow(0 15px 30px rgba(0,0,0,0.5))',
-            }}
-          >
-            <PlayingCard card={isOwnPlayer ? card : undefined} hidden={!isOwnPlayer} className="w-24 h-36" animate={false} />
-          </motion.div>
-
-          {/* Linha de trajetória */}
-          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }} aria-hidden="true">
-            <motion.path
-              d={`M ${sourcePosition.x} ${sourcePosition.y} Q ${midX} ${midY} ${targetPosition.x} ${targetPosition.y}`}
-              fill="none"
-              stroke={discardType === 'matched' && isSuccess 
-                ? 'rgba(34, 197, 94, 0.5)' 
-                : 'rgba(168, 85, 247, 0.4)'}
-              strokeWidth="3"
-              strokeDasharray="8,4"
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: 1, opacity: 0.7 }}
-              transition={{ duration: duration / 1000 * 0.8, ease: "easeOut" }}
-            />
-          </svg>
-
-          {/* Indicador de ação */}
-          <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="absolute top-8 left-1/2 transform -translate-x-1/2 z-[10001]"
-          >
-            <div className={`bg-gradient-to-r ${style.gradient} backdrop-blur-md rounded-xl px-6 py-3 shadow-xl`}>
-              <div className="text-white font-semibold text-lg flex items-center gap-3">
-                <span className="text-2xl">{style.icon}</span>
-                <span>{style.text}</span>
-                <span className="text-white/70">•</span>
-                <span className="text-white/90">{playerName}</span>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Efeito de brilho no destino (pilha de descarte) */}
-          <motion.div
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: [0.5, 1.5, 1], opacity: [0, 0.8, 0] }}
-            transition={{ duration: duration / 1000, times: [0, 0.7, 1] }}
-            style={{
-              position: 'absolute',
-              left: targetPosition.x,
-              top: targetPosition.y,
-              x: '-50%',
-              y: '-50%',
-            }}
-          >
-            <div className={`w-32 h-32 rounded-full blur-xl ${style.glowColor}`} />
-          </motion.div>
-
-          {/* Partículas de sucesso melhoradas para matched_discard */}
-          {discardType === 'matched' && isSuccess && (
-            <>
-              {Array.from({ length: 12 }).map((_, i) => {
-                const angle = (i * 30) * Math.PI / 180;
-                const distance = 100 + (i % 3) * 20;
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{
-                      x: targetPosition.x,
-                      y: targetPosition.y,
-                      scale: 0,
-                      opacity: 1,
-                    }}
-                    animate={{
-                      x: targetPosition.x + Math.cos(angle) * distance,
-                      y: targetPosition.y + Math.sin(angle) * distance,
-                      scale: [0, 1.5, 0],
-                      opacity: [1, 1, 0],
-                    }}
-                    transition={{
-                      duration: 0.8,
-                      delay: 0.3 + (i * 0.05),
-                      ease: "easeOut",
-                    }}
-                    className="absolute w-4 h-4 bg-green-400 rounded-full"
-                    style={{ 
-                      zIndex: 10001,
-                      boxShadow: '0 0 10px rgba(34, 197, 94, 0.8)'
-                    }}
-                  />
-                );
-              })}
-              {/* Estrelas de sucesso */}
-              {Array.from({ length: 5 }).map((_, i) => (
-                <motion.div
-                  key={`star-${i}`}
-                  initial={{
-                    x: targetPosition.x,
-                    y: targetPosition.y,
-                    scale: 0,
-                    rotate: 0,
-                  }}
-                  animate={{
-                    x: targetPosition.x + (randomFloat() - 0.5) * 150,
-                    y: targetPosition.y + (randomFloat() - 0.5) * 150,
-                    scale: [0, 1.2, 0],
-                    rotate: 360,
-                  }}
-                  transition={{
-                    duration: 1,
-                    delay: 0.4 + i * 0.1,
-                    ease: "easeOut",
-                  }}
-                  className="absolute text-2xl"
-                  style={{ zIndex: 10001 }}
-                >
-                  ⭐
-                </motion.div>
-              ))}
-            </>
-          )}
-        </div>
+          {Array.from({ length: 8 }).map((_, i) => {
+            const angle = (i / 8) * Math.PI * 2;
+            const distance = (isCompact ? 34 : 56) + (i % 2) * 14;
+            const baseY = target.y + size.halfH * 0.6;
+            return (
+              <motion.span
+                key={i}
+                initial={{ x: target.x, y: baseY, scale: 1, opacity: 0.9 }}
+                animate={{ x: target.x + Math.cos(angle) * distance, y: baseY + Math.sin(angle) * distance * 0.45, scale: 0, opacity: 0 }}
+                transition={{ duration: 0.45, ease: "easeOut" }}
+                className={cn("absolute left-0 top-0 h-2 w-2 rounded-full", tone.dust)}
+              />
+            );
+          })}
+        </>
       )}
-    </AnimatePresence>
+
+      {/* Aviso curto acima da pilha: quem descartou */}
+      <motion.div
+        initial={{ opacity: 0, y: 8, scale: 0.9 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 380, damping: 26 }}
+        className="absolute z-[10001]"
+        style={{ left: target.x, top: target.y - size.halfH - (isCompact ? 30 : 44) }}
+      >
+        <div className={cn("-translate-x-1/2 whitespace-nowrap rounded-full border-2 font-bold text-white shadow-lg", tone.pill, isCompact ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-xs")}>
+          {label} · {playerName}
+        </div>
+      </motion.div>
+    </div>
   );
 }

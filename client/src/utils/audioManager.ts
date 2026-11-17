@@ -446,6 +446,60 @@ class AudioManager {
     playNote(880, 0.14);
   }
 
+  /** Três bipes curtos e agudos: faltam 10 segundos da vez. */
+  playTimeWarning(): void {
+    if (!this.canPlaySfx()) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    for (const offset of [0, 0.18, 0.36]) {
+      const start = ctx.currentTime + offset;
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(1046.5, start);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(this.sfxVolume * 0.12, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.12);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.13);
+    }
+  }
+
+  /** Nota curta que sobe com o valor somado no resumo da partida. */
+  playScoreTick(step: number): void {
+    if (!this.canPlaySfx()) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(440 * Math.pow(2, Math.min(step, 12) / 12), ctx.currentTime);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(this.sfxVolume * 0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.16);
+  }
+
+  /** Arpejo de conquista desbloqueada. */
+  playAchievement(): void {
+    if (!this.canPlaySfx()) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+      const start = ctx.currentTime + i * 0.09;
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, start);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(this.sfxVolume * 0.2, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.35);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.36);
+    });
+  }
+
   setMusicVolume(volume: number): void {
     this.musicVolume = Math.max(0, Math.min(1, volume));
     if (this.menuMusic) this.menuMusic.volume = this.musicVolume;
