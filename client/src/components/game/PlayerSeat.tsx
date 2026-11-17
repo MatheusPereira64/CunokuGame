@@ -14,6 +14,9 @@ import { swapCardStyle, useSwapHighlights } from "./swapHighlight";
 import { SwapBadge } from "./SwapBadge";
 import { seatDetail } from "./helpers";
 import { useTargetingSpread } from "./targetingRules";
+import { isCardDealt, useDealProgress } from "@/components/animations/dealStore";
+import { slotKey, useTableHold } from "@/components/animations/tableHold";
+import { HeldCard } from "./HeldCard";
 
 /** Selo de quem declarou Cunoku, sobre o avatar durante as rodadas finais. */
 export function DeclarerBadge({ show }: { show: boolean }) {
@@ -92,6 +95,8 @@ interface PlayerSeatProps {
   emoteId?: string;
   /** Declarou Cunoku: destacado durante as rodadas finais */
   isDeclarer?: boolean;
+  /** Carta que este jogador comprou e ainda está decidindo o que fazer */
+  heldCard?: { card: Card; faceUp: boolean } | null;
   style?: React.CSSProperties;
   className?: string;
 }
@@ -108,6 +113,7 @@ export function PlayerSeat({
   compact: compactProp,
   emoteId,
   isDeclarer = false,
+  heldCard = null,
   sealedCardIds = [],
   skipNextTurnIds,
   style,
@@ -119,6 +125,8 @@ export function PlayerSeat({
   const targetingSpread = useTargetingSpread();
   const notice = useSeatNotice(player.id);
   const previousRevealedState = useRef<Map<string, boolean>>(new Map());
+  const deal = useDealProgress();
+  const tableHold = useTableHold();
 
   const compact = compactProp ?? (opponentCount >= 4 || isCompact);
   const cardSize = seatCardSize(compact, isCompact);
@@ -151,7 +159,14 @@ export function PlayerSeat({
         return (
           <div
             key={card.id ?? i}
-            className={cn("relative shrink-0", i > 0 && !spreadHand && overlapClass)}
+            className={cn(
+              "relative shrink-0",
+              i > 0 && !spreadHand && overlapClass,
+              // Distribuição: a carta só aparece quando a carta voadora pousa aqui
+              deal.active && (isCardDealt(deal, player.id, i) ? "deal-pop" : "invisible"),
+              // Troca: o lugar fica vazio até a carta comprada pousar nele
+              tableHold.slots.has(slotKey(player.id, i)) && "invisible",
+            )}
             style={swapCardStyle(swapHighlights[card.id], i + 1)}
             ref={(el) => registerCardPosition(positionKey, el, card)}
             data-card-target={`${player.id}:${i}`}
@@ -210,6 +225,7 @@ export function PlayerSeat({
       />
       {/* Sempre ao lado do ícone; no lado direito da mesa abre para dentro, sem sair da tela */}
       <DeclarerBadge show={isDeclarer} />
+      <HeldCard playerId={player.id} card={heldCard?.card ?? null} faceUp={!!heldCard?.faceUp} side={side} compact={compact || isCompact} />
       <EmoteBubble emoteId={emoteId} className={side === "right" ? "right-full top-0 mr-1" : "left-full top-0 ml-1"} />
       {/* Última jogada: logo abaixo do avatar no topo; nas laterais abre para dentro da mesa */}
       <SeatNoticeChip notice={notice} className={noticePlacement(side)} />

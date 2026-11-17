@@ -6,7 +6,8 @@ import { DiscardAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./t
 import { useI18n } from "@/contexts/i18n-context";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
-import { flyingCardSize, measureCenter } from "./flyingCard";
+import { flyingCardSize, measureCenter, arcPeakY } from "./flyingCard";
+import { landOnPile } from "./tableHold";
 
 interface CardDiscardAnimationProps extends BaseAnimationProps {
   data: DiscardAnimationData;
@@ -56,7 +57,7 @@ export function CardDiscardAnimation({ data, onComplete, duration = DEFAULT_DURA
       const guess = data.targetPosition;
       const peak = {
         x: (sourcePosition.x + guess.x) / 2 - size.halfW,
-        y: Math.min(sourcePosition.y, guess.y) - (isCompact ? 50 : 90) - size.halfH,
+        y: arcPeakY(Math.min(sourcePosition.y, guess.y) - (isCompact ? 50 : 90) - size.halfH),
       };
       await animate(scope.current, { x: [start.x, start.x, peak.x], y: [start.y, start.y - 14, peak.y], scale: [1, 1.1, 1.18], rotate: [0, -4, spins ? 200 : -14] }, { duration: seconds * 0.45, ease: "easeOut" });
       if (cancelled) return;
@@ -67,6 +68,7 @@ export function CardDiscardAnimation({ data, onComplete, duration = DEFAULT_DURA
       await animate(scope.current, { x: pile.x - size.halfW, y: pile.y - size.halfH, scale: 1, rotate: spins ? 360 : 0 }, { duration: seconds * 0.4, ease: [0.5, 0, 0.75, 0] });
       if (cancelled) return;
       setLanded(true);
+      landOnPile(card.id);
       setTimeout(() => onCompleteRef.current(), 300);
     };
     void run();

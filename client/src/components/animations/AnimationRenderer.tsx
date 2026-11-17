@@ -18,6 +18,8 @@ import { CardSwapAnimation } from './CardSwapAnimation';
 import { CardPeekAnimation } from './CardPeekAnimation';
 import { CardPenaltyAnimation } from './CardPenaltyAnimation';
 import { CardDealAnimation } from './CardDealAnimation';
+import { endDeal } from './dealStore';
+import { releaseAll } from './tableHold';
 
 interface AnimationRendererProps {
   currentAnimation: AnimationEvent | null;
@@ -68,6 +70,9 @@ export function AnimationRenderer({
     
     // Se reduced motion ou duração 0, completa imediatamente
     if (config.reducedMotion || duration === 0) {
+      // Sem animação de distribuição, a mesa mostra todas as cartas de uma vez
+      if (currentAnimation.type === 'deal') endDeal();
+      releaseAll();
       // Usa setTimeout para evitar chamada síncrona no render
       setTimeout(onComplete, 0);
       return null;

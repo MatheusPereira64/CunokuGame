@@ -6,7 +6,7 @@ import { DrawAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./type
 import { useI18n } from "@/contexts/i18n-context";
 import { useIsCompactGame } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
-import { flyingCardSize, measureCenter } from "./flyingCard";
+import { flyingCardSize, measureCenter, rememberDrawnSlot, arcPeakY } from "./flyingCard";
 
 interface CardDrawAnimationProps extends BaseAnimationProps {
   data: DrawAnimationData;
@@ -36,7 +36,7 @@ export function CardDrawAnimation({ data, onComplete, duration = DEFAULT_DURATIO
       const guess = data.targetPosition;
       const peak = {
         x: (sourcePosition.x + guess.x) / 2 - size.halfW,
-        y: Math.min(sourcePosition.y, guess.y) - (isCompact ? 45 : 80) - size.halfH,
+        y: arcPeakY(Math.min(sourcePosition.y, guess.y) - (isCompact ? 45 : 80) - size.halfH),
       };
       // 1) Desliza do topo da pilha e sobe
       await animate(
@@ -47,9 +47,11 @@ export function CardDrawAnimation({ data, onComplete, duration = DEFAULT_DURATIO
       if (cancelled) return;
       if (isOwnPlayer) setFaceUp(true);
       // 2) Mede o destino agora: o espaço da carta comprada aparece durante o voo
-      const landing = (isOwnPlayer ? measureCenter("[data-drawn-card]") : null) ?? guess;
+      // A sua vai para o espaço da carta comprada; a do oponente, para a mão dele
+      const landing = measureCenter(isOwnPlayer ? "[data-drawn-card]" : `[data-held-card="${CSS.escape(data.playerId)}"]`) ?? guess;
       await animate(scope.current, { x: landing.x - size.halfW, y: landing.y - size.halfH, scale: 1, rotate: 0 }, { duration: seconds * 0.45, ease: [0.4, 0, 0.2, 1] });
       if (cancelled) return;
+      if (isOwnPlayer) rememberDrawnSlot(document.querySelector<HTMLElement>("[data-drawn-card]"));
       onCompleteRef.current();
     };
     void run();

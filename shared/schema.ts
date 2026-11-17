@@ -207,7 +207,6 @@ export type MatchReward = {
 
 export type GameAction =
   | { type: "draw_deck" }
-  | { type: "draw_discard" }
   | { type: "discard_drawn" }
   | { type: "replace_card"; handIndex: number } // Replace hand card with drawn card
   | { type: "use_ability"; ability: string; targetPlayerId?: string; targetCardIndex?: number; targetCardIndex2?: number; targetPlayerId2?: string; targetCardIndex3?: number; /** Ids das cartas escolhidas: valem mais que as posições, que mudam com descartes */ targetCardId?: string; targetCardId2?: string }

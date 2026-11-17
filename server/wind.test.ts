@@ -121,7 +121,8 @@ describe.each([
   const botState = (drawn: Card, overrides: Partial<GameState> = {}) =>
     stateWith(drawn, {
       players: [
-        player("bot", [card("c1", "Q", 12), card("c2", "J", 11)], [], true),
+        // Bot já conhece quase toda a mão (só a Q é desconhecida): o Vento passa na frente
+        player("bot", [card("c1", "K", 0), card("c2", "Q", 12)], [0], true),
         player("bia", [card("b1", "3", 3)], [0]),
         player("caio", [card("d1", "3", 3), card("d2", "4", 4)], [0, 1]),
       ],
@@ -133,20 +134,26 @@ describe.each([
     expect(action).toMatchObject({ type: "use_ability", ability: "wind", targetPlayerId: "caio" });
   });
 
-  it("descarta quando ninguém conhece cartas", () => {
+  it("sem alvo para o Vento, põe a carta baixa no lugar de uma desconhecida", () => {
     const state = botState(card("x", "A", 1));
-    state.players.forEach((p) => (p.knownCards = {}));
-    expect(new Bot("bot", "hard", "bot").decideTurn(state, 0).type).toBe("discard_drawn");
+    state.players.slice(1).forEach((p) => (p.knownCards = {}));
+    expect(new Bot("bot", "hard", "bot").decideTurn(state, 0)).toEqual({ type: "replace_card", handIndex: 1 });
+  });
+
+  it("com muitas cartas desconhecidas, prefere melhorar a própria mão ao Vento", () => {
+    const state = botState(card("x", "A", 1));
+    state.players[0]!.knownCards = {};
+    expect(new Bot("bot", "hard", "bot").decideTurn(state, 0)).toEqual({ type: "replace_card", handIndex: 0 });
   });
 
   it("não tenta usar com carta vinda do descarte, o que travaria o turno", () => {
     const state = botState(card("x", "A", 1), { drawnFromDiscard: true });
-    expect(new Bot("bot", "hard", "bot").decideTurn(state, 0).type).toBe("discard_drawn");
+    expect(new Bot("bot", "hard", "bot").decideTurn(state, 0).type).not.toBe("use_ability");
   });
 
   it("prefere trocar uma carta alta conhecida a usar o Vento", () => {
     const state = botState(card("x", "A", 1));
-    state.players[0]!.knownCards = { "0": true };
-    expect(new Bot("bot", "hard", "bot").decideTurn(state, 0)).toEqual({ type: "replace_card", handIndex: 0 });
+    state.players[0]!.knownCards = { "1": true };
+    expect(new Bot("bot", "hard", "bot").decideTurn(state, 0)).toEqual({ type: "replace_card", handIndex: 1 });
   });
 });

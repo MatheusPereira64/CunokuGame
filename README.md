@@ -65,11 +65,11 @@ Ter a **menor soma de cartas** quando a partida acabar. Cada jogador começa com
 
 ### Seu turno
 
-1. **Compre** uma carta do baralho ou pegue a de cima da pilha de descarte.
+1. **Compre** uma carta do baralho. A pilha de descarte não serve para comprar.
 2. **Decida** o que fazer com ela:
    - substituir uma carta da sua mão, descartando a antiga;
    - descartá-la direto na pilha;
-   - usar o poder dela, se a carta veio do baralho. Carta pega do descarte não usa poder.
+   - usar o poder dela.
 
 Nas partidas online com 2 ou mais pessoas, cada vez tem **60 segundos**. Se o tempo acabar, o jogo compra e descarta pelo jogador.
 

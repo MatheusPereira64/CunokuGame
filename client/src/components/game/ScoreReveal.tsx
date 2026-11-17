@@ -18,6 +18,11 @@ export function revealOrder(players: Pick<Player, "id" | "hand" | "score">[]): {
     .flatMap((p) => p.hand.map((_, cardIndex) => ({ playerId: p.id, cardIndex })));
 }
 
+/** Acima de 4 cartas a fileira não cabe lado a lado no painel. */
+function crowded(handSize: number) {
+  return handSize > 4;
+}
+
 /** Soma das cartas já viradas; com tudo virado, vale o placar oficial. */
 export function runningTotal(player: Pick<Player, "hand" | "score">, revealedCount: number): number {
   if (revealedCount >= player.hand.length) return player.score;
@@ -72,12 +77,14 @@ export function ScoreReveal({
             key={p.id}
             layout
             className={cn(
-              "flex items-center justify-between gap-2 rounded-lg transition-colors",
+              // Se ainda faltar espaço (tela estreita), cartas e pontos descem para a linha de baixo
+              "flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg transition-colors",
               compact ? "px-2 py-1" : "p-2.5",
               isWinner ? "bg-amber-50 ring-2 ring-amber-400" : "bg-gray-50",
             )}
           >
-            <div className="flex min-w-0 items-center gap-2">
+            {/* Base pequena: o nome encolhe (reticências) antes de a linha quebrar */}
+            <div className="flex min-w-0 flex-1 basis-24 items-center gap-2">
               <span className="w-6 shrink-0 font-bold text-gray-400">{done ? `#${i + 1}` : ""}</span>
               <Avatar
                 name={p.name}
@@ -90,10 +97,11 @@ export function ScoreReveal({
               />
               <span className="truncate font-bold text-gray-900">{p.name}</span>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <div className="flex gap-0.5">
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              <div className={cn("flex", crowded(p.hand.length) ? "" : "gap-0.5")}>
                 {p.hand.map((card, ci) => (
-                  <div key={card.id || ci}>
+                  // Mão grande: as cartas se sobrepõem, deixando o canto com o valor à mostra
+                  <div key={card.id || ci} className={cn(ci > 0 && crowded(p.hand.length) && (compact ? "-ml-3" : "-ml-3.5"))}>
                     <PlayingCard
                       card={card}
                       hidden={ci >= shown}

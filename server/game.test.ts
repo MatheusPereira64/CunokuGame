@@ -124,6 +124,15 @@ describe("GameLogic.processAction", () => {
     expect(result.newState).toBe(state);
   });
 
+  it("recusa compra da pilha de descarte: só se compra do baralho", () => {
+    const state = baseState();
+    const result = GameLogic.processAction(state, { type: "draw_discard" }, "p1");
+
+    expect(result.newState.drawnCard).toBeNull();
+    expect(result.newState.turnPhase).toBe("draw");
+    expect(result.newState.discardPile.map((c) => c.id)).toEqual(["disc"]);
+  });
+
   it("compra do baralho e entra em action", () => {
     const state = baseState();
     const result = GameLogic.processAction(state, { type: "draw_deck" }, "p1");

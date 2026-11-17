@@ -15,6 +15,8 @@ import {
   visibleCardCenter,
 } from './types';
 import { useAnimationQueue } from './useAnimationQueue';
+import { lastHeldPosition } from '@/components/game/HeldCard';
+import { lastDrawnSlotPosition } from './flyingCard';
 
 interface UseGameAnimationsOptions {
   gameState: GameState | null;
@@ -111,14 +113,14 @@ export function useGameAnimations({
 
   // Carta comprada: a sua fica no centro da mesa; a do oponente, junto da mão dele
   const getDrawnPosition = useCallback((owner: string, fallback: () => Position): Position => {
-    if (owner === playerId) {
-      const el = document.querySelector('[data-drawn-card]');
-      if (el?.isConnected) {
-        const rect = el.getBoundingClientRect();
-        if (rect.width > 0) return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-      }
+    // A sua fica no centro da mesa; a do oponente, na mão dele junto do avatar
+    const selector = owner === playerId ? '[data-drawn-card]' : `[data-held-card="${CSS.escape(owner)}"]`;
+    const el = document.querySelector(selector);
+    if (el?.isConnected) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0) return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
     }
-    return fallback();
+    return (owner === playerId ? lastDrawnSlotPosition() : lastHeldPosition(owner)) ?? fallback();
   }, [playerId]);
 
   // Obtém nome de jogador

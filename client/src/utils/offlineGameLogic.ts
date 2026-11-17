@@ -35,8 +35,6 @@ export function processOfflineAction(
   switch (action.type) {
     case "draw_deck":
       return drawFromDeck(newState, player);
-    case "draw_discard":
-      return drawFromDiscard(newState, player);
     case "discard_drawn":
       return discardDrawn(newState, player, playerId);
     case "replace_card":
@@ -86,16 +84,6 @@ function drawFromDeck(newState: GameState, player: Player): GameState {
   return newState;
 }
 
-function drawFromDiscard(newState: GameState, player: Player): GameState {
-  const discardCard = newState.discardPile.pop();
-  if (!discardCard) return newState;
-  newState.logs.push(`${player.name} comprou a carta ${discardCard.rank} de ${discardCard.suit} da pilha de descarte`);
-  newState.drawnCard = discardCard;
-  newState.drawnFromDiscard = true;
-  newState.turnPhase = "action";
-  return newState;
-}
-
 function advanceTurn(newState: GameState) {
   if (moveToNextPlayer(newState)) return;
   newState.turnPhase = "finished";
@@ -123,6 +111,7 @@ function replaceDrawn(newState: GameState, player: Player, handIndex: number | u
   newState.forcedReplace = false;
   const oldCard = player.hand[handIndex];
   player.hand[handIndex] = newState.drawnCard;
+  rememberPlacedCard(player, handIndex);
   if (oldCard) {
     newState.discardPile.push(oldCard);
     newState.logs.push(`${player.name} substituiu a carta ${handIndex + 1} da mão`);
@@ -347,4 +336,12 @@ export function processBotTurn(
 ): GameState {
   const action = botPlayer.decideTurn(gameState, playerIndex);
   return processOfflineAction(gameState, action, gameState.players[playerIndex].id);
+}
+
+/**
+ * Bot lembra da carta que ele mesmo pôs na mão (knownCards é a memória dele).
+ * Para pessoas a carta volta de costas: lembrar dela faz parte do jogo.
+ */
+function rememberPlacedCard(player: Player, handIndex: number) {
+  if (player.isBot) player.knownCards[handIndex.toString()] = true;
 }

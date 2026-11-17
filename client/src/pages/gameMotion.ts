@@ -158,6 +158,26 @@ function playPenalties(
   });
 }
 
+/**
+ * Lugares da mesa que devem esperar a animação: cada carta nova na pilha de descarte
+ * (identificada pelo id) e a posição da mão que recebeu a carta comprada.
+ * Usa as mesmas regras de playTableAnimations para não segurar o que não vai animar.
+ */
+export function pendingTableHolds(prev: GameState, current: GameState): { pileCardIds: string[]; slots: string[] } {
+  const grew = current.discardPile.length > prev.discardPile.length;
+  if (!grew) return { pileCardIds: [], slots: [] };
+  const top = current.discardPile[current.discardPile.length - 1];
+  const drewThenCleared = !!prev.drawnCard && !current.drawnCard;
+  if (drewThenCleared) {
+    const { before, after } = actorOf(prev, current);
+    const handIndex = before?.hand.findIndex((c) => c.id === top?.id) ?? -1;
+    const replaced = !!before && !!after && after.hand.length === before.hand.length && handIndex >= 0;
+    return { pileCardIds: top ? [top.id] : [], slots: replaced && after ? [`${after.id}_${handIndex}`] : [] };
+  }
+  const shrank = current.players.some((p, i) => prev.players[i] && p.hand.length < prev.players[i].hand.length);
+  return { pileCardIds: shrank && top ? [top.id] : [], slots: [] };
+}
+
 export function isOpeningDeal(state: GameState) {
   return state.turnPhase !== "waiting" && state.round === 1 && !state.drawnCard && state.discardPile.length <= 1;
 }

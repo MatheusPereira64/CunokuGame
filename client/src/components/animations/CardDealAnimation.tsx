@@ -1,244 +1,131 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState, useMemo } from "react";
+import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
 import { useLatest } from "./useLatest";
 import { PlayingCard } from "../PlayingCard";
 import { DealAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
 import { useI18n } from "@/contexts/i18n-context";
+import { useIsCompactGame } from "@/hooks/use-landscape";
+import { audioManager } from "@/utils/audioManager";
+import { flyingCardSize } from "./flyingCard";
+import { dealKey, endDeal, markDealt } from "./dealStore";
 
 interface CardDealAnimationProps extends BaseAnimationProps {
   data: DealAnimationData;
 }
 
 interface DealingCard {
+  key: string;
   playerId: string;
-  playerName: string;
-  cardIndex: number;
-  targetPosition: { x: number; y: number };
+  target: { x: number; y: number };
+  /** Quando a carta sai do baralho (ms desde o início) */
   delay: number;
 }
 
-export function CardDealAnimation({
-  data,
-  onComplete,
-  duration = DEFAULT_DURATIONS.deal // Por carta
-}: CardDealAnimationProps) {
+/** Quanto tempo cada carta leva do baralho até a mão, em proporção ao intervalo entre cartas. */
+const FLIGHT_SHARE = 1.4;
+
+/**
+ * Distribuição inicial: uma carta por jogador de cada vez, como na mesa de verdade.
+ * Cada carta da mesa só aparece quando a carta voadora pousa nela (dealStore).
+ */
+export function CardDealAnimation({ data, onComplete, duration = DEFAULT_DURATIONS.deal }: CardDealAnimationProps) {
   const { t } = useI18n();
-  const [isVisible, setIsVisible] = useState(true);
-  const [dealtCards, setDealtCards] = useState<Set<string>>(new Set());
-  const [phase, setPhase] = useState<'dealing' | 'complete'>('dealing');
-
+  const isCompact = useIsCompactGame();
+  const size = flyingCardSize(isCompact);
   const { players, deckPosition } = data;
+  const [launched, setLaunched] = useState<ReadonlySet<string>>(new Set());
+  const [landed, setLanded] = useState<ReadonlySet<string>>(new Set());
+  const flightMs = duration * FLIGHT_SHARE;
 
-  // Cria a sequência de cartas a serem distribuídas
-  // Distribui uma carta para cada jogador por vez (round-robin)
-  const dealingSequence = useMemo(() => {
-    const sequence: DealingCard[] = [];
-    const maxCards = Math.max(...players.map(p => p.cards.length));
-    
-    let cardNumber = 0;
+  const sequence = useMemo(() => {
+    const cards: DealingCard[] = [];
+    const maxCards = Math.max(0, ...players.map((p) => p.cards.length));
     for (let cardIndex = 0; cardIndex < maxCards; cardIndex++) {
       for (const player of players) {
-        if (cardIndex < player.cards.length && cardIndex < player.positions.length) {
-          sequence.push({
-            playerId: player.id,
-            playerName: player.name,
-            cardIndex,
-            targetPosition: player.positions[cardIndex],
-            delay: cardNumber * duration,
-          });
-          cardNumber++;
-        }
+        const target = player.positions[cardIndex];
+        if (cardIndex >= player.cards.length || !target) continue;
+        cards.push({ key: dealKey(player.id, cardIndex), playerId: player.id, target, delay: cards.length * duration });
       }
     }
-    
-    return sequence;
+    return cards;
   }, [players, duration]);
-
-  const totalDuration = dealingSequence.length * duration + 500; // +500ms buffer
 
   const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
-    // Distribui cada carta em sequência
-    const timers = dealingSequence.map((card, index) => {
-      return setTimeout(() => {
-        setDealtCards(prev => {
-          const next = new Set(prev);
-          next.add(`${card.playerId}_${card.cardIndex}`);
-          return next;
-        });
-      }, card.delay);
-    });
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (const card of sequence) {
+      timers.push(
+        setTimeout(() => {
+          setLaunched((prev) => new Set(prev).add(card.key));
+          audioManager.playCardSlide();
+        }, card.delay),
+        setTimeout(() => {
+          setLanded((prev) => new Set(prev).add(card.key));
+          markDealt(card.key);
+        }, card.delay + flightMs),
+      );
+    }
+    const total = (sequence.at(-1)?.delay ?? 0) + flightMs + 150;
+    timers.push(
+      setTimeout(() => {
+        endDeal();
+        onCompleteRef.current();
+      }, total),
+    );
+    // Sair da partida no meio da distribuição é tratado pela página do jogo (endDeal ao desmontar)
+    return () => timers.forEach(clearTimeout);
+  }, [sequence, flightMs, onCompleteRef]);
 
-    // Completa a animação
-    const completeTimer = setTimeout(() => {
-      setPhase('complete');
-      setIsVisible(false);
-      setTimeout(() => onCompleteRef.current(), 100);
-    }, totalDuration);
-
-    return () => {
-      timers.forEach(t => clearTimeout(t));
-      clearTimeout(completeTimer);
-    };
-  }, [dealingSequence, totalDuration, onCompleteRef]);
-
-  if (!isVisible) return null;
-
-  // Agrupa jogadores para mostrar progresso
-  const dealtCardsArray = Array.from(dealtCards);
-  const playerProgress = players.map(player => ({
+  const progress = players.map((player) => ({
+    id: player.id,
     name: player.name,
     total: player.cards.length,
-    dealt: dealtCardsArray.filter(key => key.startsWith(player.id)).length,
+    dealt: sequence.filter((c) => c.playerId === player.id && landed.has(c.key)).length,
   }));
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <div className="fixed inset-0 pointer-events-none z-[9999]">
-          {/* Overlay suave */}
+    <div className="fixed inset-0 pointer-events-none z-[9999]">
+      {/* Cartas em voo: saem do baralho e somem ao pousar (a carta da mesa aparece no lugar) */}
+      {sequence.map((card, index) => {
+        if (!launched.has(card.key) || landed.has(card.key)) return null;
+        const start = { x: deckPosition.x - size.halfW, y: deckPosition.y - size.halfH };
+        const end = { x: card.target.x - size.halfW, y: card.target.y - size.halfH };
+        const peakY = Math.min(deckPosition.y, card.target.y) - (isCompact ? 30 : 60) - size.halfH;
+        return (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.3 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="absolute inset-0 bg-black"
-          />
-
-          {/* Cartas sendo distribuídas */}
-          {dealingSequence.map((dealCard, index) => {
-            const cardKey = `${dealCard.playerId}_${dealCard.cardIndex}`;
-            const isDealt = dealtCards.has(cardKey);
-            
-            // Calcula arco para a animação
-            const midX = (deckPosition.x + dealCard.targetPosition.x) / 2;
-            const midY = Math.min(deckPosition.y, dealCard.targetPosition.y) - 80;
-
-            return (
-              <motion.div
-                key={cardKey}
-                initial={{
-                  x: deckPosition.x - 48,
-                  y: deckPosition.y - 68,
-                  scale: 0.8,
-                  opacity: 0,
-                  rotate: 0,
-                }}
-                animate={isDealt ? {
-                  x: [deckPosition.x - 48, midX - 48, dealCard.targetPosition.x - 48],
-                  y: [deckPosition.y - 68, midY - 68, dealCard.targetPosition.y - 68],
-                  scale: [0.8, 1.1, 1],
-                  opacity: [0, 1, 1],
-                  rotate: [0, 15, 0],
-                } : {}}
-                transition={{
-                  duration: duration / 1000 * 0.8,
-                  ease: "easeOut",
-                  times: [0, 0.4, 1],
-                }}
-                style={{
-                  position: 'absolute',
-                  zIndex: 10000 + index,
-                  filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.4))',
-                }}
-              >
-                <PlayingCard card={undefined} hidden={true} className="w-24 h-36" animate={false} />
-              </motion.div>
-            );
-          })}
-
-          {/* Indicador de distribuição — centralizado no topo da mesa */}
-          <div className="absolute top-4 md:top-6 left-0 right-0 z-[10001] flex justify-center px-4 pointer-events-none">
-            <motion.div
-              initial={{ opacity: 0, y: -16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="max-w-[min(92vw,36rem)]"
-            >
-              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 backdrop-blur-md rounded-2xl px-5 py-3 md:px-8 md:py-4 shadow-2xl border border-white/10">
-                <div className="text-white font-bold text-base md:text-xl text-center mb-2">
-                  {t("anim.dealing")}
-                </div>
-                <div className="flex flex-wrap justify-center gap-1.5 md:gap-2">
-                  {playerProgress.map((player, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-1.5 bg-white/20 rounded-lg px-2.5 py-1"
-                    >
-                      <span className="text-white/90 text-xs md:text-sm truncate max-w-[5.5rem]">
-                        {player.name}
-                      </span>
-                      <span className="text-emerald-100 font-mono text-xs md:text-sm tabular-nums">
-                        {player.dealt}/{player.total}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Efeito de brilho no deck */}
-          <motion.div
+            key={card.key}
+            initial={{ ...start, scale: 0.9, rotate: 0 }}
             animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.3, 0.6, 0.3],
+              x: [start.x, (start.x + end.x) / 2, end.x],
+              y: [start.y, peakY, end.y],
+              scale: [0.9, 1.05, 0.85],
+              rotate: [0, index % 2 ? 14 : -14, 0],
             }}
-            transition={{
-              duration: 0.3,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-            style={{
-              position: "absolute",
-              left: deckPosition.x,
-              top: deckPosition.y,
-              x: "-50%",
-              y: "-50%",
-            }}
+            transition={{ duration: flightMs / 1000, ease: [0.3, 0.1, 0.3, 1], times: [0, 0.45, 1] }}
+            style={{ position: "absolute", left: 0, top: 0, zIndex: 10000 + index, filter: "drop-shadow(0 10px 16px rgba(0,0,0,0.45))" }}
           >
-            <div className="w-28 h-28 bg-emerald-400 rounded-full blur-xl" />
+            <PlayingCard hidden className={size.className} animate={false} />
           </motion.div>
+        );
+      })}
 
-          {/* Contador total — centralizado na base */}
-          <div className="absolute bottom-4 md:bottom-8 left-0 right-0 z-[10001] flex justify-center pointer-events-none">
-            <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-              <div className="bg-white/90 text-emerald-700 font-bold text-lg md:text-2xl px-5 py-2 md:px-6 md:py-3 rounded-full shadow-lg flex items-center gap-2">
-                <span>{dealtCards.size}</span>
-                <span className="text-emerald-500">/</span>
-                <span className="text-emerald-600">{dealingSequence.length}</span>
-                <span className="text-sm font-normal text-emerald-600 ml-1">{t("anim.cards")}</span>
-              </div>
-            </motion.div>
+      {/* Progresso discreto no topo */}
+      <div className="absolute left-0 right-0 top-12 z-[10001] flex justify-center px-4 md:top-16">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-full border border-white/15 bg-black/60 px-3 py-1 text-white shadow-lg backdrop-blur-sm"
+        >
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 text-[11px] md:text-sm">
+            <span className="font-bold text-emerald-300">{t("anim.dealing")}</span>
+            {progress.map((p) => (
+              <span key={p.id} className="tabular-nums text-white/85">
+                {p.name} {p.dealt}/{p.total}
+              </span>
+            ))}
           </div>
-
-          {/* Linhas de conexão para cada jogador */}
-          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }} aria-hidden="true">
-            {players.map((player, playerIndex) => {
-              // Calcula posição média das cartas do jogador
-              const avgX = player.positions.reduce((sum, p) => sum + p.x, 0) / player.positions.length;
-              const avgY = player.positions.reduce((sum, p) => sum + p.y, 0) / player.positions.length;
-              const midX = (deckPosition.x + avgX) / 2;
-              const midY = Math.min(deckPosition.y, avgY) - 60;
-
-              return (
-                <motion.path
-                  key={playerIndex}
-                  d={`M ${deckPosition.x} ${deckPosition.y} Q ${midX} ${midY} ${avgX} ${avgY}`}
-                  fill="none"
-                  stroke={`rgba(52, 211, 153, ${0.3 + (playerIndex * 0.1)})`}
-                  strokeWidth="2"
-                  strokeDasharray="8,4"
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={{ pathLength: 1, opacity: 0.5 }}
-                  transition={{ duration: 0.5, delay: playerIndex * 0.1 }}
-                />
-              );
-            })}
-          </svg>
-        </div>
-      )}
-    </AnimatePresence>
+        </motion.div>
+      </div>
+    </div>
   );
 }

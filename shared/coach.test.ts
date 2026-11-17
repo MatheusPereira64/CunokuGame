@@ -64,9 +64,9 @@ describe("coachTip", () => {
     expect(coachTip(s, 0, { type: "discard_drawn" })?.key).not.toBe("coach.shouldSwap");
   });
 
-  it("lembra do Rei no descarte na hora de comprar", () => {
+  it("não sugere comprar do descarte: só se compra do baralho", () => {
     const s = state({ turnPhase: "draw", discardPile: [card("K", 0)] });
-    expect(coachTip(s, 0, { type: "draw_deck" })?.key).toBe("coach.takeDiscard");
+    expect(coachTip(s, 0, { type: "draw_deck" })).toBeNull();
   });
 });
 
@@ -101,5 +101,17 @@ describe("conquistas de jogada", () => {
     expect(isRewardUnlocked("back", "seigaiha", [])).toBe(true);
     expect(isRewardUnlocked("back", "kin", [])).toBe(false);
     expect(isRewardUnlocked("back", "kin", ["win_zero"])).toBe(true);
+  });
+});
+
+describe("bots compram só do baralho", () => {
+  it("nenhuma dificuldade pega a carta do descarte, nem um Rei", async () => {
+    const { decideBotTurn } = await import("./botBrain");
+    for (const difficulty of ["easy", "medium", "hard"] as const) {
+      for (let i = 0; i < 20; i++) {
+        const s = state({ turnPhase: "draw", discardPile: [card("K", 0, `k${i}`)], seed: `s${i}` });
+        expect(decideBotTurn(s, 1, difficulty)).toEqual({ type: "draw_deck" });
+      }
+    }
   });
 });

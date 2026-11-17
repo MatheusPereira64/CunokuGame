@@ -1,5 +1,5 @@
 import { GameState, GameAction } from "@shared/schema";
-import { decideBotTurn, type BotDifficulty } from "@shared/botBrain";
+import { decideBotFinish, decideBotTurn, type BotDifficulty } from "@shared/botBrain";
 
 export type { BotDifficulty };
 
@@ -30,23 +30,8 @@ export class BotPlayer {
     return decideBotTurn(state, playerIndex, this.difficulty);
   }
 
-  // Decide if bot wants to call "Cunoku" (end game)
+  /** Declara Cunoku antes de comprar? Mesma regra do servidor (shared/botBrain). */
   decideFinish(state: GameState, playerIndex: number): boolean {
-    const player = state.players[playerIndex];
-    const totalScore = player.hand.reduce((sum, card) => sum + card.value, 0);
-
-    if (this.difficulty === "easy") {
-      // Easy: call after round 3
-      return state.round > 3 && totalScore < 15;
-    }
-
-    if (this.difficulty === "medium") {
-      // Medium: call if score < 8
-      return totalScore < 8;
-    }
-
-    // Hard: call if score is good AND others likely have worse
-    return totalScore < 5;
+    return decideBotFinish(state, playerIndex, this.difficulty);
   }
 }
-

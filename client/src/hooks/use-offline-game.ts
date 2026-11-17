@@ -72,7 +72,10 @@ export function useOfflineGame(
           processingRef.current = false;
           return;
         }
-        const action = bot.decideTurn(before, before.currentPlayerIndex);
+        // Antes de comprar, o bot pode declarar Cunoku (como no online); depois segue a vez normalmente
+        const action = bot.decideFinish(before, before.currentPlayerIndex)
+          ? ({ type: "declare_finish" } as const)
+          : bot.decideTurn(before, before.currentPlayerIndex);
         const after = processOfflineAction(before, action, currentPlayer.id);
 
         commitState(after);

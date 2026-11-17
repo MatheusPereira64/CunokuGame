@@ -15,6 +15,8 @@ import { useIsCompactGame } from "@/hooks/use-landscape";
 import { useI18n } from "@/contexts/i18n-context";
 import { ArrowUpDown, Lock } from "lucide-react";
 import { loadProfile } from "@/lib/playerProfile";
+import { isCardDealt, useDealProgress } from "@/components/animations/dealStore";
+import { slotKey, useTableHold } from "@/components/animations/tableHold";
 
 interface MyAreaProps {
   gameState: GameState;
@@ -30,6 +32,8 @@ interface MyAreaProps {
 }
 
 export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCardPosition, revealedCards = {}, emoteId }: MyAreaProps) {
+  const deal = useDealProgress();
+  const tableHold = useTableHold();
   const isCompact = useIsCompactGame();
   const { t } = useI18n();
   const swapHighlights = useSwapHighlights();
@@ -118,6 +122,8 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
               key={card.id || i}
               className={cn(
                 "relative flex flex-col items-center group",
+                deal.active && (isCardDealt(deal, me.id, i) ? "deal-pop" : "invisible"),
+                tableHold.slots.has(slotKey(me.id, i)) && "invisible",
                 isCompact
                   ? "min-w-[52px] flex-shrink-0"
                   : useFanOverlap
@@ -180,7 +186,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
                 <div style={swapCardStyle(swapHighlights[card.id])}>
                 <PlayingCard
                   card={revealedFace ?? card}
-                  hidden={!gameState.winnerId && (sealed || (!isKnownCard && !revealedFace))}
+                  hidden={!gameState.winnerId && (sealed || (!isKnownCard && !revealedFace) || tableHold.faces.has(slotKey(me.id, i)))}
                   selected={selectedHandIndex === i}
                   className={cn(
                     "transition-all mx-auto",

@@ -1,4 +1,6 @@
-import { useEffect, useState, useRef, useCallback, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useState, useRef, useCallback, useSyncExternalStore } from "react";
+import { beginDeal, endDeal } from "@/components/animations/dealStore";
+import { afterPileLanding, holdFace, holdPileCard, holdSlot, releaseAll, releaseFace, slotKey } from "@/components/animations/tableHold";
 import { useRoute, useLocation } from "wouter";
 import { useGameSocket } from "@/hooks/use-game-socket";
 import { useOfflineGame } from "@/hooks/use-offline-game";
@@ -28,7 +30,7 @@ import { loadTableTheme, subscribeTableTheme } from "@/lib/tableTheme";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { SwapHighlight } from "@/components/game/swapHighlight";
 import { ActiveTable, ConnectingScreen, renderPregame } from "@/pages/gameTable";
-import { applyOfflineSession, isOpeningDeal, leftWaitingRoom, matchInProgress, playTableAnimations, syncFinishedMatch } from "@/pages/gameMotion";
+import { applyOfflineSession, isOpeningDeal, leftWaitingRoom, matchInProgress, pendingTableHolds, playTableAnimations, syncFinishedMatch } from "@/pages/gameMotion";
 
 const QUEUE_START_RETRY_MS = 2000;
 const SWAP_HIGHLIGHT_MS = 6000;
@@ -251,6 +253,36 @@ export default function Game() {
   const animationTriggeredRef = useRef<Set<string>>(new Set());
   const hasDealtRef = useRef(false);
 
+  // Antes de pintar a mesa: se vai haver distribuição, as cartas começam escondidas
+  // e aparecem uma a uma conforme a animação as entrega
+  const dealHiddenRef = useRef(false);
+  useLayoutEffect(() => {
+    if (!gameState || dealHiddenRef.current) return;
+    const prev = prevGameStateRef.current;
+    const willDeal = prev ? leftWaitingRoom(prev, gameState) : isOpeningDeal(gameState);
+    if (!willDeal) return;
+    dealHiddenRef.current = true;
+    beginDeal();
+  }, [gameState]);
+  useEffect(() => () => {
+    endDeal();
+    releaseAll();
+  }, []);
+
+  // Antes de pintar: a carta trocada e a pilha de descarte esperam as cartas voadoras chegarem
+  const heldIdsRef = useRef<Set<string>>(new Set());
+  useLayoutEffect(() => {
+    const prev = prevGameStateRef.current;
+    if (!gameState || !prev) return;
+    const { pileCardIds, slots } = pendingTableHolds(prev, gameState);
+    for (const id of pileCardIds) {
+      if (heldIdsRef.current.has(id)) continue;
+      heldIdsRef.current.add(id);
+      holdPileCard(id);
+    }
+    slots.forEach(holdSlot);
+  }, [gameState]);
+
   useEffect(() => {
     if (!gameState) return;
 
@@ -336,7 +368,7 @@ export default function Game() {
   );
 
   useEffect(() => {
-    if (privateReveal) showReveals(privateReveal.reveals, privateReveal.durationMs);
+    if (privateReveal) afterPileLanding(() => showReveals(privateReveal.reveals, privateReveal.durationMs));
     // showReveals muda com o idioma, e isso não pode repetir a revelação
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [privateReveal]);
@@ -373,24 +405,33 @@ export default function Game() {
         clearTimeout(revealedOpponentCard.timer);
       }
 
-      const overlayTimer = setTimeout(() => {
-        setOnlineRevealedCard(null);
-        setRevealedOpponentCard(null);
-      }, 3000);
+      // O painel abre depois que a carta do poder cai na pilha
+      let overlayTimer: ReturnType<typeof setTimeout> | undefined;
+      let cancelled = false;
+      afterPileLanding(() => {
+        if (cancelled) return;
+        overlayTimer = setTimeout(() => {
+          setOnlineRevealedCard(null);
+          setRevealedOpponentCard(null);
+        }, 3000);
 
-      setRevealedOpponentCard({
-        card: onlineRevealedCard.card,
-        playerName: onlineRevealedCard.playerName,
-        timer: overlayTimer,
+        setRevealedOpponentCard({
+          card: onlineRevealedCard.card,
+          playerName: onlineRevealedCard.playerName,
+          timer: overlayTimer,
+        });
+        audioManager.playCardFlip();
+
+        const targetPlayerId = (onlineRevealedCard as any).targetPlayerId as string | undefined;
+        if (targetPlayerId && onlineRevealedCard.card) {
+          revealOpponentCardInHand(targetPlayerId, onlineRevealedCard.card);
+        }
       });
-      audioManager.playCardFlip();
 
-      const targetPlayerId = (onlineRevealedCard as any).targetPlayerId as string | undefined;
-      if (targetPlayerId && onlineRevealedCard.card) {
-        revealOpponentCardInHand(targetPlayerId, onlineRevealedCard.card);
-      }
-
-      return () => clearTimeout(overlayTimer);
+      return () => {
+        cancelled = true;
+        clearTimeout(overlayTimer);
+      };
     }
   }, [onlineRevealedCard, isOffline, setOnlineRevealedCard, revealOpponentCardInHand]);
 
@@ -556,6 +597,13 @@ export default function Game() {
 
     if (action.kind === "peek_own") {
       const cardIndex = action.cardIndex;
+      // A carta só vira depois que a carta do poder cai na pilha
+      const faceKey = slotKey(playerId, cardIndex);
+      holdFace(faceKey);
+      afterPileLanding(() => {
+        releaseFace(faceKey);
+        audioManager.playCardFlip();
+      });
       sendAction({
         type: "use_ability",
         ability: "peek_own",
@@ -563,7 +611,6 @@ export default function Game() {
         targetCardIndex: cardIndex,
         targetCardId: action.cardId,
       });
-      audioManager.playCardFlip();
 
       // A carta volta a ficar oculta após 20 segundos (apenas visual)
       const timer = setTimeout(() => {
@@ -588,10 +635,13 @@ export default function Game() {
           if (revealedOpponentCard?.timer) {
             clearTimeout(revealedOpponentCard.timer);
           }
-          const overlayTimer = setTimeout(() => setRevealedOpponentCard(null), 3000);
-          setRevealedOpponentCard({ card: peekedCard, playerName: targetPlayer.name, timer: overlayTimer });
-          revealOpponentCardInHand(action.targetPlayerId, peekedCard);
-          audioManager.playCardFlip();
+          // O painel abre depois que a carta do poder cai na pilha
+          afterPileLanding(() => {
+            const overlayTimer = setTimeout(() => setRevealedOpponentCard(null), 3000);
+            setRevealedOpponentCard({ card: peekedCard, playerName: targetPlayer.name, timer: overlayTimer });
+            revealOpponentCardInHand(action.targetPlayerId, peekedCard);
+            audioManager.playCardFlip();
+          });
         }
       }
 
@@ -637,12 +687,18 @@ export default function Game() {
 
     if (action.kind === "king") {
       // Offline não há servidor: as faces vêm do estado local
-      if (isOffline) showReveals(revealCards(gameState, [action.targetPlayerId]), KING_REVEAL_MS);
+      if (isOffline) {
+        const reveals = revealCards(gameState, [action.targetPlayerId]);
+        afterPileLanding(() => showReveals(reveals, KING_REVEAL_MS));
+      }
       sendAction({ type: "use_ability", ability: "king", targetPlayerId: action.targetPlayerId });
     }
 
     if (action.kind === "joker_reveal") {
-      if (isOffline) showReveals(revealCards(gameState, gameState.players.map((p) => p.id)), JOKER_REVEAL_MS);
+      if (isOffline) {
+        const reveals = revealCards(gameState, gameState.players.map((p) => p.id));
+        afterPileLanding(() => showReveals(reveals, JOKER_REVEAL_MS));
+      }
       sendAction({ type: "use_ability", ability: "joker_reveal" });
     }
 

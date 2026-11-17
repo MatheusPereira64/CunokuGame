@@ -1,280 +1,178 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, useAnimate } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useLatest } from "./useLatest";
 import { PlayingCard } from "../PlayingCard";
-import { ReplaceAnimationData, BaseAnimationProps, DEFAULT_DURATIONS } from "./types";
+import { ReplaceAnimationData, BaseAnimationProps, DEFAULT_DURATIONS, type Position } from "./types";
 import { useI18n } from "@/contexts/i18n-context";
-
-function motionForPhase<T>(phase: string, poses: { highlight: T; lift: T; swap: T; done: T }): T {
-  if (phase === "highlight") return poses.highlight;
-  if (phase === "lift") return poses.lift;
-  if (phase === "swap") return poses.swap;
-  return poses.done;
-}
-
-function shown(phase: string, on: number, off: number) {
-  return phase === "highlight" ? off : on;
-}
+import { useIsCompactGame } from "@/hooks/use-landscape";
+import { cn } from "@/lib/utils";
+import { flyingCardSize, measureCenter, arcPeakY } from "./flyingCard";
+import { landOnPile, releaseSlot, slotKey } from "./tableHold";
 
 interface CardReplaceAnimationProps extends BaseAnimationProps {
   data: ReplaceAnimationData;
   isOwnPlayer?: boolean;
 }
 
-export function CardReplaceAnimation({
-  data,
-  onComplete,
-  duration = DEFAULT_DURATIONS.replace,
-  isOwnPlayer = false
-}: CardReplaceAnimationProps) {
-  const { t } = useI18n();
-  const [isVisible, setIsVisible] = useState(true);
-  const [phase, setPhase] = useState<'highlight' | 'lift' | 'swap' | 'complete'>('highlight');
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const { 
-    drawnCard, 
-    handCard, 
-    drawnCardPosition, 
-    handCardPosition, 
-    discardPosition,
-    playerName 
-  } = data;
+/** Lugar e tamanho da carta na mão: a animação começa e termina exatamente nele. */
+function measureSlot(playerId: string, handIndex: number): { center: Position; width: number } | null {
+  const el = document.querySelector(`[data-card-target="${CSS.escape(playerId)}:${handIndex}"]`);
+  if (!el) return null;
+  const rect = el.getBoundingClientRect();
+  if (rect.width === 0) return null;
+  return { center: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, width: rect.width };
+}
+
+/**
+ * Troca da carta comprada por uma da mão, em três tempos:
+ * 1. a carta escolhida da mão acende (anel e "carta N") e sobe do lugar;
+ * 2. ela vira de face e voa em arco até a pilha de descarte, com impacto ao cair;
+ * 3. a carta comprada voa até o lugar vazio e encaixa, com um brilho verde.
+ * O lugar na mão e a pilha mostram o estado novo só quando cada carta pousa (tableHold).
+ */
+export function CardReplaceAnimation({ data, onComplete, duration = DEFAULT_DURATIONS.replace, isOwnPlayer = false }: CardReplaceAnimationProps) {
+  const { t } = useI18n();
+  const isCompact = useIsCompactGame();
+  const size = flyingCardSize(isCompact);
+  const { drawnCard, handCard, drawnCardPosition, playerId, playerName, handIndex } = data;
+  const [handScope, animateHand] = useAnimate();
+  const [drawnScope, animateDrawn] = useAnimate();
+
+  const initialSlot = measureSlot(playerId, handIndex);
+  const [slot] = useState(() => initialSlot ?? { center: data.handCardPosition, width: size.halfW * 2 });
+  const slotScale = slot.width / (size.halfW * 2);
+
+  const [handFaceUp, setHandFaceUp] = useState(isOwnPlayer);
+  const [pileTarget, setPileTarget] = useState(data.discardPosition);
+  const [handLanded, setHandLanded] = useState(false);
+  const [drawnLanded, setDrawnLanded] = useState(false);
 
   const onCompleteRef = useLatest(onComplete);
   useEffect(() => {
-    // Fase 1: Destacar cartas
-    const liftTimer = setTimeout(() => {
-      setPhase('lift');
-    }, duration * 0.1);
+    let cancelled = false;
+    const ms = duration;
+    // O Framer Motion mede em segundos; os tempos abaixo são frações da duração
+    const sec = duration / 1000;
+    const at = (p: Position) => ({ x: p.x - size.halfW, y: p.y - size.halfH });
 
-    // Fase 2: Levantar cartas
-    const swapTimer = setTimeout(() => {
-      setPhase('swap');
-    }, duration * 0.25);
-
-    // Fase 3: Animação principal de troca
-    const completeTimer = setTimeout(() => {
-      setPhase('complete');
-    }, duration * 0.85);
-
-    // Fase 4: Finalização
-    const endTimer = setTimeout(() => {
-      setIsVisible(false);
-      setTimeout(() => onCompleteRef.current(), 100);
-    }, duration);
-
-    return () => {
-      clearTimeout(liftTimer);
-      clearTimeout(swapTimer);
-      clearTimeout(completeTimer);
-      clearTimeout(endTimer);
+    // Carta que sai da mão: acende no lugar, sobe, vira e vai para a pilha
+    const handFlight = async () => {
+      const start = at(slot.center);
+      // Começa parada no lugar da mão (os valores iniciais do Framer partem de 0)
+      await animateHand(handScope.current, { x: start.x, y: start.y, scale: slotScale, rotate: 0 }, { duration: 0 });
+      await animateHand(handScope.current, { x: start.x, y: start.y - (isCompact ? 14 : 24), scale: slotScale * 1.15, rotate: -6 }, { delay: sec * 0.18, duration: sec * 0.18, ease: "easeOut" });
+      if (cancelled) return;
+      setHandFaceUp(true);
+      const pile = measureCenter("[data-discard-pile]") ?? data.discardPosition;
+      setPileTarget(pile);
+      const end = at(pile);
+      const peakY = arcPeakY(Math.min(slot.center.y, pile.y) - (isCompact ? 50 : 90) - size.halfH);
+      await animateHand(
+        handScope.current,
+        { x: [start.x, (start.x + end.x) / 2, end.x], y: [start.y - (isCompact ? 14 : 24), peakY, end.y], scale: [slotScale * 1.15, 1.15, 1], rotate: [-6, -16, 0] },
+        { duration: sec * 0.36, ease: [0.3, 0.05, 0.25, 1] },
+      );
+      if (cancelled) return;
+      setHandLanded(true);
+      landOnPile(handCard.id);
     };
-  }, [duration, onCompleteRef]);
 
-  if (!isVisible) return null;
+    // Carta comprada: espera a da mão sair do lugar e voa até ele
+    const drawnFlight = async () => {
+      await wait(ms * 0.42);
+      if (cancelled) return;
+      const target = measureSlot(playerId, handIndex)?.center ?? slot.center;
+      const start = at(drawnCardPosition);
+      const end = at(target);
+      const peakY = arcPeakY(Math.min(drawnCardPosition.y, target.y) - (isCompact ? 30 : 60) - size.halfH);
+      await animateDrawn(drawnScope.current, { x: start.x, y: start.y, scale: 1, rotate: 0 }, { duration: 0 });
+      await animateDrawn(drawnScope.current, { opacity: 1 }, { duration: 0.08 });
+      await animateDrawn(
+        drawnScope.current,
+        { x: [start.x, (start.x + end.x) / 2, end.x], y: [start.y, peakY, end.y], scale: [1, 1.12, slotScale], rotate: [0, 10, 0] },
+        { duration: sec * 0.38, ease: [0.3, 0.05, 0.25, 1] },
+      );
+      if (cancelled) return;
+      setDrawnLanded(true);
+      releaseSlot(slotKey(playerId, handIndex));
+    };
 
-  // Ponto central entre as duas cartas (mais alto para melhor visibilidade)
-  const centerX = (drawnCardPosition.x + handCardPosition.x) / 2;
-  const arcHeight = Math.max(100, Math.abs(handCardPosition.y - drawnCardPosition.y) * 0.5);
-  const centerY = Math.min(drawnCardPosition.y, handCardPosition.y) - arcHeight;
+    void Promise.all([handFlight(), drawnFlight()]).then(async () => {
+      if (cancelled) return;
+      await wait(320);
+      if (!cancelled) onCompleteRef.current();
+    });
+    return () => {
+      cancelled = true;
+    };
+    // A animação roda uma vez por troca
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const slotBox = {
+    left: slot.center.x - slot.width / 2 - 4,
+    top: slot.center.y - (slot.width * 1.4) / 2 - 4,
+    width: slot.width + 8,
+    height: slot.width * 1.4 + 8,
+  };
+  const translate = (p: Position, scale = 1) => `translate(${p.x - size.halfW}px, ${p.y - size.halfH}px) scale(${scale})`;
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <div className="fixed inset-0 pointer-events-none z-[9999]">
-          {/* Overlay */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.3 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black"
-          />
+    <div className="fixed inset-0 pointer-events-none z-[9999]">
+      {/* 1. O lugar escolhido acende enquanto a troca acontece; fica verde quando a nova chega */}
+      <motion.div
+        initial={{ opacity: 0, scale: 1.25 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.2 }}
+        className={cn(
+          "absolute rounded-xl border-[3px] transition-colors duration-200",
+          drawnLanded ? "border-emerald-300 shadow-[0_0_22px_rgba(16,185,129,0.8)]" : "border-amber-300 shadow-[0_0_22px_rgba(252,211,77,0.8)] motion-safe:animate-pulse",
+        )}
+        style={slotBox}
+      />
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="absolute z-[10002]"
+        style={{ left: slot.center.x, top: slotBox.top - (isCompact ? 22 : 28) }}
+      >
+        <div className={cn("-translate-x-1/2 whitespace-nowrap rounded-full border-2 border-amber-200 bg-amber-500 font-black text-amber-950 shadow-lg", isCompact ? "px-2 py-0.5 text-[10px]" : "px-3 py-1 text-xs")}>
+          {t("anim.replacedSlot", { n: String(handIndex + 1), player: playerName })}
+        </div>
+      </motion.div>
 
-          {/* Carta da mão indo para o descarte */}
-          <motion.div
-            initial={{
-              x: handCardPosition.x - 48,
-              y: handCardPosition.y - 68,
-              scale: 1,
-              rotate: 0,
-              opacity: 1,
-            }}
-            animate={motionForPhase(phase, {
-              highlight: { x: handCardPosition.x - 48, y: handCardPosition.y - 68, scale: 1.1, rotate: 0, opacity: 1 },
-              lift: { x: handCardPosition.x - 48, y: handCardPosition.y - 88, scale: 1.15, rotate: -5, opacity: 1 },
-              swap: { x: centerX - 48, y: centerY - 68, scale: 1.2, rotate: -25, opacity: 1 },
-              done: { x: discardPosition.x - 48, y: discardPosition.y - 68, scale: 0.9, rotate: -5, opacity: 0.95 },
-            })}
-            transition={{
-              type: "spring",
-              stiffness: 200,
-              damping: 25,
-              mass: 0.7,
-            }}
-            style={{
-              position: 'absolute',
-              zIndex: 10001,
-              filter: 'drop-shadow(0 20px 40px rgba(239, 68, 68, 0.6))',
-            }}
-          >
-            <PlayingCard card={handCard} hidden={false} className="w-24 h-36" animate={false} />
-            {/* Badge "Descarte" */}
-            {phase === 'swap' && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap"
-              >
-                → {t("anim.fromDiscard")}
-              </motion.div>
-            )}
-          </motion.div>
-
-          {/* Carta comprada indo para a mão */}
-          <motion.div
-            initial={{
-              x: drawnCardPosition.x - 48,
-              y: drawnCardPosition.y - 68,
-              scale: 1,
-              rotate: 0,
-              opacity: 1,
-            }}
-            animate={motionForPhase(phase, {
-              highlight: { x: drawnCardPosition.x - 48, y: drawnCardPosition.y - 68, scale: 1.1, rotate: 0, opacity: 1 },
-              lift: { x: drawnCardPosition.x - 48, y: drawnCardPosition.y - 88, scale: 1.15, rotate: 5, opacity: 1 },
-              swap: { x: centerX - 48, y: centerY - 38, scale: 1.3, rotate: 25, opacity: 1 },
-              done: { x: handCardPosition.x - 48, y: handCardPosition.y - 68, scale: 1, rotate: 0, opacity: 1 },
-            })}
-            transition={{
-              type: "spring",
-              stiffness: 200,
-              damping: 25,
-              mass: 0.7,
-            }}
-            style={{
-              position: 'absolute',
-              zIndex: 10000,
-              filter: 'drop-shadow(0 20px 40px rgba(34, 197, 94, 0.6))',
-            }}
-          >
-            <PlayingCard card={isOwnPlayer ? drawnCard : undefined} hidden={!isOwnPlayer} className="w-24 h-36" animate={false} />
-            {/* Badge "Mão" */}
-            {phase === 'swap' && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap"
-              >
-                → Mão
-              </motion.div>
-            )}
-          </motion.div>
-
-          {/* Linhas de conexão animadas mais visíveis */}
-          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 9998 }} aria-hidden="true">
-            {/* Linha da carta da mão para descarte (vermelha) */}
-            <motion.path
-              d={`M ${handCardPosition.x} ${handCardPosition.y} Q ${centerX} ${centerY - 40} ${discardPosition.x} ${discardPosition.y}`}
-              fill="none"
-              stroke="rgba(239, 68, 68, 0.9)"
-              strokeWidth="5"
-              strokeDasharray="12,6"
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: shown(phase, 1, 0), opacity: shown(phase, 1, 0) }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-            />
-            
-            {/* Linha da carta comprada para a mão (verde) */}
-            <motion.path
-              d={`M ${drawnCardPosition.x} ${drawnCardPosition.y} Q ${centerX} ${centerY + 40} ${handCardPosition.x} ${handCardPosition.y}`}
-              fill="none"
-              stroke="rgba(34, 197, 94, 0.9)"
-              strokeWidth="5"
-              strokeDasharray="12,6"
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: shown(phase, 1, 0), opacity: shown(phase, 1, 0) }}
-              transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
-            />
-          </svg>
-
-          {/* Indicador de ação melhorado */}
-          <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="absolute top-8 left-1/2 transform -translate-x-1/2 z-[10002]"
-          >
-            <div className="bg-gradient-to-r from-cyan-500 to-blue-600 backdrop-blur-md rounded-xl px-6 py-3 shadow-xl border-2 border-cyan-400">
-              <div className="text-white font-bold text-lg flex items-center gap-3">
-                <motion.span
-                  animate={{ rotate: [0, 180, 360] }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                  className="text-2xl"
-                >
-                  🔄
-                </motion.span>
-                <div className="flex flex-col">
-                  <span>{t("anim.replacing")}</span>
-                  <span className="text-xs font-normal text-cyan-100">
-                    {t("anim.replacingDesc", { player: playerName })}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Efeitos de brilho pulsante no centro */}
-          {phase === 'swap' && (
-            <>
-              <motion.div
-                animate={{ 
-                  scale: [1, 1.4, 1],
-                  opacity: [0.4, 0.8, 0.4]
-                }}
-                transition={{ 
-                  duration: 0.8,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-                style={{
-                  position: 'absolute',
-                  left: centerX,
-                  top: centerY,
-                  x: '-50%',
-                  y: '-50%',
-                }}
-              >
-                <div className="w-48 h-48 bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 rounded-full blur-3xl" />
-              </motion.div>
-              {/* Partículas de troca */}
-              {Array.from({ length: 8 }).map((_, i) => {
-                const angle = (i * 45) * Math.PI / 180;
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{
-                      scale: [0, 1, 0],
-                      opacity: [0, 1, 0],
-                      x: centerX + Math.cos(angle) * 60 - 4,
-                      y: centerY + Math.sin(angle) * 60 - 4,
-                    }}
-                    transition={{
-                      duration: 0.6,
-                      delay: 0.2 + (i * 0.05),
-                      ease: "easeOut"
-                    }}
-                    className="absolute w-2 h-2 bg-cyan-400 rounded-full"
-                    style={{ zIndex: 10003 }}
-                  />
-                );
-              })}
-            </>
-          )}
+      {/* 2. Carta que sai da mão para a pilha */}
+      {!handLanded && (
+        <div
+          ref={handScope}
+          className="absolute left-0 top-0"
+          style={{ zIndex: 10001, transform: translate(slot.center, slotScale), filter: "drop-shadow(0 14px 22px rgba(0,0,0,0.5)) drop-shadow(0 0 12px rgba(249,115,22,0.6))" }}
+        >
+          <PlayingCard card={handCard} hidden={!handFaceUp} className={size.className} animate={false} />
         </div>
       )}
-    </AnimatePresence>
+      {handLanded && (
+        <motion.div
+          initial={{ scale: 0.7, opacity: 0.9 }}
+          animate={{ scale: 1.8, opacity: 0 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+          className="absolute rounded-2xl border-4 border-orange-300"
+          style={{ left: pileTarget.x - size.halfW, top: pileTarget.y - size.halfH, width: size.halfW * 2, height: size.halfH * 2 }}
+        />
+      )}
+
+      {/* 3. Carta comprada indo para o lugar vazio */}
+      {!drawnLanded && (
+        <div
+          ref={drawnScope}
+          className="absolute left-0 top-0"
+          style={{ zIndex: 10000, opacity: 0, transform: translate(drawnCardPosition), filter: "drop-shadow(0 14px 22px rgba(0,0,0,0.5)) drop-shadow(0 0 12px rgba(16,185,129,0.6))" }}
+        >
+          <PlayingCard card={isOwnPlayer ? drawnCard : undefined} hidden={!isOwnPlayer} className={size.className} animate={false} />
+        </div>
+      )}
+    </div>
   );
 }

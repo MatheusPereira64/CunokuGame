@@ -1,4 +1,7 @@
 import { RefObject } from "react";
+import { useDealProgress } from "@/components/animations/dealStore";
+import { useTableHold, visiblePileIndex } from "@/components/animations/tableHold";
+import { rememberDrawnSlot } from "@/components/animations/flyingCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { GameState } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
@@ -31,6 +34,9 @@ export function CenterPile({
 }: CenterPileProps) {
   const isCompact = useIsCompactGame();
   const { t } = useI18n();
+  const dealing = useDealProgress().active;
+  // Cartas a caminho da pilha ainda não chegaram: mostra o que estava embaixo
+  const pileTop = visiblePileIndex(gameState.discardPile, useTableHold().pileCards);
 
   const cardClass = fit(isCompact, "w-12 h-[4.25rem]", "w-20 h-28 md:w-24 md:h-36");
   const canDraw = isMyTurn && phase === "draw";
@@ -88,7 +94,7 @@ export function CenterPile({
             exit={{ scale: 0, opacity: 0, transition: { duration: 0.12 } }}
             className={cn("relative z-20 flex items-center", fit(isCompact, "gap-1", "gap-2"))}
           >
-            <div className="relative" data-drawn-card>
+            <div className="relative" data-drawn-card ref={rememberDrawnSlot}>
               {!isCompact && (
                 <div className="absolute -top-7 left-0 right-0 text-center font-bold text-yellow-400 drop-shadow-md whitespace-nowrap text-xs">
                   {t("game.drawnCard")}
@@ -155,11 +161,13 @@ export function CenterPile({
 
       {/* Pilha de descarte */}
       <div className="relative" ref={discardRef} data-discard-pile>
-        {gameState.discardPile.length > 0 ? (
+        {pileTop >= 0 ? (
           <div className="relative">
             <div className={cn(labelClass, "text-white/50")}>{isCompact ? t("game.discardPileShort") : t("game.discardPile")}</div>
+            {/* Na distribuição o descarte fica de costas e vira quando a última carta chega */}
             <PlayingCard
-              card={gameState.discardPile[gameState.discardPile.length - 1]}
+              card={gameState.discardPile[pileTop]}
+              hidden={dealing}
               className={cardClass}
             />
           </div>

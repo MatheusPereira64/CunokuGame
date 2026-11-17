@@ -38,20 +38,11 @@ function slot(index: number) {
 export function coachTip(state: GameState, playerIndex: number, action: GameAction): CoachTip | null {
   const player = state.players[playerIndex];
   if (!player || state.winnerId) return null;
-  if (state.turnPhase === "draw" && action.type === "draw_deck") return drawTip(state, playerIndex);
   const drawn = state.drawnCard;
   if (!drawn || state.turnPhase !== "action" || state.forcedReplace || state.jokerRevealed) return null;
   if (action.type === "discard_drawn") return discardTip(state, playerIndex, drawn);
   if (action.type === "replace_card") return replaceTip(state, playerIndex, drawn, action.handIndex);
   return null;
-}
-
-/** Carta de valor zero ou negativo no descarte vale mais que uma compra às cegas. */
-function drawTip(state: GameState, playerIndex: number): CoachTip | null {
-  const top = state.discardPile[state.discardPile.length - 1];
-  const worst = worstKnown(state, playerIndex);
-  if (!top || top.value > 0 || !worst || worst.card.value - top.value < NICE_SWAP) return null;
-  return { key: "coach.takeDiscard", vars: { rank: top.rank, worst: worst.card.rank, slot: slot(worst.index) }, tone: "hint" };
 }
 
 function discardTip(state: GameState, playerIndex: number, drawn: Card): CoachTip | null {

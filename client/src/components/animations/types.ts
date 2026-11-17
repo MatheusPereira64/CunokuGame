@@ -152,7 +152,7 @@ export interface AnimationConfig {
 export const DEFAULT_DURATIONS: Record<AnimationType, number> = {
   draw: 650,
   discard: 650,
-  replace: 600,
+  replace: 1400,
   swap: 2000,
   peek: 1500,
   penalty: 1000,

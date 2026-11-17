@@ -341,6 +341,7 @@ function ArcSeat({
       compact={opponents.length >= 3 || isCompact}
       emoteId={emoteId}
       isDeclarer={isDeclarer(gameState, player.id)}
+      heldCard={heldCardOf(gameState, player.id)}
       sealedCardIds={sealedIds(gameState)}
       skipNextTurnIds={gameState.skipNextTurnIds}
       className="absolute z-20"
@@ -367,12 +368,20 @@ function RowSeats(props: Omit<Parameters<typeof ArcSeats>[0], "isCompact">) {
           compact
           emoteId={activeEmotes[p.id]}
           isDeclarer={isDeclarer(gameState, p.id)}
+          heldCard={heldCardOf(gameState, p.id)}
           sealedCardIds={sealedIds(gameState)}
           skipNextTurnIds={gameState.skipNextTurnIds}
         />
       ))}
     </div>
   );
+}
+
+/** Carta comprada que o jogador da vez ainda está decidindo (do descarte, a face é pública). */
+function heldCardOf(gameState: GameState, id: string) {
+  const current = gameState.players[gameState.currentPlayerIndex];
+  if (!gameState.drawnCard || current?.id !== id || gameState.winnerId) return null;
+  return { card: gameState.drawnCard, faceUp: gameState.drawnFromDiscard };
 }
 
 function inFinalRounds(gameState: GameState) {

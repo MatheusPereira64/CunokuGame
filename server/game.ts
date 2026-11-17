@@ -312,8 +312,6 @@ export class GameLogic {
     switch (action.type) {
       case "draw_deck":
         return this.drawFromDeck(newState, playerIndex);
-      case "draw_discard":
-        return this.drawFromDiscardPile(newState, playerIndex);
       case "discard_drawn":
         return this.discardDrawnCard(newState, playerIndex, playerId);
       case "replace_card":
@@ -353,16 +351,6 @@ export class GameLogic {
     return { newState };
   }
 
-  private static drawFromDiscardPile(newState: GameState, playerIndex: number): ActionResult {
-    const discardCard = newState.discardPile.pop();
-    if (discardCard) {
-      newState.drawnCard = discardCard;
-      newState.drawnFromDiscard = true;
-      newState.turnPhase = "action";
-      newState.logs.push(`${newState.players[playerIndex].name} comprou a carta ${discardCard.rank} de ${discardCard.suit} da pilha de descarte`);
-    }
-    return { newState };
-  }
 
   private static discardDrawnCard(newState: GameState, playerIndex: number, playerId: string): ActionResult {
     if (!newState.drawnCard) return { newState };
@@ -388,6 +376,8 @@ export class GameLogic {
     newState.forcedReplace = false;
     const oldCard = player.hand[action.handIndex];
     player.hand[action.handIndex] = newState.drawnCard;
+    // Bot lembra da carta que pôs na mão (knownCards é a memória dele); pessoas precisam lembrar sozinhas
+    if (player.isBot) player.knownCards[action.handIndex.toString()] = true;
     if (oldCard) {
       newState.discardPile.push(oldCard);
       newState.logs.push(`${newState.players[playerIndex].name} substituiu a carta ${action.handIndex + 1} da mão`);
