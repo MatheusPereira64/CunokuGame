@@ -1,0 +1,33 @@
+name: 💡 Sugerir uma ideia
+description: Nova função, ajuste de regra ou mudança visual
+title: "[Ideia] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Qual é a ideia?
+      description: Descreva o que você gostaria de ver no jogo.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Por que isso deixaria o jogo melhor?
+      description: Qual problema resolve ou que diversão acrescenta.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Regras e poderes das cartas
+        - Bots
+        - Visual e animações
+        - Partidas online e salas
+        - Liga, ranking e conquistas
+        - Outro
+  - type: textarea
+    id: refs
+    attributes:
+      label: Exemplos ou referências
+      description: Imagens, rascunhos ou jogos que fazem algo parecido.

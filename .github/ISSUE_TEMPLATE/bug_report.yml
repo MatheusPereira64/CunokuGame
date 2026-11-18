@@ -1,0 +1,63 @@
+name: 🐞 Relatar um bug
+description: Algo no jogo não funciona como deveria
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por ajudar a melhorar o Cunoku! Falhas de segurança (ver cartas escondidas, entrar na conta de outra pessoa, mexer no ranking) **não** devem ir aqui: veja o [SECURITY.md](https://github.com/MatheusPereira64/CunokuGame/blob/main/SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: O que aconteceu?
+      description: Descreva o problema e o que você esperava que acontecesse.
+      placeholder: Ao descartar a carta, ela ficou presa no meio da mesa…
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir
+      description: Passo a passo até o problema aparecer.
+      placeholder: |
+        1. Jogar contra 2 bots no difícil
+        2. Comprar um 9 e usar o poder
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Onde aconteceu?
+      multiple: true
+      options:
+        - Navegador (computador)
+        - Navegador (celular)
+        - App Android (APK)
+        - App iPhone (IPA)
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Modo de jogo
+      multiple: true
+      options:
+        - Contra bots (offline)
+        - Sala com amigos
+        - Fila rápida
+        - Desafio diário
+        - Wi-Fi local
+        - Fora da partida (menu, perfil, liga…)
+  - type: input
+    id: version
+    attributes:
+      label: Versão do app
+      description: Aparece no menu de configurações. No navegador, pode deixar em branco.
+      placeholder: "1.4.5"
+  - type: textarea
+    id: media
+    attributes:
+      label: Capturas de tela ou vídeo
+      description: Arraste imagens ou vídeos para cá, se tiver.
