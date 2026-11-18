@@ -165,3 +165,13 @@ npm run deploy:cf
 ```
 
 Como alternativa, Railway ou Render com `npm run build` e `npm start`.
+
+## Licença
+
+O Cunoku é um projeto **proprietário**: todos os direitos reservados a Matheus Pereira. O código está visível para estudo, mas não pode ser copiado, modificado, publicado nem usado com fins comerciais sem autorização por escrito. Veja o [LICENSE](LICENSE).
+
+Contribuições são feitas só por pessoas com acesso ao projeto, nos termos do [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Créditos
+
+- Trilhas sonoras (`client/public/audio/soundtrack`) e efeitos sonoros (`client/public/audio/sfx`): músicas livres de direitos autorais.

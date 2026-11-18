@@ -1,0 +1,60 @@
+Cunoku
+Copyright (c) 2026 Matheus Pereira. Todos os direitos reservados.
+
+Este software, incluindo o código-fonte, o código compilado, os aplicativos
+(APK e IPA), as regras e o nome do jogo, a arte, as interfaces, os textos e a
+documentação (o "Software"), é propriedade exclusiva de Matheus Pereira.
+
+O código-fonte pode estar visível publicamente. Isso não concede nenhuma
+licença. Sem autorização prévia e por escrito do titular, é proibido:
+
+  1. copiar, reproduzir ou redistribuir o Software, no todo ou em parte;
+  2. modificar o Software ou criar obras derivadas dele;
+  3. publicar o Software ou cópias dele em lojas de aplicativos, sites ou
+     servidores, com ou sem alterações;
+  4. usar o Software, ou qualquer parte dele, com fins comerciais, incluindo
+     vender, alugar, licenciar, exibir anúncios ou cobrar pelo acesso;
+  5. remover ou alterar este aviso de direitos autorais.
+
+É permitido apenas:
+
+  - jogar o Cunoku pelos canais oficiais (o site e os aplicativos publicados
+    pelo titular);
+  - ver o código-fonte no repositório oficial, para fins pessoais e de estudo;
+  - contribuir com o projeto, para quem recebeu acesso do titular, nos termos
+    do arquivo CONTRIBUTING.md.
+
+Músicas, efeitos sonoros e outros recursos de terceiros seguem as licenças
+dos seus próprios autores, indicadas no README, e não são cobertos por este
+aviso.
+
+O SOFTWARE É FORNECIDO "NO ESTADO EM QUE SE ENCONTRA", SEM GARANTIAS DE
+QUALQUER TIPO. EM NENHUM CASO O TITULAR SERÁ RESPONSÁVEL POR DANOS DECORRENTES
+DO USO OU DA IMPOSSIBILIDADE DE USO DO SOFTWARE.
+
+Para pedir autorização: abra uma issue no repositório oficial ou fale
+diretamente com o titular.
+
+---------------------------------------------------------------------------
+
+Cunoku
+Copyright (c) 2026 Matheus Pereira. All rights reserved.
+
+This software, including its source code, compiled code, apps (APK and IPA),
+game rules and name, artwork, interfaces, text and documentation (the
+"Software"), is the exclusive property of Matheus Pereira.
+
+The source code may be publicly visible. That does not grant any license.
+Without the copyright holder's prior written permission, you may not copy,
+redistribute, modify, create derivative works from, publish (in app stores,
+websites or servers) or use the Software, in whole or in part, for any
+commercial purpose, nor remove this notice.
+
+You may only play Cunoku through the official channels, view the source code
+in the official repository for personal and study purposes, and contribute if
+you were granted access, under the terms of CONTRIBUTING.md.
+
+Third-party music, sound effects and assets remain under their authors'
+licenses, listed in the README.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
