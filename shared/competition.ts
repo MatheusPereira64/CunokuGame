@@ -174,7 +174,7 @@ export function standingsByDivision(
 export function computeDivisions(rows: WeeklyResult[], currentWeek: string): Map<string, Division> {
   const divisions = new Map<string, Division>();
   const divisionOf = (id: string) => divisions.get(id) ?? "bronze";
-  const weeks = Array.from(new Set(rows.map((r) => r.week).filter((w) => w < currentWeek))).sort();
+  const weeks = Array.from(new Set(rows.map((r) => r.week).filter((w) => w < currentWeek))).sort((a, b) => a.localeCompare(b));
   for (const week of weeks) {
     const tables = standingsByDivision(
       rows.filter((r) => r.week === week),

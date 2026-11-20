@@ -327,7 +327,7 @@ function ArcSeat({
   registerCardPosition: RegisterCard;
   isCompact: boolean;
 }) {
-  const pos = seatPositions[index] ?? seatPositions[seatPositions.length - 1];
+  const pos = seatPositions[index] ?? seatPositions.at(-1)!;
   return (
     <PlayerSeat
       player={player}

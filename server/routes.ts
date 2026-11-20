@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import type { Server } from "http";
+import type { Server } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { competitionStore, storage } from "./storage";
 import { api } from "@shared/routes";

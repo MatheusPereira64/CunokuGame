@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertRoomSchema, rooms } from './schema';
+import { rooms } from './schema';
 import { RANK_TIERS } from './rank';
 import { DIVISIONS } from './competition';
 

@@ -1,8 +1,7 @@
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { GameState, Card } from '@shared/schema';
 import { 
   Position, 
-  AnimationEvent,
   DrawAnimationData,
   DiscardAnimationData,
   ReplaceAnimationData,
@@ -11,7 +10,6 @@ import {
   PenaltyAnimationData,
   DealAnimationData,
   AnimationConfig,
-  generateAnimationId,
   visibleCardCenter,
 } from './types';
 import { useAnimationQueue } from './useAnimationQueue';

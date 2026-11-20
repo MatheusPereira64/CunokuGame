@@ -56,7 +56,7 @@ function currentTip(
   }
 
   const me = gameState.players.find((p) => p.id === playerId);
-  const top = gameState.discardPile[gameState.discardPile.length - 1];
+  const top = gameState.discardPile.at(-1);
   const knowsMatch = !!me && !!top && me.hand.some((c, i) => me.knownCards[String(i)] && c.rank === top.rank);
   if (!isMyTurn && knowsMatch && !seen.has("freeDiscard")) {
     return { id: "freeDiscard", title: t("tips.freeDiscardTitle"), body: t("tips.freeDiscardBody") };

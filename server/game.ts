@@ -1,4 +1,4 @@
-import { Card, GameState, Player, Rank, Suit, RANKS, SUITS } from "@shared/schema";
+import { Card, GameState, Player, Rank, RANKS, SUITS } from "@shared/schema";
 import { seededRandom, stateRandom } from "@shared/seededRandom";
 
 import { randomFloat, randomInt, shuffleInPlace } from "@shared/secureRandom";
@@ -223,8 +223,8 @@ export class GameLogic {
     if (!player1 || !player2 || player1.id === player2.id) {
       return { success: false, message: "Must select two different players to swap" };
     }
-    const cardIdx1 = cardIdx !== undefined ? cardIdx : randomInt(player1.hand.length);
-    const cardIdx2 = targetCardIdx2 !== undefined ? targetCardIdx2 : randomInt(player2.hand.length);
+    const cardIdx1 = cardIdx ?? randomInt(player1.hand.length);
+    const cardIdx2 = targetCardIdx2 ?? randomInt(player2.hand.length);
     if (cardIdx1 < 0 || cardIdx1 >= player1.hand.length || cardIdx2 < 0 || cardIdx2 >= player2.hand.length) {
       return { success: false, message: "Invalid card indices for swap" };
     }
@@ -240,8 +240,8 @@ export class GameLogic {
   ): AbilityResult {
     const targetPlayer = state.players.find(p => p.id === targetId);
     if (!targetPlayer) return { success: false, message: "Target player not found" };
-    const sourceCardIdx = cardIdx !== undefined ? cardIdx : randomInt(sourcePlayer.hand.length);
-    const finalTargetCardIdx = targetCardIdx !== undefined ? targetCardIdx : randomInt(targetPlayer.hand.length);
+    const sourceCardIdx = cardIdx ?? randomInt(sourcePlayer.hand.length);
+    const finalTargetCardIdx = targetCardIdx ?? randomInt(targetPlayer.hand.length);
     if (sourceCardIdx < 0 || sourceCardIdx >= sourcePlayer.hand.length || finalTargetCardIdx < 0 || finalTargetCardIdx >= targetPlayer.hand.length) {
       return { success: false, message: "Invalid card indices for swap" };
     }

@@ -48,7 +48,7 @@ export function MyArea({ gameState, me, isMyTurn, phase, sendAction, registerCar
     (!isMyTurn || phase === "draw");
 
   // Cartas que sei serem iguais à do topo: descartá-las não tem risco
-  const topDiscard = gameState.discardPile[gameState.discardPile.length - 1];
+  const topDiscard = gameState.discardPile.at(-1);
   const safeDiscards = canFreeDiscard
     ? me.hand.flatMap((card, index) => (me.knownCards[index.toString()] && card.rank === topDiscard?.rank ? [index] : []))
     : [];

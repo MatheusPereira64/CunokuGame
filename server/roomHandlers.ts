@@ -163,7 +163,7 @@ export async function resolveDisconnectedTurn(
 ): Promise<GameState | null> {
   const room = await storage.getRoom(roomCode);
   const state = room?.gameState as GameState | undefined;
-  if (!state || state.reconnectPlayerId !== playerId) return null;
+  if (state?.reconnectPlayerId !== playerId) return null;
   const next = autoPlayDisconnectedTurn(state);
   if (next === state) return state;
   await storage.updateGameState(roomCode, next);
@@ -366,7 +366,7 @@ export async function handlePlayerAction(
   if (!roomCode || !playerId) return;
 
   const room = await storage.getRoom(roomCode);
-  if (!room || !room.gameState) return;
+  if (!room?.gameState) return;
 
   const state = room.gameState as GameState;
   if (state.winnerId) return;
@@ -424,7 +424,7 @@ export async function executeBotTurn(
   competition?: CompetitionStore,
 ): Promise<void> {
   const room = await storage.getRoom(roomCode);
-  if (!room || !room.gameState) return;
+  if (!room?.gameState) return;
 
   let updatedState = room.gameState as GameState;
   if (updatedState.winnerId) return;
@@ -454,7 +454,7 @@ export async function executeBotTurn(
     const newLogs = updatedState.logs.slice(logsBefore.length);
     const botLogs = newLogs.filter((log) => log.includes(currentPlayer.name));
     if (botLogs.length > 0) {
-      const lastBotLog = botLogs[botLogs.length - 1]!;
+      const lastBotLog = botLogs.at(-1)!;
       messenger.broadcast({
         type: "bot_action",
         botName: currentPlayer.name,
@@ -477,7 +477,7 @@ export async function executeBotTurn(
     const newLogs = updatedState.logs.slice(logsBefore.length);
     const botLogs = newLogs.filter((log) => log.includes(currentPlayer.name));
     if (botLogs.length > 0) {
-      const lastBotLog = botLogs[botLogs.length - 1]!;
+      const lastBotLog = botLogs.at(-1)!;
       messenger.broadcast({
         type: "bot_action",
         botName: currentPlayer.name,

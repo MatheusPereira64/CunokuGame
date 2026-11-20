@@ -52,7 +52,7 @@ export function judgeFreeDiscard(state: GameState, playerIndex: number, cardInde
   if (state.winnerId || state.turnPhase === "finished" || state.turnPhase === "waiting") return "ignored";
   if (state.currentPlayerIndex === playerIndex && state.turnPhase !== "draw") return "ignored";
   const card = typeof cardIndex === "number" ? state.players[playerIndex]?.hand[cardIndex] : undefined;
-  const top = state.discardPile[state.discardPile.length - 1];
+  const top = state.discardPile.at(-1);
   if (!card || !top || isSealed(state, card.id)) return "ignored";
   return card.rank === top.rank ? "match" : "wrong";
 }

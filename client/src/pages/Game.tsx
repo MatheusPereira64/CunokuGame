@@ -164,16 +164,14 @@ export default function Game() {
 
   useEffect(() => {
     if (!fromQueue || isOffline) return;
-    if (!gameState || gameState.turnPhase !== "waiting" || gameState.players.length < 2) {
+    if (gameState?.turnPhase !== "waiting" || gameState.players.length < 2) {
       if (gameState?.turnPhase === "waiting") {
         queueStartAtRef.current = null;
         setQueueCountdown(null);
       }
       return;
     }
-    if (queueStartAtRef.current == null) {
-      queueStartAtRef.current = Date.now() + START_COUNTDOWN_MS;
-    }
+    queueStartAtRef.current ??= Date.now() + START_COUNTDOWN_MS;
     const tick = () => {
       const startAt = queueStartAtRef.current;
       if (startAt == null) return;
@@ -615,7 +613,7 @@ export default function Game() {
       // A carta volta a ficar oculta após 20 segundos (apenas visual)
       const timer = setTimeout(() => {
         const currentMe = gameState.players.find((p) => p.id === playerId);
-        if (currentMe && currentMe.knownCards[cardIndex.toString()]) {
+        if (currentMe?.knownCards[cardIndex.toString()]) {
           const updatedKnownCards = { ...currentMe.knownCards };
           delete updatedKnownCards[cardIndex.toString()];
           currentMe.knownCards = updatedKnownCards;
@@ -629,7 +627,7 @@ export default function Game() {
       // Offline: feedback imediato. Online: private_info do servidor (só quem peekou recebe).
       if (isOffline) {
         const targetPlayer = gameState.players.find((p) => p.id === action.targetPlayerId);
-        if (targetPlayer && targetPlayer.hand[action.targetCardIndex]) {
+        if (targetPlayer?.hand[action.targetCardIndex]) {
           const peekedCard = targetPlayer.hand[action.targetCardIndex];
 
           if (revealedOpponentCard?.timer) {

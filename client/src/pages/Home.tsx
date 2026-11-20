@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Button } from "@/components/Button";
 import { useCreateRoom, useJoinRoom, fetchLanInfo } from "@/hooks/use-rooms";
 import { useToast } from "@/hooks/use-toast";
@@ -162,7 +162,6 @@ export default function Home() {
   const [languageOpen, setLanguageOpen] = useState(false);
   const [name, setName] = useState(() => loadProfile().displayName);
   const [roomCode, setRoomCode] = useState("");
-  const [mode, setMode] = useState<"create" | "join" | "bots" | null>(null);
   const [gameMode, setGameMode] = useState<"multiplayer" | "vs_bots">("multiplayer");
   const [botDifficulty, setBotDifficulty] = useState<MenuDifficulty>("medium");
   const [botCount, setBotCount] = useState<number>(2);
@@ -402,7 +401,6 @@ export default function Home() {
             onOpenChange={(open) => {
               setCreateDialogOpen(open);
               if (open) {
-                setMode("create");
                 setGameMode("multiplayer");
                 resetCreateDialog();
               }
@@ -664,7 +662,7 @@ export default function Home() {
 
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="secondary" size="lg" className={menuBtnClass} onClick={() => { setMode("bots"); setGameMode("vs_bots"); }}>
+              <Button variant="secondary" size="lg" className={menuBtnClass} onClick={() => setGameMode("vs_bots")}>
                 <Bot className={menuIconClass} /> {t("menu.playBots")}
               </Button>
             </DialogTrigger>
@@ -761,7 +759,7 @@ export default function Home() {
 
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="secondary" size="lg" className={menuBtnClass} onClick={() => setMode("join")}>
+              <Button variant="secondary" size="lg" className={menuBtnClass}>
                 <Users className={menuIconClass} /> {t("menu.joinRoom")}
               </Button>
             </DialogTrigger>

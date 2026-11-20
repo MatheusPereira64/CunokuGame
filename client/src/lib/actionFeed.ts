@@ -118,7 +118,7 @@ export function parseActionLog(line: string, players: Named[]): ActionEvent | nu
   const found = findActor(line, players);
   if (!found) return null;
   for (const rule of RULES) {
-    const m = found.rest.match(rule.re);
+    const m = rule.re.exec(found.rest);
     if (m) return { actorId: found.player.id, ...rule.build(m, players) };
   }
   return null;

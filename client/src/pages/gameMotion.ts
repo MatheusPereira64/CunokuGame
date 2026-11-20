@@ -58,9 +58,9 @@ function playReplace(
   animateReplace: MotionApi["animateReplace"],
 ) {
   const { before, after } = actorOf(prev, current);
-  if (!before || !after || after.hand.length !== before.hand.length) return false;
+  if (!before || after?.hand.length !== before.hand.length) return false;
   const drawnCard = prev.drawnCard;
-  const discardedCard = current.discardPile[current.discardPile.length - 1];
+  const discardedCard = current.discardPile.at(-1);
   const handIndex = before.hand.findIndex((c) => c.id === discardedCard?.id);
   if (!drawnCard || !discardedCard || handIndex < 0) return false;
   remember(triggered, `replace_${after.id}_${discardedCard.id}`, 2000, () => {
@@ -78,7 +78,7 @@ function playDiscardDrawn(
 ) {
   const { after } = actorOf(prev, current);
   // A carta descartada fica aberta na pilha: a face que vale é a do topo do descarte
-  const discardedCard = current.discardPile[current.discardPile.length - 1] ?? prev.drawnCard;
+  const discardedCard = current.discardPile.at(-1) ?? prev.drawnCard;
   if (!discardedCard || !after) return;
   remember(triggered, `discard_drawn_${after.id}_${discardedCard.id}`, 2000, () => {
     audioManager.playCardSlide();
@@ -111,8 +111,8 @@ function playOneHandDiscard(
   const removedCard = prevPlayer.hand.find(
     (prevCard) => !player.hand.some((currCard) => currCard.id === prevCard.id),
   );
-  if (!removedCard || current.discardPile.length <= prev.discardPile.length) return;
-  const topDiscard = current.discardPile[current.discardPile.length - 1];
+  const topDiscard = current.discardPile.at(-1);
+  if (!removedCard || !topDiscard || current.discardPile.length <= prev.discardPile.length) return;
   const isMatch = topDiscard.id === removedCard.id;
   const discardType: "from_hand" | "matched" =
     prev.currentPlayerIndex === playerIndex && prev.turnPhase === "draw" ? "from_hand" : "matched";
@@ -166,7 +166,7 @@ function playPenalties(
 export function pendingTableHolds(prev: GameState, current: GameState): { pileCardIds: string[]; slots: string[] } {
   const grew = current.discardPile.length > prev.discardPile.length;
   if (!grew) return { pileCardIds: [], slots: [] };
-  const top = current.discardPile[current.discardPile.length - 1];
+  const top = current.discardPile.at(-1);
   const drewThenCleared = !!prev.drawnCard && !current.drawnCard;
   if (drewThenCleared) {
     const { before, after } = actorOf(prev, current);

@@ -34,7 +34,7 @@ export class RoomDurableObject extends DurableObject<Env> {
   private session: RoomSessionData = createEmptySession();
   private sessionLoaded = false;
   private roomCode = "";
-  private backupWriter = new LatestStateWriter(
+  private readonly backupWriter = new LatestStateWriter(
     (code, state) => createStorage(this.env).updateGameState(code, state),
     (work) => this.ctx.waitUntil(work),
   );

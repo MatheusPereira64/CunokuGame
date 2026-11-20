@@ -1,6 +1,5 @@
 import { getDb, getPool } from "../server/db";
 import { sql } from "drizzle-orm";
-import * as schema from "../shared/schema";
 
 async function initDatabase() {
   const db = await getDb();

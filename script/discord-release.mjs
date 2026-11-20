@@ -87,7 +87,9 @@ const response = await fetch(webhook, {
   body: JSON.stringify(payload),
 });
 if (!response.ok) {
-  console.error(`Discord respondeu ${response.status}: ${await response.text()}`);
+  // Resposta externa: sem quebras de linha nem caracteres de controle, para não forjar linhas no log
+  const detail = (await response.text()).replaceAll(/[\u0000-\u001f\u007f]+/g, " ").slice(0, 300);
+  console.error(`Discord respondeu ${response.status}: ${detail}`);
   process.exit(1);
 }
 console.log(`Aviso da versão ${version} enviado ao Discord`);

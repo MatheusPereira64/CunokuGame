@@ -21,7 +21,7 @@ export function filterGameStateForPlayer(state: GameState, playerId: string): Ga
 
   if (filteredState.drawnCard) {
     const currentPlayer = state.players[state.currentPlayerIndex];
-    const isCurrentPlayer = currentPlayer && currentPlayer.id === playerId;
+    const isCurrentPlayer = currentPlayer?.id === playerId;
     if (!isCurrentPlayer) {
       filteredState.drawnCard = null;
     }

@@ -83,6 +83,6 @@ class Matchmaker {
 let singleton: Matchmaker | null = null;
 
 export function getMatchmaker(): Matchmaker {
-  if (!singleton) singleton = new Matchmaker();
+  singleton ??= new Matchmaker();
   return singleton;
 }

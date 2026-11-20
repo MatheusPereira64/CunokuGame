@@ -6,7 +6,7 @@ export function parseInviteCode(input: string): string | null {
 
   try {
     const url = raw.includes("://") ? new URL(raw) : new URL(raw, "https://cunoku.local");
-    const fromPath = url.pathname.match(/\/join\/([A-Za-z0-9]{4})(?:\/|$)/i);
+    const fromPath = /\/join\/([A-Za-z0-9]{4})(?:\/|$)/i.exec(url.pathname);
     if (fromPath?.[1]) return fromPath[1].toUpperCase();
 
     const query = url.searchParams.get("join") || url.searchParams.get("code");

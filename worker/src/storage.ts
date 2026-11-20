@@ -10,7 +10,7 @@ import { createDb, ensureSchema, type WorkerDb } from "./db";
 import type { Env } from "./env";
 
 export class WorkerDatabaseStorage implements IStorage {
-  constructor(private db: WorkerDb) {}
+  constructor(private readonly db: WorkerDb) {}
 
   async createRoom(insertRoom: InsertRoom): Promise<Room> {
     await ensureSchema(this.db);
@@ -56,7 +56,7 @@ export class WorkerDatabaseStorage implements IStorage {
 
 /** Storage em memória para `wrangler dev` sem DATABASE_URL/Hyperdrive. */
 export class WorkerMemoryStorage implements IStorage {
-  private static rooms = new Map<string, Room>();
+  private static readonly rooms = new Map<string, Room>();
 
   async createRoom(insertRoom: InsertRoom): Promise<Room> {
     const room: Room = {

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode } from "react";
 import { featureTranslations } from "@/contexts/i18n-features";
 
 export type Language = "pt" | "es" | "en";
@@ -42,24 +42,24 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     const translations = getTranslations(language);
     
     // Padrões de mensagens dos bots e suas traduções
-    const queenMatch = message.match(/usou a Rainha em (.+?)$/);
+    const queenMatch = /usou a Rainha em (.+?)$/.exec(message);
     if (queenMatch) return translations["bot.usedQueen"].replace("{player}", queenMatch[1]);
     if (message.includes("usou o Valete e comprou mais uma carta")) return translations["bot.usedJack"];
-    const sealMatch = message.match(/selou uma carta de (.+?)$/);
+    const sealMatch = /selou uma carta de (.+?)$/.exec(message);
     if (sealMatch) return translations["bot.sealedCard"].replace("{player}", sealMatch[1]);
-    const kingMatch = message.match(/usou o Rei para ver as cartas de (.+?)$/);
+    const kingMatch = /usou o Rei para ver as cartas de (.+?)$/.exec(message);
     if (kingMatch) return translations["bot.usedKing"].replace("{player}", kingMatch[1]);
     if (message.includes("usou o Coringa para ver as cartas de todos")) return translations["bot.usedJoker"];
-    const forcedMatch = message.match(/forçou (.+?) a trocar uma carta$/);
+    const forcedMatch = /forçou (.+?) a trocar uma carta$/.exec(message);
     if (forcedMatch) return translations["bot.forcedTrade"].replace("{player}", forcedMatch[1]);
 
-    const windMatch = message.match(/usou o Vento nas cartas de (.+?)$/);
+    const windMatch = /usou o Vento nas cartas de (.+?)$/.exec(message);
     if (windMatch) {
       return translations["bot.usedWind"].replace("{player}", windMatch[1]);
     }
 
     // Troca de cartas: "trocou a carta X de Y com a carta Z de W"
-    const swapMatch = message.match(/trocou a carta (\d+) de (.+?) com a carta (\d+) de (.+?)$/);
+    const swapMatch = /trocou a carta (\d+) de (.+?) com a carta (\d+) de (.+?)$/.exec(message);
     if (swapMatch) {
       return translations["bot.swappedCard"]
         .replace("{card1}", swapMatch[1])
@@ -69,7 +69,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
     
     // Descarte: "descartou a carta X de Y"
-    const discardMatch = message.match(/descartou a carta (.+?) de (.+?)$/);
+    const discardMatch = /descartou a carta (.+?) de (.+?)$/.exec(message);
     if (discardMatch && !message.includes("da mão")) {
       return translations["bot.discardedCard"]
         .replace("{rank}", discardMatch[1])
@@ -77,7 +77,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
     
     // Descarte da mão: "descartou a carta X de Y da mão"
-    const discardHandMatch = message.match(/descartou a carta (.+?) de (.+?) da mão/);
+    const discardHandMatch = /descartou a carta (.+?) de (.+?) da mão/.exec(message);
     if (discardHandMatch) {
       return translations["bot.discardedFromHand"]
         .replace("{rank}", discardHandMatch[1])
@@ -85,7 +85,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
     
     // Substituição: "substituiu a carta X da mão"
-    const replaceMatch = message.match(/substituiu a carta (\d+) da mão/);
+    const replaceMatch = /substituiu a carta (\d+) da mão/.exec(message);
     if (replaceMatch) {
       return translations["bot.replacedCard"]
         .replace("{index}", replaceMatch[1]);
@@ -97,7 +97,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
     
     // Habilidade ver carta de oponente: "usou habilidade para ver uma carta de X"
-    const peekOpponentMatch = message.match(/usou habilidade para ver uma carta de (.+?)$/);
+    const peekOpponentMatch = /usou habilidade para ver uma carta de (.+?)$/.exec(message);
     if (peekOpponentMatch) {
       return translations["bot.usedAbilityPeekOpponent"]
         .replace("{player}", peekOpponentMatch[1]);
@@ -130,14 +130,14 @@ function translateLaterBotMessage(message: string, translations: Record<string, 
     return translations["bot.drewFromDeck"];
   }
 
-  const drawDiscardMatch = message.match(/comprou a carta (.+?) de (.+?) da pilha de descarte/);
+  const drawDiscardMatch = /comprou a carta (.+?) de (.+?) da pilha de descarte/.exec(message);
   if (drawDiscardMatch) {
     return translations["bot.drewFromDiscard"]
       .replace("{rank}", drawDiscardMatch[1])
       .replace("{suit}", drawDiscardMatch[2]);
   }
 
-  const matchingDiscardMatch = message.match(/descartou a carta (.+?) de (.+?) \(corresponde ao descarte\)/);
+  const matchingDiscardMatch = /descartou a carta (.+?) de (.+?) \(corresponde ao descarte\)/.exec(message);
   if (matchingDiscardMatch) {
     return translations["bot.discardedMatching"]
       .replace("{rank}", matchingDiscardMatch[1])

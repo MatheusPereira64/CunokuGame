@@ -19,7 +19,7 @@ class AudioManager {
   private menuMusic: HTMLAudioElement | null = null;
   /** Faixa sorteada para a partida atual */
   private gameMusic: HTMLAudioElement | null = null;
-  private gameTracks: HTMLAudioElement[] = [];
+  private readonly gameTracks: HTMLAudioElement[] = [];
   private currentMusic: HTMLAudioElement | null = null;
   /** Faixa que deveria estar tocando (sobrevive a mute/pause). */
   private desiredTrack: MusicTrack | null = null;
@@ -310,9 +310,7 @@ class AudioManager {
     if (typeof window === "undefined") return null;
     const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
-    if (!this.audioCtx) {
-      this.audioCtx = new Ctor();
-    }
+    this.audioCtx ??= new Ctor();
     if (this.audioCtx.state === "suspended") {
       this.audioCtx.resume().catch(() => {});
     }

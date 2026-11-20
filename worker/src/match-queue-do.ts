@@ -86,7 +86,7 @@ export class MatchQueueDurableObject extends DurableObject<Env> {
   private async handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
     const method = request.method.toUpperCase();
-    const ticketMatch = url.pathname.match(/\/api\/matchmaking\/([^/]+)$/);
+    const ticketMatch = /\/api\/matchmaking\/([^/]+)$/.exec(url.pathname);
 
     if (method === "POST" && url.pathname.endsWith("/api/matchmaking")) {
       let playerName = "";

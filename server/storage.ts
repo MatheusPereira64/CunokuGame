@@ -108,7 +108,7 @@ export class DatabaseStorage implements IStorage {
 
 // Memory storage for development when DATABASE_URL is not set
 export class MemoryStorage implements IStorage {
-  private rooms: Map<string, Room> = new Map();
+  private readonly rooms: Map<string, Room> = new Map();
 
   async createRoom(insertRoom: InsertRoom): Promise<Room> {
     const room: Room = {

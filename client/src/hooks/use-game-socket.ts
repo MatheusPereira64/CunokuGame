@@ -67,7 +67,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
       connect();
     };
     const checkAlive = (graceMs: number) => {
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
+      if (ws?.readyState !== WebSocket.OPEN) {
         if (!ws || ws.readyState === WebSocket.CLOSED) reconnectNow();
         return;
       }

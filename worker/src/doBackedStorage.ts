@@ -12,13 +12,13 @@ export interface RoomCache {
  * Várias jogadas seguidas viram uma gravação só: o banco é cópia, não a fonte da partida.
  */
 export class LatestStateWriter {
-  private pending = new Map<string, GameState>();
+  private readonly pending = new Map<string, GameState>();
   private running = false;
 
   constructor(
-    private write: (code: string, state: GameState) => Promise<unknown>,
+    private readonly write: (code: string, state: GameState) => Promise<unknown>,
     /** Mantém o objeto vivo até a gravação terminar */
-    private keepAlive: (work: Promise<unknown>) => void,
+    private readonly keepAlive: (work: Promise<unknown>) => void,
   ) {}
 
   push(code: string, state: GameState): void {
@@ -55,9 +55,9 @@ export class LatestStateWriter {
  */
 export class DoBackedStorage implements IStorage {
   constructor(
-    private inner: IStorage,
-    private cache: RoomCache,
-    private writer: LatestStateWriter,
+    private readonly inner: IStorage,
+    private readonly cache: RoomCache,
+    private readonly writer: LatestStateWriter,
   ) {}
 
   async createRoom(room: Parameters<IStorage["createRoom"]>[0]): Promise<Room> {
@@ -68,7 +68,7 @@ export class DoBackedStorage implements IStorage {
 
   async getRoom(code: string): Promise<Room | undefined> {
     const cached = await this.cache.get();
-    if (cached && cached.code === code) return cached;
+    if (cached?.code === code) return cached;
     const room = await this.inner.getRoom(code);
     if (room) await this.cache.put(room);
     return room;

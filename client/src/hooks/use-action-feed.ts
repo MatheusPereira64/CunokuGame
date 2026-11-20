@@ -53,7 +53,7 @@ export function useActionFeed(gameState: GameState | null | undefined, viewerId:
       if (!event || event.actorId === viewerId) continue;
       const actor = players.find((p) => p.id === event.actorId);
       const vars = { ...event.vars };
-      if (me && vars.target === me.name) vars.target = tRef.current("feed.you");
+      if (vars.target === me?.name && me) vars.target = tRef.current("feed.you");
       const notice: SeatNotice = {
         id: nextId.current++,
         kind: event.kind,

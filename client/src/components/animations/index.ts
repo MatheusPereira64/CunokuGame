@@ -13,7 +13,6 @@ export { CardDealAnimation } from './CardDealAnimation';
 export { CunokuCallOverlay } from './CunokuCallOverlay';
 
 // Exporta orquestrador e hooks
-export { AnimationOrchestrator } from './AnimationOrchestrator';
 export { useAnimationQueue } from './useAnimationQueue';
 export { useGameAnimations } from './useGameAnimations';
 

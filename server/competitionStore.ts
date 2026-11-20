@@ -77,7 +77,7 @@ function ensureCompetitionSchema(db: CompetitionDb): Promise<void> {
 }
 
 export class DrizzleCompetitionStore implements CompetitionStore {
-  constructor(private resolveDb: () => Promise<CompetitionDb | null> | CompetitionDb | null) {}
+  constructor(private readonly resolveDb: () => Promise<CompetitionDb | null> | CompetitionDb | null) {}
 
   private async db(): Promise<CompetitionDb> {
     const db = await this.resolveDb();
@@ -160,9 +160,9 @@ export class DrizzleCompetitionStore implements CompetitionStore {
 
 /** Em memória para LAN/dev sem banco, onde não há contas: serve só de leitura vazia e aos testes. */
 export class MemoryCompetitionStore implements CompetitionStore {
-  private entries: DailyEntry[] = [];
-  private results: MatchResult[] = [];
-  private accounts = new Map<string, RankAccount>();
+  private readonly entries: DailyEntry[] = [];
+  private readonly results: MatchResult[] = [];
+  private readonly accounts = new Map<string, RankAccount>();
 
   addAccount(token: string, account: RankAccount): void {
     this.accounts.set(token, account);

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { GameState, GameAction, Player } from "@shared/schema";
+import { GameState, GameAction } from "@shared/schema";
 import { processOfflineAction } from "@/utils/offlineGameLogic";
 import { applyBotReactions } from "@shared/cardPowers";
 import { BotPlayer } from "@/utils/botPlayer";
@@ -102,7 +102,7 @@ export function useOfflineGame(
       
       // Se for turno de bot ao carregar, processa automaticamente
       const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-      if (currentPlayer && currentPlayer.isBot && currentPlayer.id !== playerId) {
+      if (currentPlayer?.isBot && currentPlayer.id !== playerId) {
         setTimeout(() => {
           processBotTurns(bots);
         }, 1000);

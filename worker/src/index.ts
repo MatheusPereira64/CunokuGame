@@ -35,7 +35,7 @@ async function handleReadApi(request: Request, env: Env, url: URL, path: string,
     const rooms = await storage.listRooms();
     return json(rooms.filter((room) => room.gameMode !== "daily").map(toPublicRoom), 200, request);
   }
-  const getMatch = path.match(/^\/api\/rooms\/([^/]+)$/);
+  const getMatch = /^\/api\/rooms\/([^/]+)$/.exec(path);
   if (method === "GET" && getMatch) {
     const code = decodeURIComponent(getMatch[1]!).toUpperCase();
     const room = await storage.getRoom(code);
