@@ -415,6 +415,13 @@ export async function handlePlayerAction(
   }
 }
 
+/** Mostra à sala a última coisa que o bot fez, a partir das linhas novas do log. */
+function announceBotLog(messenger: RoomMessenger, botName: string, newLogs: string[]): void {
+  const lastBotLog = newLogs.filter((log) => log.includes(botName)).at(-1);
+  if (!lastBotLog) return;
+  messenger.broadcast({ type: "bot_action", botName, message: lastBotLog.replace(`${botName} `, "") });
+}
+
 export async function executeBotTurn(
   storage: IStorage,
   session: RoomSessionData,
@@ -451,16 +458,7 @@ export async function executeBotTurn(
     );
     updatedState = finishResult.newState;
 
-    const newLogs = updatedState.logs.slice(logsBefore.length);
-    const botLogs = newLogs.filter((log) => log.includes(currentPlayer.name));
-    if (botLogs.length > 0) {
-      const lastBotLog = botLogs.at(-1)!;
-      messenger.broadcast({
-        type: "bot_action",
-        botName: currentPlayer.name,
-        message: lastBotLog.replace(`${currentPlayer.name} `, ""),
-      });
-    }
+    announceBotLog(messenger, currentPlayer.name, updatedState.logs.slice(logsBefore.length));
 
     await storage.updateGameState(roomCode, updatedState);
     messenger.broadcast({ type: "game_state", state: updatedState });
@@ -474,16 +472,7 @@ export async function executeBotTurn(
     const result = GameLogic.processAction(updatedState, action, currentPlayer.id);
     updatedState = result.newState;
 
-    const newLogs = updatedState.logs.slice(logsBefore.length);
-    const botLogs = newLogs.filter((log) => log.includes(currentPlayer.name));
-    if (botLogs.length > 0) {
-      const lastBotLog = botLogs.at(-1)!;
-      messenger.broadcast({
-        type: "bot_action",
-        botName: currentPlayer.name,
-        message: lastBotLog.replace(`${currentPlayer.name} `, ""),
-      });
-    }
+    announceBotLog(messenger, currentPlayer.name, updatedState.logs.slice(logsBefore.length));
 
     await storage.updateGameState(roomCode, updatedState);
     const rewards = await settleFinishedMatch(competition, room, updatedState, session);
