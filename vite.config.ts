@@ -40,10 +40,22 @@ export default defineConfig({
       },
       workbox: {
         // Precache do build; ícones públicos entram via includeAssets
-        globPatterns: ["**/*.{js,css,html,svg,woff2,png}"],
+        // A página (html) fica fora do precache: guardada, ela abriria a versão antiga até o SW se atualizar
+        globPatterns: ["**/*.{js,css,svg,woff2,png}"],
+        navigateFallback: null,
         // WebSocket e API nunca passam pelo service worker
         navigateFallbackDenylist: [/^\/ws/, /^\/api/],
         runtimeCaching: [
+          {
+            // Navegação: rede primeiro (sempre a última versão); sem internet, a última página guardada
+            urlPattern: ({ request }) => request.mode === "navigate",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "cunoku-pages",
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 5 },
+            },
+          },
           {
             // Músicas e SFX: cache sob demanda (arquivos grandes)
             urlPattern: /\/audio\/.*\.mp3$/,

@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/contexts/i18n-context";
 import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
+import { WebFreshness } from "@/components/AppInviteDialog";
 import Home from "@/pages/Home";
 import Game from "@/pages/Game";
 import JoinInvite from "@/pages/JoinInvite";
@@ -50,7 +51,8 @@ function App() {
       <I18nProvider>
         <TooltipProvider>
           <Toaster />
-          <UpdateAvailableDialog />
+          {/* App (APK/IPA): oferece baixar a versão nova. Site: está sempre na última, só confere o cache */}
+          {isNativeApp() ? <UpdateAvailableDialog /> : <WebFreshness />}
           <DeepLinkListener />
           <Router />
         </TooltipProvider>

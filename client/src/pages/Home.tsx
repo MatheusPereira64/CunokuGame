@@ -16,6 +16,7 @@ import { TableThemeButton } from "@/components/TableThemePicker";
 import { HomeFeatures } from "@/components/HomeFeatures";
 import { RulesDialog } from "@/components/RulesDialog";
 import { InstallAppButton } from "@/components/InstallAppButton";
+import { AppInviteDialog } from "@/components/AppInviteDialog";
 import { ProfileDialog } from "@/components/ProfileDialog";
 import { DailyChallengeDialog } from "@/components/DailyChallengeDialog";
 import { LeagueDialog } from "@/components/LeagueDialog";
@@ -317,6 +318,7 @@ export default function Home() {
         )}
       >
         <InstallAppButton compact={isLandscapeMenu} />
+        <AppInviteDialog />
         <LeaderboardDialog compact={isLandscapeMenu} />
         <div className="relative shrink-0">
           {showNameHint && (
