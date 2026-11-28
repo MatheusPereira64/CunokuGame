@@ -220,6 +220,32 @@ export async function getMe(
   return { profile: toPublic(row, position, { includeProgress: true }) };
 }
 
+/** Moldura, título e faixa só podem ser usados depois de desbloqueados. */
+function cosmeticsUnlocked(patch: { frameId?: string; titleId?: string; bannerId?: string }, unlocked: string[]): boolean {
+  if (patch.frameId !== undefined && !isFrameUnlocked(patch.frameId, unlocked)) return false;
+  if (patch.titleId !== undefined && !isTitleUnlocked(patch.titleId, unlocked)) return false;
+  return patch.bannerId === undefined || isBannerUnlocked(patch.bannerId, unlocked);
+}
+
+/** Nome de usuário pedido: válido e livre vira o novo; sem pedido, mantém o atual. */
+async function resolveNickname(
+  db: any,
+  row: RankPlayer,
+  requested: string | undefined,
+): Promise<string | null | { error: string; status: number }> {
+  if (requested === undefined) return row.nickname;
+  const wanted = normalizeNickname(requested);
+  if (!wanted) return { error: "invalid_nickname", status: 400 };
+  if (wanted === row.nickname) return row.nickname;
+  const [owner] = await db
+    .select({ id: rankPlayers.id })
+    .from(rankPlayers)
+    .where(and(eq(rankPlayers.nickname, wanted), sql`${rankPlayers.id} <> ${row.id}`))
+    .limit(1);
+  if (owner) return { error: "nickname_taken", status: 409 };
+  return wanted;
+}
+
 export async function updateRankProfile(
   db: any,
   token: string,
@@ -236,31 +262,11 @@ export async function updateRankProfile(
   const row = await getPlayerByToken(db, token);
   if (!row) return { error: "unauthorized", status: 401 };
 
-  const unlocked = rowAchievements(row);
-  if (patch.frameId !== undefined && !isFrameUnlocked(patch.frameId, unlocked)) {
-    return { error: "cosmetic_locked", status: 400 };
-  }
-  if (patch.titleId !== undefined && !isTitleUnlocked(patch.titleId, unlocked)) {
-    return { error: "cosmetic_locked", status: 400 };
-  }
-  if (patch.bannerId !== undefined && !isBannerUnlocked(patch.bannerId, unlocked)) {
-    return { error: "cosmetic_locked", status: 400 };
-  }
+  if (!cosmeticsUnlocked(patch, rowAchievements(row))) return { error: "cosmetic_locked", status: 400 };
 
-  let nickname = row.nickname;
-  if (patch.nickname !== undefined) {
-    const wanted = normalizeNickname(patch.nickname);
-    if (!wanted) return { error: "invalid_nickname", status: 400 };
-    if (wanted !== row.nickname) {
-      const [owner] = await db
-        .select({ id: rankPlayers.id })
-        .from(rankPlayers)
-        .where(and(eq(rankPlayers.nickname, wanted), sql`${rankPlayers.id} <> ${row.id}`))
-        .limit(1);
-      if (owner) return { error: "nickname_taken", status: 409 };
-      nickname = wanted;
-    }
-  }
+  const nicknameResult = await resolveNickname(db, row, patch.nickname);
+  if (typeof nicknameResult !== "string" && nicknameResult !== null) return nicknameResult;
+  const nickname = nicknameResult;
 
   let updated: RankPlayer;
   try {

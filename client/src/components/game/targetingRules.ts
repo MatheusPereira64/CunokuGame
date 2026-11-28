@@ -89,67 +89,70 @@ export function togglePick(spec: TargetingSpec, picks: TargetPick[], pick: Targe
   return [...picks.slice(0, spec.slots - 1), pick];
 }
 
+/** 9 e 10: troca entre duas mãos diferentes; se uma delas é a minha, vira "swap_me". */
+function buildSwapAction(a: TargetPick | undefined, b: TargetPick | undefined, playerId: string): AbilityAction | null {
+  if (a?.cardIndex == null || b?.cardIndex == null || a.playerId === b.playerId) return null;
+  const mine = [a, b].find((p) => p.playerId === playerId);
+  const theirs = [a, b].find((p) => p !== mine);
+  if (mine && theirs) {
+    return {
+      kind: "swap_me",
+      myCardIndex: mine.cardIndex!,
+      targetPlayerId: theirs.playerId,
+      targetCardIndex: theirs.cardIndex!,
+      myCardId: mine.cardId,
+      targetCardId: theirs.cardId,
+    };
+  }
+  return {
+    kind: "swap_others",
+    player1Id: a.playerId,
+    card1Index: a.cardIndex,
+    player2Id: b.playerId,
+    card2Index: b.cardIndex,
+    card1Id: a.cardId,
+    card2Id: b.cardId,
+  };
+}
+
+/** Habilidades que miram uma carta de alguém: sem carta escolhida ainda, não há ação. */
+function buildCardAction(rank: Card["rank"], a: TargetPick): AbilityAction | null {
+  const cardIndex = a.cardIndex;
+  if (cardIndex == null) return null;
+  switch (rank) {
+    case "3":
+    case "4":
+      return { kind: "seal", targetPlayerId: a.playerId, cardIndex, cardId: a.cardId };
+    case "5":
+    case "6":
+      return { kind: "peek_opponent", targetPlayerId: a.playerId, targetCardIndex: cardIndex, cardId: a.cardId };
+    case "7":
+    case "8":
+      return { kind: "peek_own", cardIndex, cardId: a.cardId };
+    case "Joker":
+      return { kind: "joker_force", targetPlayerId: a.playerId, cardIndex, cardId: a.cardId };
+    default:
+      return null;
+  }
+}
+
+/** Habilidades que miram só o jogador. */
+const PLAYER_TARGET_KIND: Partial<Record<Card["rank"], "wind" | "queen" | "king">> = { A: "wind", "2": "wind", Q: "queen", K: "king" };
+
 export function buildAbilityAction(
   rank: Card["rank"] | undefined,
   jokerRevealed: boolean,
   picks: TargetPick[],
   playerId: string,
 ): AbilityAction | null {
+  if (!rank) return null;
   const [a, b] = picks;
-  switch (rank) {
-    case "A":
-    case "2":
-      return a ? { kind: "wind", targetPlayerId: a.playerId } : null;
-    case "3":
-    case "4":
-      return a?.cardIndex != null ? { kind: "seal", targetPlayerId: a.playerId, cardIndex: a.cardIndex, cardId: a.cardId } : null;
-    case "5":
-    case "6":
-      return a?.cardIndex != null
-        ? { kind: "peek_opponent", targetPlayerId: a.playerId, targetCardIndex: a.cardIndex, cardId: a.cardId }
-        : null;
-    case "7":
-    case "8":
-      return a?.cardIndex != null ? { kind: "peek_own", cardIndex: a.cardIndex, cardId: a.cardId } : null;
-    case "9":
-    case "10": {
-      if (a?.cardIndex == null || b?.cardIndex == null || a.playerId === b.playerId) return null;
-      const mine = [a, b].find((p) => p.playerId === playerId);
-      const theirs = [a, b].find((p) => p !== mine);
-      if (mine && theirs) {
-        return {
-          kind: "swap_me",
-          myCardIndex: mine.cardIndex!,
-          targetPlayerId: theirs.playerId,
-          targetCardIndex: theirs.cardIndex!,
-          myCardId: mine.cardId,
-          targetCardId: theirs.cardId,
-        };
-      }
-      return {
-        kind: "swap_others",
-        player1Id: a.playerId,
-        card1Index: a.cardIndex,
-        player2Id: b.playerId,
-        card2Index: b.cardIndex,
-        card1Id: a.cardId,
-        card2Id: b.cardId,
-      };
-    }
-    case "J":
-      return { kind: "jack" };
-    case "Q":
-      return a ? { kind: "queen", targetPlayerId: a.playerId } : null;
-    case "K":
-      return a ? { kind: "king", targetPlayerId: a.playerId } : null;
-    case "Joker":
-      if (!jokerRevealed) return { kind: "joker_reveal" };
-      return a?.cardIndex != null
-        ? { kind: "joker_force", targetPlayerId: a.playerId, cardIndex: a.cardIndex, cardId: a.cardId }
-        : null;
-    default:
-      return null;
-  }
+  if (rank === "J") return { kind: "jack" };
+  if (rank === "Joker" && !jokerRevealed) return { kind: "joker_reveal" };
+  if (rank === "9" || rank === "10") return buildSwapAction(a, b, playerId);
+  const playerKind = PLAYER_TARGET_KIND[rank];
+  if (playerKind) return a ? { kind: playerKind, targetPlayerId: a.playerId } : null;
+  return a ? buildCardAction(rank, a) : null;
 }
 
 /** Jogadores cujas mãos abrem sem sobreposição enquanto se escolhe uma carta delas. */

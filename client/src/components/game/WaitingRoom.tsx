@@ -67,6 +67,188 @@ function EmptySeat({ compact, label }: { compact: boolean; label: string }) {
   );
 }
 
+type InviteOptionsProps = Pick<
+  WaitingRoomProps,
+  "roomCode" | "players" | "lanJoinUrl" | "onCopyCode" | "onShareInvite" | "onCopyDiscordInvite" | "onInviteFriend" | "onCopyLanUrl"
+> & { isLan: boolean; isLandscape: boolean };
+
+/** Código da sala e as formas de chamar gente (link, Discord, amigos, rede local). */
+function InviteOptions({
+  roomCode,
+  players,
+  isLan,
+  isLandscape,
+  lanJoinUrl,
+  onCopyCode,
+  onShareInvite,
+  onCopyDiscordInvite,
+  onInviteFriend,
+  onCopyLanUrl,
+}: InviteOptionsProps) {
+  const { t } = useI18n();
+  return (
+    <>
+      <button
+        type="button"
+        className={cn(
+          "flex w-full items-center gap-2 rounded-xl border-2 border-dashed border-[#d4af37]/60 bg-black/30 text-left transition-colors hover:bg-black/50",
+          fit(isLandscape, "p-2 mb-2", "p-4 mb-3")
+        )}
+        onClick={onCopyCode}
+      >
+        <div
+          className={cn(
+            "flex-1 pl-6 text-center font-mono font-bold tracking-[0.35em] text-amber-200",
+            fit(isLandscape, "text-2xl", "text-4xl")
+          )}
+        >
+          {roomCode}
+        </div>
+        <Copy className="h-5 w-5 shrink-0 text-amber-100/70" />
+      </button>
+
+      {onShareInvite && (
+        <Button
+          variant="outline"
+          className={cn(
+            "w-full border-[#d4af37]/60 text-amber-100 hover:bg-white/10",
+            fit(isLandscape, "mb-0 h-9 text-sm", "mb-4")
+          )}
+          onClick={onShareInvite}
+        >
+          <Link2 className="mr-2 h-4 w-4" /> {t("invite.share")}
+        </Button>
+      )}
+
+      {/* Link da LAN só funciona na mesma Wi-Fi: não faz sentido mandar no Discord */}
+      {onCopyDiscordInvite && !isLan && (
+        <Button
+          variant="outline"
+          className={cn(
+            "w-full border-[#5865f2]/70 text-indigo-100 hover:bg-[#5865f2]/20",
+            fit(isLandscape, "mb-0 mt-1 h-9 text-sm", "-mt-2 mb-4")
+          )}
+          onClick={onCopyDiscordInvite}
+        >
+          <MessageCircle className="mr-2 h-4 w-4" /> {t("invite.discord")}
+        </Button>
+      )}
+
+      {onInviteFriend && (
+        <FriendsInvite inRoom={players.map((p) => p.name)} compact={isLandscape} onInvite={onInviteFriend} />
+      )}
+
+      {isLan && lanJoinUrl && (
+        <div className={cn("rounded-xl border border-white/20 bg-black/30", fit(isLandscape, "mt-2 p-2", "mb-4 p-3"))}>
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-100">
+            <Wifi className="h-4 w-4" />
+            {t("waiting.lanUrl")}
+          </div>
+          <button
+            type="button"
+            className="w-full break-all text-left font-mono text-xs text-white/90 hover:underline"
+            onClick={onCopyLanUrl}
+          >
+            {lanJoinUrl}
+          </button>
+          {!isLandscape && <p className="mt-2 text-xs text-white/60">{t("waiting.lanHint")}</p>}
+        </div>
+      )}
+    </>
+  );
+}
+
+function SeatCard({ player, isMe, isHost, compact }: { player: Player; isMe: boolean; isHost: boolean; compact: boolean }) {
+  const { t } = useI18n();
+  // O próprio jogador usa o visual salvo aqui; os outros, o que veio do servidor
+  const profile = isMe ? loadProfile() : null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.6 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: "spring", stiffness: 320, damping: 20 }}
+      className={cn("flex min-w-0 flex-col items-center gap-1 rounded-2xl p-2", isMe && "bg-white/10 ring-1 ring-amber-300/60")}
+    >
+      <Avatar
+        name={player.name}
+        compact={compact}
+        hideLabel
+        iconId={profile?.iconId ?? (player.iconId as ProfileIconId | undefined)}
+        accent={profile?.accent ?? (player.accent as ProfileAccent | undefined)}
+      />
+      <div className="w-full truncate text-center text-sm font-bold">{player.name}</div>
+      <div className="flex min-h-[1rem] flex-wrap justify-center gap-1">
+        {isMe && <SeatTag tone="you">{t("waiting.you")}</SeatTag>}
+        {isHost && <SeatTag tone="host">{t("waiting.host")}</SeatTag>}
+      </div>
+    </motion.div>
+  );
+}
+
+function waitingHint(canStart: boolean, quickMatch: boolean): { title: string; desc: string } {
+  if (canStart) return { title: "waiting.waitHost", desc: "waiting.waitHostDesc" };
+  return { title: "waiting.needPlayers", desc: quickMatch ? "queue.waitingPlayersDesc" : "waiting.needPlayersDesc" };
+}
+
+/** Contagem da partida rápida, botão de começar (host) ou aviso de espera. */
+function StartArea({
+  canStart,
+  startCountdown,
+  isHost,
+  quickMatch,
+  compact,
+  playerCount,
+  onStart,
+}: {
+  canStart: boolean;
+  startCountdown: number | null;
+  isHost: boolean;
+  quickMatch: boolean;
+  compact: boolean;
+  playerCount: number;
+  onStart: () => void;
+}) {
+  const { t } = useI18n();
+  if (canStart && startCountdown != null) {
+    return (
+      <motion.div
+        key={startCountdown}
+        initial={{ scale: 1.4, opacity: 0.4 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className={cn("text-center font-display font-bold text-amber-200", fit(compact, "text-2xl", "text-4xl"))}
+      >
+        {t("queue.countdown", { seconds: String(Math.max(startCountdown, 1)) })}
+      </motion.div>
+    );
+  }
+  if (isHost && (canStart || !quickMatch)) {
+    return (
+      <Button
+        variant="primary"
+        size="lg"
+        disabled={!canStart}
+        className={cn("w-full font-bold", canStart && "ring-2 ring-amber-300/70", fit(compact, "text-sm py-3 h-auto", "text-lg py-6"))}
+        onClick={onStart}
+      >
+        {canStart ? `${t("waiting.startGame")} (${playerCount})` : t("waiting.missingPlayer")}
+      </Button>
+    );
+  }
+  const hint = waitingHint(canStart, quickMatch);
+  return (
+    <div className="rounded-xl bg-white/10 p-2 text-center sm:p-3">
+      <div className="font-semibold text-amber-100">{t(hint.title)}</div>
+      <div className="mt-0.5 text-sm text-white/60">{t(hint.desc)}</div>
+    </div>
+  );
+}
+
+function subtitleKey(quickMatch: boolean, isLan: boolean): string {
+  if (quickMatch) return "queue.matchedDesc";
+  return isLan ? "waiting.shareLan" : "waiting.shareCode";
+}
+
+
 export function WaitingRoom({
   roomCode,
   players,
@@ -91,7 +273,6 @@ export function WaitingRoom({
   const isPortrait = useIsPortrait();
   const isCompactGame = useIsCompactGame();
   const isLandscape = isCompactGame && !isPortrait;
-  const profile = loadProfile();
   const { mat } = useSyncExternalStore(subscribeTableTheme, loadTableTheme, loadTableTheme);
   const emptySeats = emptySeatCount(players.length, maxPlayers);
   const manySeats = players.length + emptySeats > 4;
@@ -139,79 +320,23 @@ export function WaitingRoom({
               {quickMatch ? t("queue.matched") : t("waiting.title")}
             </h2>
             <p className={cn("text-white/60", fit(isLandscape, "mt-1 text-xs", "mt-2 text-sm"))}>
-              {quickMatch ? t("queue.matchedDesc") : isLan ? t("waiting.shareLan") : t("waiting.shareCode")}
+              {t(subtitleKey(quickMatch, isLan))}
             </p>
           </div>
 
           {!quickMatch && (
-            <>
-              <button
-                type="button"
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-xl border-2 border-dashed border-[#d4af37]/60 bg-black/30 text-left transition-colors hover:bg-black/50",
-                  fit(isLandscape, "p-2 mb-2", "p-4 mb-3")
-                )}
-                onClick={onCopyCode}
-              >
-                <div
-                  className={cn(
-                    "flex-1 pl-6 text-center font-mono font-bold tracking-[0.35em] text-amber-200",
-                    fit(isLandscape, "text-2xl", "text-4xl")
-                  )}
-                >
-                  {roomCode}
-                </div>
-                <Copy className="h-5 w-5 shrink-0 text-amber-100/70" />
-              </button>
-
-              {onShareInvite && (
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full border-[#d4af37]/60 text-amber-100 hover:bg-white/10",
-                    fit(isLandscape, "mb-0 h-9 text-sm", "mb-4")
-                  )}
-                  onClick={onShareInvite}
-                >
-                  <Link2 className="mr-2 h-4 w-4" /> {t("invite.share")}
-                </Button>
-              )}
-
-              {/* Link da LAN só funciona na mesma Wi-Fi: não faz sentido mandar no Discord */}
-              {onCopyDiscordInvite && !isLan && (
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full border-[#5865f2]/70 text-indigo-100 hover:bg-[#5865f2]/20",
-                    fit(isLandscape, "mb-0 mt-1 h-9 text-sm", "-mt-2 mb-4")
-                  )}
-                  onClick={onCopyDiscordInvite}
-                >
-                  <MessageCircle className="mr-2 h-4 w-4" /> {t("invite.discord")}
-                </Button>
-              )}
-
-              {onInviteFriend && (
-                <FriendsInvite inRoom={players.map((p) => p.name)} compact={isLandscape} onInvite={onInviteFriend} />
-              )}
-
-              {isLan && lanJoinUrl && (
-                <div className={cn("rounded-xl border border-white/20 bg-black/30", fit(isLandscape, "mt-2 p-2", "mb-4 p-3"))}>
-                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-100">
-                    <Wifi className="h-4 w-4" />
-                    {t("waiting.lanUrl")}
-                  </div>
-                  <button
-                    type="button"
-                    className="w-full break-all text-left font-mono text-xs text-white/90 hover:underline"
-                    onClick={onCopyLanUrl}
-                  >
-                    {lanJoinUrl}
-                  </button>
-                  {!isLandscape && <p className="mt-2 text-xs text-white/60">{t("waiting.lanHint")}</p>}
-                </div>
-              )}
-            </>
+            <InviteOptions
+              roomCode={roomCode}
+              players={players}
+              isLan={isLan}
+              isLandscape={isLandscape}
+              lanJoinUrl={lanJoinUrl}
+              onCopyCode={onCopyCode}
+              onShareInvite={onShareInvite}
+              onCopyDiscordInvite={onCopyDiscordInvite}
+              onInviteFriend={onInviteFriend}
+              onCopyLanUrl={onCopyLanUrl}
+            />
           )}
         </div>
 
@@ -230,68 +355,24 @@ export function WaitingRoom({
               )
             )}
           >
-            {players.map((p) => {
-              const isMe = p.id === playerId;
-              return (
-                <motion.div
-                  key={p.id}
-                  initial={{ opacity: 0, scale: 0.6 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: "spring", stiffness: 320, damping: 20 }}
-                  className={cn("flex min-w-0 flex-col items-center gap-1 rounded-2xl p-2", isMe && "bg-white/10 ring-1 ring-amber-300/60")}
-                >
-                  <Avatar
-                    name={p.name}
-                    compact={isLandscape}
-                    hideLabel
-                    iconId={isMe ? profile.iconId : (p.iconId as ProfileIconId | undefined)}
-                    accent={isMe ? profile.accent : (p.accent as ProfileAccent | undefined)}
-                  />
-                  <div className="w-full truncate text-center text-sm font-bold">{p.name}</div>
-                  <div className="flex min-h-[1rem] flex-wrap justify-center gap-1">
-                    {isMe && <SeatTag tone="you">{t("waiting.you")}</SeatTag>}
-                    {p.id === hostId && <SeatTag tone="host">{t("waiting.host")}</SeatTag>}
-                  </div>
-                </motion.div>
-              );
-            })}
+            {players.map((p) => (
+              <SeatCard key={p.id} player={p} isMe={p.id === playerId} isHost={p.id === hostId} compact={isLandscape} />
+            ))}
             {Array.from({ length: emptySeats }, (_, i) => (
               <EmptySeat key={i} compact={isLandscape} label={t("waiting.emptySeat")} />
             ))}
           </div>
 
           <div className={fit(isLandscape, "mt-2", "mt-5")}>
-            {canStart && startCountdown != null ? (
-              <motion.div
-                key={startCountdown}
-                initial={{ scale: 1.4, opacity: 0.4 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className={cn("text-center font-display font-bold text-amber-200", fit(isLandscape, "text-2xl", "text-4xl"))}
-              >
-                {t("queue.countdown", { seconds: String(Math.max(startCountdown, 1)) })}
-              </motion.div>
-            ) : isHost && (canStart || !quickMatch) ? (
-              <Button
-                variant="primary"
-                size="lg"
-                disabled={!canStart}
-                className={cn(
-                  "w-full font-bold",
-                  canStart && "ring-2 ring-amber-300/70",
-                  fit(isLandscape, "text-sm py-3 h-auto", "text-lg py-6")
-                )}
-                onClick={onStart}
-              >
-                {canStart ? `${t("waiting.startGame")} (${players.length})` : t("waiting.missingPlayer")}
-              </Button>
-            ) : (
-              <div className="rounded-xl bg-white/10 p-2 text-center sm:p-3">
-                <div className="font-semibold text-amber-100">{canStart ? t("waiting.waitHost") : t("waiting.needPlayers")}</div>
-                <div className="mt-0.5 text-sm text-white/60">
-                  {canStart ? t("waiting.waitHostDesc") : quickMatch ? t("queue.waitingPlayersDesc") : t("waiting.needPlayersDesc")}
-                </div>
-              </div>
-            )}
+            <StartArea
+              canStart={canStart}
+              startCountdown={startCountdown}
+              isHost={isHost}
+              quickMatch={quickMatch}
+              compact={isLandscape}
+              playerCount={players.length}
+              onStart={onStart}
+            />
           </div>
         </div>
       </div>

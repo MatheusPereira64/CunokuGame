@@ -76,3 +76,51 @@ const DEFAULT_MAX_PLAYERS = 4;
 export function emptySeatCount(playerCount: number, maxPlayers?: number | null): number {
   return Math.max(0, (maxPlayers || DEFAULT_MAX_PLAYERS) - playerCount);
 }
+
+/** Mensagem "use_ability" que o servidor espera para cada habilidade escolhida no modal. */
+export function abilityMessage(action: AbilityAction, myId: string): Record<string, unknown> & { type: "use_ability"; ability: string } {
+  switch (action.kind) {
+    case "peek_own":
+      return { type: "use_ability", ability: "peek_own", targetPlayerId: myId, targetCardIndex: action.cardIndex, targetCardId: action.cardId };
+    case "peek_opponent":
+      return {
+        type: "use_ability",
+        ability: "peek_opponent",
+        targetPlayerId: action.targetPlayerId,
+        targetCardIndex: action.targetCardIndex,
+        targetCardId: action.cardId,
+      };
+    case "swap_me":
+      return {
+        type: "use_ability",
+        ability: "swap",
+        targetPlayerId: myId,
+        targetCardIndex: action.myCardIndex,
+        targetPlayerId2: action.targetPlayerId,
+        targetCardIndex3: action.targetCardIndex,
+        targetCardId: action.myCardId,
+        targetCardId2: action.targetCardId,
+      };
+    case "swap_others":
+      return {
+        type: "use_ability",
+        ability: "swap",
+        targetPlayerId: action.player1Id,
+        targetCardIndex: action.card1Index,
+        targetPlayerId2: action.player2Id,
+        targetCardIndex3: action.card2Index,
+        targetCardId: action.card1Id,
+        targetCardId2: action.card2Id,
+      };
+    case "seal":
+    case "joker_force":
+      return { type: "use_ability", ability: action.kind, targetPlayerId: action.targetPlayerId, targetCardIndex: action.cardIndex, targetCardId: action.cardId };
+    case "queen":
+    case "king":
+    case "wind":
+      return { type: "use_ability", ability: action.kind, targetPlayerId: action.targetPlayerId };
+    case "jack":
+    case "joker_reveal":
+      return { type: "use_ability", ability: action.kind };
+  }
+}

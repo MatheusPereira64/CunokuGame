@@ -15,3 +15,7 @@ release-artifacts
 android/keystore.properties
 android/*.keystore
 android/*.jks
+
+# Playwright (teste E2E)
+test-results
+playwright-report

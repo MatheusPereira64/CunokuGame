@@ -125,36 +125,48 @@ function replaceDrawn(newState: GameState, player: Player, handIndex: number | u
 
 type AbilityAction = Extract<GameAction, { type: "use_ability" }>;
 
-function useDrawnAbility(newState: GameState, player: Player, action: AbilityAction, playerId: string): GameState {
-  if (!newState.drawnCard || newState.drawnFromDiscard || newState.forcedReplace) return newState;
-  const rank = newState.drawnCard.rank;
-  if (rank === "J") return useJack(newState, player, playerId);
-  if (rank === "Joker") return useJoker(newState, player, action, playerId);
-  if (abilityTouchesSealedCard(newState, rank, playerId, action)) return newState;
+/** Habilidades que só miram uma pessoa (selar, Rainha, Rei). false = alvo inválido, a jogada não acontece. */
+function applyPlayerTargetAbility(newState: GameState, player: Player, action: AbilityAction, playerId: string, rank: string): boolean {
   const target = newState.players.find((p) => p.id === action.targetPlayerId);
   if (rank === "3" || rank === "4") {
-    if (!applySeal(newState, playerId, action.targetPlayerId, action.targetCardIndex)) return newState;
+    if (!applySeal(newState, playerId, action.targetPlayerId, action.targetCardIndex)) return false;
     newState.logs.push(`${player.name} selou uma carta de ${target?.name}`);
   }
   if (rank === "Q") {
-    if (!target || target.id === playerId) return newState;
+    if (!target || target.id === playerId) return false;
     applyQueen(newState, player, target, randomFloat);
     newState.logs.push(`${player.name} usou a Rainha em ${target.name}`);
   }
   if (rank === "K") {
-    if (!target) return newState;
+    if (!target) return false;
     newState.logs.push(`${player.name} usou o Rei para ver as cartas de ${target.name}`);
   }
+  return true;
+}
+
+/** Espiar (5 a 8), trocar (9 e 10) e o vento (A e 2): não cancelam a jogada. */
+function applyCardAbility(newState: GameState, player: Player, action: AbilityAction, playerId: string, rank: string): void {
   if (rank === "7" || rank === "8") {
     peekOwnCard(player, action, playerId);
     newState.logs.push(`${player.name} usou habilidade para ver uma de suas cartas`);
   }
   if (rank === "5" || rank === "6") {
     peekOpponentCard(newState, action, playerId);
+    const target = newState.players.find((p) => p.id === action.targetPlayerId);
     if (target && target.id !== playerId) newState.logs.push(`${player.name} usou habilidade para ver uma carta de ${target.name}`);
   }
   if (rank === "9" || rank === "10") swapCards(newState, player, action, playerId);
   if (rank === "A" || rank === "2") windOnOpponent(newState, player, action, playerId);
+}
+
+function useDrawnAbility(newState: GameState, player: Player, action: AbilityAction, playerId: string): GameState {
+  if (!newState.drawnCard || newState.drawnFromDiscard || newState.forcedReplace) return newState;
+  const rank = newState.drawnCard.rank;
+  if (rank === "J") return useJack(newState, player, playerId);
+  if (rank === "Joker") return useJoker(newState, player, action, playerId);
+  if (abilityTouchesSealedCard(newState, rank, playerId, action)) return newState;
+  if (!applyPlayerTargetAbility(newState, player, action, playerId, rank)) return newState;
+  applyCardAbility(newState, player, action, playerId, rank);
   newState.discardPile.push(newState.drawnCard);
   newState.drawnCard = null;
   newState.drawnFromDiscard = false;

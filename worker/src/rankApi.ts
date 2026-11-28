@@ -23,82 +23,60 @@ async function getRankDb(env: Env) {
 }
 
 type RankJson = (data: unknown, status?: number) => Response;
+type RankDb = NonNullable<Awaited<ReturnType<typeof getRankDb>>>;
+type RankResult = { error: string; status: number } | object;
+type RouteCtx = { request: Request; db: RankDb; json: RankJson; token: string | null };
+type RouteHandler = (ctx: RouteCtx) => Promise<Response>;
 
-async function dispatchRankRoute(
-  request: Request,
-  db: NonNullable<Awaited<ReturnType<typeof getRankDb>>>,
-  path: string,
-  method: string,
-  json: RankJson,
-): Promise<Response | null> {
-  if (method === "POST" && path === api.rank.register.path) {
-    const body = api.rank.register.input.parse(await request.json());
-    const result = await registerRankPlayer(db, body);
-    if ("error" in result) return json({ message: result.error }, result.status);
-    return json(result, 201);
-  }
-  if (method === "POST" && path === api.rank.login.path) {
-    const body = api.rank.login.input.parse(await request.json());
-    const result = await loginRankPlayer(db, body);
-    if ("error" in result) return json({ message: result.error }, result.status);
-    return json(result);
-  }
-  if (method === "POST" && path === api.metrics.match.path) {
+/** Resultado de um serviço do ranking: erro vira { message } com o status dele. */
+function reply(json: RankJson, result: RankResult, okStatus = 200): Response {
+  if ("error" in result) return json({ message: result.error }, result.status);
+  return json(result, okStatus);
+}
+
+/** Rota que exige o token do jogador logado. */
+function authed(run: (ctx: RouteCtx & { token: string }) => Promise<Response>): RouteHandler {
+  return (ctx) => (ctx.token ? run({ ...ctx, token: ctx.token }) : Promise.resolve(ctx.json({ message: "unauthorized" }, 401)));
+}
+
+function searchParam(request: Request, name: string, fallback: string): number {
+  return Number(new URL(request.url).searchParams.get(name) || fallback);
+}
+
+/** Rotas exatas: "MÉTODO caminho" → handler. */
+const RANK_ROUTES: Record<string, RouteHandler> = {
+  [`POST ${api.rank.register.path}`]: async ({ request, db, json }) =>
+    reply(json, await registerRankPlayer(db, api.rank.register.input.parse(await request.json())), 201),
+  [`POST ${api.rank.login.path}`]: async ({ request, db, json }) =>
+    reply(json, await loginRankPlayer(db, api.rank.login.input.parse(await request.json()))),
+  [`POST ${api.metrics.match.path}`]: async ({ request, db, json }) => {
     const parsed = matchMetricSchema.safeParse(await request.json().catch(() => null));
     if (!parsed.success) return json({ message: "Invalid metric" }, 400);
     await recordMetrics(db, new Date().toISOString().slice(0, 10), metricKeysForMatch(parsed.data));
     return new Response(null, { status: 204, headers: corsHeaders(request) });
-  }
-  if (method === "GET" && path === api.metrics.summary.path) {
-    return json(await metricsSummary(db, Number(new URL(request.url).searchParams.get("days") || "30")));
-  }
+  },
+  [`GET ${api.metrics.summary.path}`]: async ({ request, db, json }) => json(await metricsSummary(db, searchParam(request, "days", "30"))),
+  [`GET ${api.rank.leaderboard.path}`]: async ({ request, db, json }) =>
+    json({ entries: await getLeaderboard(db, searchParam(request, "limit", "50")) }),
+  [`GET ${api.rank.me.path}`]: authed(async ({ db, json, token }) => reply(json, await getMe(db, token))),
+  [`PATCH ${api.rank.profile.path}`]: authed(async ({ request, db, json, token }) =>
+    reply(json, await updateRankProfile(db, token, api.rank.profile.input.parse(await request.json()))),
+  ),
+  [`POST ${api.rank.linkEmail.path}`]: authed(async ({ request, db, json, token }) =>
+    reply(json, await linkRankEmail(db, token, api.rank.linkEmail.input.parse(await request.json()))),
+  ),
+  [`POST ${api.rank.matchResult.path}`]: authed(async ({ request, db, json, token }) =>
+    reply(json, await recordRankMatch(db, token, api.rank.matchResult.input.parse(await request.json()))),
+  ),
+};
+
+async function dispatchRankRoute(request: Request, db: RankDb, path: string, method: string, json: RankJson): Promise<Response | null> {
+  const ctx: RouteCtx = { request, db, json, token: bearerToken(request.headers.get("authorization")) };
+  const handler = RANK_ROUTES[`${method} ${path}`];
+  if (handler) return handler(ctx);
   if (method === "GET" && path.startsWith(api.profile.view.path)) {
     const profile = await getPublicProfile(db, decodeURIComponent(path.slice(api.profile.view.path.length)));
-    if (!profile) return json({ message: "Profile not found" }, 404);
-    return json({ profile });
-  }
-  if (method === "GET" && path === api.rank.leaderboard.path) {
-    const limit = Number(new URL(request.url).searchParams.get("limit") || "50");
-    const entries = await getLeaderboard(db, limit);
-    return json({ entries });
-  }
-  return dispatchAuthedRankRoute(request, db, path, method, json);
-}
-
-async function dispatchAuthedRankRoute(
-  request: Request,
-  db: NonNullable<Awaited<ReturnType<typeof getRankDb>>>,
-  path: string,
-  method: string,
-  json: RankJson,
-): Promise<Response | null> {
-  const token = bearerToken(request.headers.get("authorization"));
-  if (method === "GET" && path === api.rank.me.path) {
-    if (!token) return json({ message: "unauthorized" }, 401);
-    const result = await getMe(db, token);
-    if ("error" in result) return json({ message: result.error }, result.status);
-    return json(result);
-  }
-  if (method === "PATCH" && path === api.rank.profile.path) {
-    if (!token) return json({ message: "unauthorized" }, 401);
-    const body = api.rank.profile.input.parse(await request.json());
-    const result = await updateRankProfile(db, token, body);
-    if ("error" in result) return json({ message: result.error }, result.status);
-    return json(result);
-  }
-  if (method === "POST" && path === api.rank.linkEmail.path) {
-    if (!token) return json({ message: "unauthorized" }, 401);
-    const body = api.rank.linkEmail.input.parse(await request.json());
-    const result = await linkRankEmail(db, token, body);
-    if ("error" in result) return json({ message: result.error }, result.status);
-    return json(result);
-  }
-  if (method === "POST" && path === api.rank.matchResult.path) {
-    if (!token) return json({ message: "unauthorized" }, 401);
-    const body = api.rank.matchResult.input.parse(await request.json());
-    const result = await recordRankMatch(db, token, body);
-    if ("error" in result) return json({ message: result.error }, result.status);
-    return json(result);
+    return profile ? json({ profile }) : json({ message: "Profile not found" }, 404);
   }
   return null;
 }

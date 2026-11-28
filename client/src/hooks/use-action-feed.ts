@@ -36,6 +36,32 @@ export function useActionFeed(gameState: GameState | null | undefined, viewerId:
   stateRef.current = gameState;
   const logCount = gameState?.logs?.length ?? null;
 
+  /** Um timer por chave: um aviso novo substitui o anterior da mesma pessoa. */
+  const restartTimer = (key: string, ms: number, run: () => void) => {
+    const old = timers.current.get(key);
+    if (old) clearTimeout(old);
+    timers.current.set(key, setTimeout(run, ms));
+  };
+
+  const showSeatNotice = (actorId: string, notice: SeatNotice) => {
+    setSeatNotices((current) => ({ ...current, [actorId]: notice }));
+    restartTimer(actorId, notice.tone === "info" ? BASIC_MS : ABILITY_MS, () => {
+      timers.current.delete(actorId);
+      setSeatNotices((current) => {
+        if (current[actorId]?.id !== notice.id) return current;
+        const next = { ...current };
+        delete next[actorId];
+        return next;
+      });
+    });
+  };
+
+  const showPersonalAlert = (alert: PersonalAlert) => {
+    setPersonalAlert(alert);
+    vibrate("alert");
+    restartTimer("__alert__", ALERT_MS, () => setPersonalAlert((cur) => (cur?.id === alert.id ? null : cur)));
+  };
+
   useEffect(() => {
     const state = stateRef.current;
     if (logCount === null || !state) return;
@@ -60,41 +86,17 @@ export function useActionFeed(gameState: GameState | null | undefined, viewerId:
         text: tRef.current(seatTextKey(event, viewerId), vars),
         tone: toneOf(event, viewerId),
       };
-      setSeatNotices((current) => ({ ...current, [event.actorId]: notice }));
-      const previousTimer = timers.current.get(event.actorId);
-      if (previousTimer) clearTimeout(previousTimer);
-      const ms = notice.tone === "info" ? BASIC_MS : ABILITY_MS;
-      timers.current.set(
-        event.actorId,
-        setTimeout(() => {
-          timers.current.delete(event.actorId);
-          setSeatNotices((current) => {
-            if (current[event.actorId]?.id !== notice.id) return current;
-            const next = { ...current };
-            delete next[event.actorId];
-            return next;
-          });
-        }, ms),
-      );
-
+      showSeatNotice(event.actorId, notice);
       if (actor && targetsViewer(event, viewerId)) {
-        const alert: PersonalAlert = {
+        showPersonalAlert({
           id: notice.id,
           kind: event.kind,
           actorName: actor.name,
           text: tRef.current(`alert.${event.kind}`, { player: actor.name }),
-        };
-        setPersonalAlert(alert);
-        vibrate("alert");
-        const alertKey = "__alert__";
-        const old = timers.current.get(alertKey);
-        if (old) clearTimeout(old);
-        timers.current.set(
-          alertKey,
-          setTimeout(() => setPersonalAlert((cur) => (cur?.id === alert.id ? null : cur)), ALERT_MS),
-        );
+        });
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- os ajudantes só usam refs e setters estáveis
   }, [logCount, viewerId]);
 
   useEffect(() => {

@@ -17,7 +17,8 @@
     "test:coverage": "vitest run --coverage",
     "ci": "npm run check && npm run test && npm run build",
     "db:push": "drizzle-kit push",
-    "db:init": "tsx script/init-db.ts"
+    "db:init": "tsx script/init-db.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
@@ -98,6 +99,7 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@cloudflare/workers-types": "^5.20260827.1",
+    "@playwright/test": "1.56",
     "@replit/vite-plugin-cartographer": "^0.4.4",
     "@replit/vite-plugin-dev-banner": "^0.1.1",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",

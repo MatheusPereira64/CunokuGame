@@ -21,7 +21,7 @@ import { rememberPlayers } from "@/lib/friends";
 import { createOfflineGame } from "@/utils/localGame";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useI18n } from "@/contexts/i18n-context";
-import { AbilityAction } from "@/components/game/helpers";
+import { abilityMessage, type AbilityAction } from "@/components/game/helpers";
 import { useIsPortrait, lockLandscape, unlockOrientation, useIsCompactGame } from "@/hooks/use-landscape";
 import { getLanJoinUrl, getNetworkMode } from "@/lib/gameServer";
 import { clearActiveSession, saveActiveSession } from "@/lib/activeSession";
@@ -600,146 +600,63 @@ export default function Game() {
     });
   };
 
-  // Resolve a ação escolhida no modal de habilidade
-  const confirmAbility = (action: AbilityAction) => {
-    if (!gameState || !me) return;
-
-    if (action.kind === "peek_own") {
-      const cardIndex = action.cardIndex;
-      // A carta só vira depois que a carta do poder cai na pilha
-      const faceKey = slotKey(playerId, cardIndex);
-      holdFace(faceKey);
-      afterPileLanding(() => {
-        releaseFace(faceKey);
-        audioManager.playCardFlip();
-      });
-      sendAction({
-        type: "use_ability",
-        ability: "peek_own",
-        targetPlayerId: playerId,
-        targetCardIndex: cardIndex,
-        targetCardId: action.cardId,
-      });
-
-      // A carta volta a ficar oculta após 20 segundos (apenas visual)
-      const timer = setTimeout(() => {
-        const currentMe = gameState.players.find((p) => p.id === playerId);
-        if (currentMe?.knownCards[cardIndex.toString()]) {
-          const updatedKnownCards = { ...currentMe.knownCards };
-          delete updatedKnownCards[cardIndex.toString()];
-          currentMe.knownCards = updatedKnownCards;
-        }
-        peekTimersRef.current.delete(cardIndex);
-      }, 20000);
-      peekTimersRef.current.set(cardIndex, timer);
-    }
-
-    if (action.kind === "peek_opponent") {
-      // Offline: feedback imediato. Online: private_info do servidor (só quem peekou recebe).
-      if (isOffline) {
-        const targetPlayer = gameState.players.find((p) => p.id === action.targetPlayerId);
-        if (targetPlayer?.hand[action.targetCardIndex]) {
-          const peekedCard = targetPlayer.hand[action.targetCardIndex];
-
-          if (revealedOpponentCard?.timer) {
-            clearTimeout(revealedOpponentCard.timer);
-          }
-          // O painel abre depois que a carta do poder cai na pilha
-          afterPileLanding(() => {
-            const overlayTimer = setTimeout(() => setRevealedOpponentCard(null), 3000);
-            setRevealedOpponentCard({ card: peekedCard, playerName: targetPlayer.name, timer: overlayTimer });
-            revealOpponentCardInHand(action.targetPlayerId, peekedCard);
-            audioManager.playCardFlip();
-          });
-        }
+  // Espiar a própria carta: ela vira depois que a carta do poder cai na pilha e volta a se esconder em 20s (só visual)
+  const showOwnPeek = (state: GameState, cardIndex: number) => {
+    const faceKey = slotKey(playerId, cardIndex);
+    holdFace(faceKey);
+    afterPileLanding(() => {
+      releaseFace(faceKey);
+      audioManager.playCardFlip();
+    });
+    const timer = setTimeout(() => {
+      const currentMe = state.players.find((p) => p.id === playerId);
+      if (currentMe?.knownCards[cardIndex.toString()]) {
+        const updatedKnownCards = { ...currentMe.knownCards };
+        delete updatedKnownCards[cardIndex.toString()];
+        currentMe.knownCards = updatedKnownCards;
       }
+      peekTimersRef.current.delete(cardIndex);
+    }, 20000);
+    peekTimersRef.current.set(cardIndex, timer);
+  };
 
-      sendAction({
-        type: "use_ability",
-        ability: "peek_opponent",
-        targetPlayerId: action.targetPlayerId,
-        targetCardIndex: action.targetCardIndex,
-        targetCardId: action.cardId,
-      });
-    }
+  // Offline não há servidor: a carta espiada do oponente vem do estado local (online chega por private_info)
+  const showOpponentPeekOffline = (state: GameState, targetPlayerId: string, targetCardIndex: number) => {
+    const targetPlayer = state.players.find((p) => p.id === targetPlayerId);
+    const peekedCard = targetPlayer?.hand[targetCardIndex];
+    if (!targetPlayer || !peekedCard) return;
+    if (revealedOpponentCard?.timer) clearTimeout(revealedOpponentCard.timer);
+    // O painel abre depois que a carta do poder cai na pilha
+    afterPileLanding(() => {
+      const overlayTimer = setTimeout(() => setRevealedOpponentCard(null), 3000);
+      setRevealedOpponentCard({ card: peekedCard, playerName: targetPlayer.name, timer: overlayTimer });
+      revealOpponentCardInHand(targetPlayerId, peekedCard);
+      audioManager.playCardFlip();
+    });
+  };
 
-    if (action.kind === "swap_me") {
-      sendAction({
-        type: "use_ability",
-        ability: "swap",
-        targetPlayerId: playerId,
-        targetCardIndex: action.myCardIndex,
-        targetPlayerId2: action.targetPlayerId,
-        targetCardIndex3: action.targetCardIndex,
-        targetCardId: action.myCardId,
-        targetCardId2: action.targetCardId,
-      });
-    }
-
-    if (action.kind === "jack") {
-      sendAction({ type: "use_ability", ability: "jack" });
-    }
-
-    if (action.kind === "queen") {
-      sendAction({ type: "use_ability", ability: "queen", targetPlayerId: action.targetPlayerId });
-    }
-
-    if (action.kind === "seal") {
-      sendAction({
-        type: "use_ability",
-        ability: "seal",
-        targetPlayerId: action.targetPlayerId,
-        targetCardIndex: action.cardIndex,
-        targetCardId: action.cardId,
-      });
-    }
-
+  // Efeitos na tela antes de enviar a habilidade (Rei e Coringa offline mostram as faces do estado local)
+  const playAbilityLocally = (state: GameState, action: AbilityAction) => {
+    if (action.kind === "peek_own") showOwnPeek(state, action.cardIndex);
+    if (!isOffline) return;
+    if (action.kind === "peek_opponent") showOpponentPeekOffline(state, action.targetPlayerId, action.targetCardIndex);
     if (action.kind === "king") {
-      // Offline não há servidor: as faces vêm do estado local
-      if (isOffline) {
-        const reveals = revealCards(gameState, [action.targetPlayerId]);
-        afterPileLanding(() => showReveals(reveals, KING_REVEAL_MS));
-      }
-      sendAction({ type: "use_ability", ability: "king", targetPlayerId: action.targetPlayerId });
+      const reveals = revealCards(state, [action.targetPlayerId]);
+      afterPileLanding(() => showReveals(reveals, KING_REVEAL_MS));
     }
-
     if (action.kind === "joker_reveal") {
-      if (isOffline) {
-        const reveals = revealCards(gameState, gameState.players.map((p) => p.id));
-        afterPileLanding(() => showReveals(reveals, JOKER_REVEAL_MS));
-      }
-      sendAction({ type: "use_ability", ability: "joker_reveal" });
-    }
-
-    if (action.kind === "joker_force") {
-      sendAction({
-        type: "use_ability",
-        ability: "joker_force",
-        targetPlayerId: action.targetPlayerId,
-        targetCardIndex: action.cardIndex,
-        targetCardId: action.cardId,
-      });
-    }
-
-    if (action.kind === "wind") {
-      sendAction({ type: "use_ability", ability: "wind", targetPlayerId: action.targetPlayerId });
-      audioManager.playSwap();
-    }
-
-    if (action.kind === "swap_others") {
-      sendAction({
-        type: "use_ability",
-        ability: "swap",
-        targetPlayerId: action.player1Id,
-        targetCardIndex: action.card1Index,
-        targetPlayerId2: action.player2Id,
-        targetCardIndex3: action.card2Index,
-        targetCardId: action.card1Id,
-        targetCardId2: action.card2Id,
-      });
+      const reveals = revealCards(state, state.players.map((p) => p.id));
+      afterPileLanding(() => showReveals(reveals, JOKER_REVEAL_MS));
     }
   };
 
+  // Resolve a ação escolhida no modal de habilidade
+  const confirmAbility = (action: AbilityAction) => {
+    if (!gameState || !me) return;
+    playAbilityLocally(gameState, action);
+    sendAction(abilityMessage(action, playerId));
+    if (action.kind === "wind") audioManager.playSwap();
+  };
 
   // Quem jogou online com você entra na lista de amigos e recentes do aparelho
   const tablemates = !isOffline && gameState && gameState.turnPhase !== "waiting"
