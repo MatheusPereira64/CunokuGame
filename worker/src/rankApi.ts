@@ -1,4 +1,5 @@
 import { api } from "../../shared/routes";
+import { matchMetricSchema, metricKeysForMatch, metricsSummary, recordMetrics } from "../../shared/metrics";
 import {
   bearerToken,
   getLeaderboard,
@@ -41,6 +42,15 @@ async function dispatchRankRoute(
     const result = await loginRankPlayer(db, body);
     if ("error" in result) return json({ message: result.error }, result.status);
     return json(result);
+  }
+  if (method === "POST" && path === api.metrics.match.path) {
+    const parsed = matchMetricSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return json({ message: "Invalid metric" }, 400);
+    await recordMetrics(db, new Date().toISOString().slice(0, 10), metricKeysForMatch(parsed.data));
+    return new Response(null, { status: 204, headers: corsHeaders(request) });
+  }
+  if (method === "GET" && path === api.metrics.summary.path) {
+    return json(await metricsSummary(db, Number(new URL(request.url).searchParams.get("days") || "30")));
   }
   if (method === "GET" && path.startsWith(api.profile.view.path)) {
     const profile = await getPublicProfile(db, decodeURIComponent(path.slice(api.profile.view.path.length)));

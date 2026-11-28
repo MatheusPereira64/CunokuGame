@@ -46,6 +46,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 
       - name: Sync Capacitor iOS
         run: node node_modules/@capacitor/cli/bin/capacitor sync ios

@@ -551,11 +551,12 @@ export default function Game() {
       players: gameState?.players,
       state: gameState,
       botDifficulty,
+      vsProfessor,
       setGameOverModalOpen,
       toast,
       t,
     });
-  }, [gameState?.winnerId, playerId, me, roomCode, isOffline, gameState?.players, botDifficulty, toast, t]);
+  }, [gameState?.winnerId, playerId, me, roomCode, isOffline, gameState?.players, botDifficulty, vsProfessor, toast, t]);
 
 
   const handleCopyCode = async () => {

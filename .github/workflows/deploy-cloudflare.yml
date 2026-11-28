@@ -27,6 +27,8 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_API_TOKE: ${{ secrets.CLOUDFLARE_API_TOKE }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Relatório de erros (opcional): sem o secret o build sai sem Sentry
+      VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
     steps:
       - # actions/checkout@v4
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262

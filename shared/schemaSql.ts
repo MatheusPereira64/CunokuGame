@@ -1,4 +1,5 @@
 import { sql, type SQL } from "drizzle-orm";
+import { METRICS_TABLE_SQL } from "./metrics";
 
 /** Tabela das salas; o servidor Node e o Worker criam igual. */
 export const CREATE_ROOMS_TABLE: SQL = sql`
@@ -58,6 +59,8 @@ export const RANK_SCHEMA_STATEMENTS: readonly SQL[] = [
       created_at TIMESTAMP DEFAULT NOW()
     )
   `,
+  // Métricas anônimas (contadores por dia)
+  METRICS_TABLE_SQL,
 ];
 
 /** Roda as instruções em sequência (cada uma depende da anterior). */

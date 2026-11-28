@@ -2,6 +2,7 @@ import { Capacitor } from "@capacitor/core";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { APP_VERSION } from "@/lib/appVersion";
+import { startErrorReporting } from "@/lib/errorReporting";
 import "./index.css";
 
 const NATIVE_SW_KEY = "cunoku_native_sw_cleared";
@@ -31,6 +32,7 @@ async function clearNativeServiceWorker(): Promise<boolean> {
 }
 
 async function boot() {
+  startErrorReporting(Capacitor.isNativePlatform());
   try {
     if (Capacitor.isNativePlatform()) {
       const reloading = await clearNativeServiceWorker();

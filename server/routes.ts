@@ -25,6 +25,7 @@ import {
   type RoomSessionData,
 } from "./roomHandlers";
 import { ensureRankSchema } from "./rankEnsure";
+import { matchMetricSchema, metricKeysForMatch, metricsSummary, recordMetrics } from "@shared/metrics";
 import { getMatchmaker } from "./matchmaking";
 import {
   bearerToken,
@@ -255,6 +256,29 @@ export function registerRoutes(
       const profile = await getPublicProfile(db, String(req.params.nickname || ""));
       if (!profile) return res.status(404).json({ message: "Profile not found" });
       res.json({ profile });
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.post(api.metrics.match.path, async (req, res) => {
+    try {
+      const parsed = matchMetricSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Invalid metric" });
+      const db = await ensureRankSchema();
+      if (!db) return res.status(204).end();
+      await recordMetrics(db, new Date().toISOString().slice(0, 10), metricKeysForMatch(parsed.data));
+      res.status(204).end();
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
+  app.get(api.metrics.summary.path, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      res.json(await metricsSummary(db, Number(req.query.days || "30")));
     } catch (err: any) {
       res.status(400).json({ message: err?.message || "Invalid input" });
     }

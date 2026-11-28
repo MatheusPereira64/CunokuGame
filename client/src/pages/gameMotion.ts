@@ -1,4 +1,5 @@
 import { GameState, Card } from "@shared/schema";
+import { isMetricReporter, matchMetricFromState, reportMatchMetric } from "@/lib/metrics";
 import { audioManager } from "@/utils/audioManager";
 import { addMatchToHistory, historyEntryFromState } from "@/lib/matchHistory";
 import { vibrate } from "@/lib/haptics";
@@ -241,6 +242,8 @@ export function syncFinishedMatch(args: {
   /** Estado final, para o histórico de partidas */
   state?: GameState | null;
   botDifficulty: Difficulty;
+  /** Partida offline contra o Professor (conta à parte nas métricas) */
+  vsProfessor?: boolean;
   setGameOverModalOpen: (open: boolean) => void;
   toast: ToastFn;
   t: Translate;
@@ -262,6 +265,10 @@ export function syncFinishedMatch(args: {
       })
     : null;
   if (entry) addMatchToHistory(entry);
+  if (entry && args.state && isMetricReporter(args.state, playerId)) {
+    const difficulty = args.vsProfessor ? "professor" : args.botDifficulty;
+    reportMatchMetric(entry.id, matchMetricFromState(args.state, args.isOffline, difficulty));
+  }
   if (hasRecordedMatchStats(matchId)) return;
   const won = winnerId === playerId;
   recordMatchResult({ won, finalScore: me.score });

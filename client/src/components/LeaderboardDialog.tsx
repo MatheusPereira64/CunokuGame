@@ -240,6 +240,9 @@ export function LeaderboardDialog({ compact = false }: LeaderboardDialogProps) {
             })}
           </ul>
         </div>
+        <Link href="/estatisticas" className="block text-center text-xs font-semibold text-indigo-700 hover:underline">
+          {t("stats.link")}
+        </Link>
       </DialogContent>
     </Dialog>
   );

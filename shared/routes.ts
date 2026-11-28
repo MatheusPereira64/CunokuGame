@@ -115,6 +115,11 @@ export const api = {
       },
     },
   },
+  metrics: {
+    /** Partida terminada: só contadores anônimos */
+    match: { method: 'POST' as const, path: '/api/rank/metrics/match' },
+    summary: { method: 'GET' as const, path: '/api/rank/metrics/summary' },
+  },
   profile: {
     view: {
       method: 'GET' as const,
