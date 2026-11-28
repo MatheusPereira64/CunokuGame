@@ -1,5 +1,6 @@
 import { GameState, Card } from "@shared/schema";
 import { audioManager } from "@/utils/audioManager";
+import { addMatchToHistory, historyEntryFromState } from "@/lib/matchHistory";
 import { vibrate } from "@/lib/haptics";
 import {
   hasRecordedMatchStats,
@@ -237,6 +238,8 @@ export function syncFinishedMatch(args: {
   roomCode: string;
   isOffline: boolean;
   players: GameState["players"] | undefined;
+  /** Estado final, para o histórico de partidas */
+  state?: GameState | null;
   botDifficulty: Difficulty;
   setGameOverModalOpen: (open: boolean) => void;
   toast: ToastFn;
@@ -249,6 +252,16 @@ export function syncFinishedMatch(args: {
   else audioManager.playGameLost();
   // Toda partida offline usa a rota /game/offline: o id único dela é o playerId
   const matchId = args.isOffline ? playerId : args.roomCode;
+  // Histórico: a revanche na mesma sala é outra partida, então o id inclui o placar final
+  const entry = args.state
+    ? historyEntryFromState({
+        id: `${matchId}:${winnerId}:${args.state.players.map((p) => p.score).join(",")}`,
+        state: args.state,
+        playerId,
+        isOffline: args.isOffline,
+      })
+    : null;
+  if (entry) addMatchToHistory(entry);
   if (hasRecordedMatchStats(matchId)) return;
   const won = winnerId === playerId;
   recordMatchResult({ won, finalScore: me.score });

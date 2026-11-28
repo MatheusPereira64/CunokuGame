@@ -3,7 +3,7 @@ import { Player, Card } from "@shared/schema";
 import { PlayingCard } from "@/components/PlayingCard";
 import { Avatar } from "@/components/Avatar";
 import { cn } from "@/lib/utils";
-import { Eye, Lock } from "lucide-react";
+import { Eye, Lock, WifiOff } from "lucide-react";
 import { useI18n } from "@/contexts/i18n-context";
 import type { ProfileAccent, ProfileIconId } from "@/lib/playerProfile";
 import { useIsCompactGame } from "@/hooks/use-landscape";
@@ -25,6 +25,24 @@ export function DeclarerBadge({ show }: { show: boolean }) {
   return (
     <span className="pointer-events-none absolute -top-2.5 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-full border border-red-200 bg-red-600 px-1.5 text-[9px] font-black uppercase tracking-wider text-white shadow-[0_0_12px_rgba(239,68,68,0.8)] motion-safe:animate-pulse">
       {t("game.cunokuShort")}
+    </span>
+  );
+}
+
+/**
+ * Jogador que caiu da partida online: chip sobre o avatar com o tempo para voltar
+ * (na vez dele) ou só "fora" (fora da vez, a mesa segue sem esperar).
+ */
+export function ReconnectBadge({ show, seconds }: { show: boolean; seconds: number | null }) {
+  const { t } = useI18n();
+  if (!show) return null;
+  return (
+    <span
+      role="status"
+      className="pointer-events-none absolute -bottom-2 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full border border-amber-200 bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-amber-950 shadow-lg"
+    >
+      <WifiOff className="h-3 w-3 motion-safe:animate-pulse" aria-hidden="true" />
+      {seconds === null ? t("reconnect.seatOffline") : t("reconnect.seatBack", { seconds: String(seconds) })}
     </span>
   );
 }
@@ -95,6 +113,8 @@ interface PlayerSeatProps {
   emoteId?: string;
   /** Declarou Cunoku: destacado durante as rodadas finais */
   isDeclarer?: boolean;
+  /** Segundos que faltam para quem caiu voltar na própria vez (null: caiu, mas não é a vez dele) */
+  reconnectSeconds?: number | null;
   /** Carta que este jogador comprou e ainda está decidindo o que fazer */
   heldCard?: { card: Card; faceUp: boolean } | null;
   style?: React.CSSProperties;
@@ -114,6 +134,7 @@ export function PlayerSeat({
   emoteId,
   isDeclarer = false,
   heldCard = null,
+  reconnectSeconds = null,
   sealedCardIds = [],
   skipNextTurnIds,
   style,
@@ -225,6 +246,7 @@ export function PlayerSeat({
       />
       {/* Sempre ao lado do ícone; no lado direito da mesa abre para dentro, sem sair da tela */}
       <DeclarerBadge show={isDeclarer} />
+      <ReconnectBadge show={!player.isConnected && !player.isBot} seconds={reconnectSeconds} />
       <HeldCard playerId={player.id} card={heldCard?.card ?? null} faceUp={!!heldCard?.faceUp} side={side} compact={compact || isCompact} />
       <EmoteBubble emoteId={emoteId} className={side === "right" ? "right-full top-0 mr-1" : "left-full top-0 ml-1"} />
       {/* Última jogada: logo abaixo do avatar no topo; nas laterais abre para dentro da mesa */}

@@ -6,7 +6,7 @@ import { Button } from "@/components/Button";
 import { VolumeControl } from "@/components/VolumeControl";
 import { TableThemeButton } from "@/components/TableThemePicker";
 import { cn, fit } from "@/lib/utils";
-import { Copy, Link2, Wifi } from "lucide-react";
+import { Copy, Link2, MessageCircle, Wifi } from "lucide-react";
 import { useI18n } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { loadProfile, type ProfileAccent, type ProfileIconId } from "@/lib/playerProfile";
@@ -26,6 +26,8 @@ interface WaitingRoomProps {
   maxPlayers?: number | null;
   onCopyCode: () => void;
   onShareInvite?: () => void;
+  /** Copia o convite já formatado para colar num canal do Discord */
+  onCopyDiscordInvite?: () => void;
   /** Convida um amigo ou jogador recente pelo nome */
   onInviteFriend?: (name: string) => void;
   onCopyLanUrl?: () => void;
@@ -74,6 +76,7 @@ export function WaitingRoom({
   maxPlayers,
   onCopyCode,
   onShareInvite,
+  onCopyDiscordInvite,
   onInviteFriend,
   onCopyLanUrl,
   onStart,
@@ -171,6 +174,20 @@ export function WaitingRoom({
                   onClick={onShareInvite}
                 >
                   <Link2 className="mr-2 h-4 w-4" /> {t("invite.share")}
+                </Button>
+              )}
+
+              {/* Link da LAN só funciona na mesma Wi-Fi: não faz sentido mandar no Discord */}
+              {onCopyDiscordInvite && !isLan && (
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full border-[#5865f2]/70 text-indigo-100 hover:bg-[#5865f2]/20",
+                    fit(isLandscape, "mb-0 mt-1 h-9 text-sm", "-mt-2 mb-4")
+                  )}
+                  onClick={onCopyDiscordInvite}
+                >
+                  <MessageCircle className="mr-2 h-4 w-4" /> {t("invite.discord")}
                 </Button>
               )}
 

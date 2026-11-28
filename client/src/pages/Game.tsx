@@ -547,6 +547,7 @@ export default function Game() {
       roomCode,
       isOffline,
       players: gameState?.players,
+      state: gameState,
       botDifficulty,
       setGameOverModalOpen,
       toast,
@@ -561,6 +562,13 @@ export default function Game() {
       title: ok ? t("game.copied") : t("error.generic"),
       description: ok ? t("game.copiedDesc") : roomCode,
     });
+  };
+
+  /** Convite pronto para o Discord: o link vira um cartão no canal e o código aparece destacado. */
+  const handleCopyDiscordInvite = async () => {
+    const text = t("invite.discordText", { url: buildInviteUrl(roomCode), code: roomCode });
+    const ok = await copyToClipboard(text);
+    toast({ title: ok ? t("invite.discordCopied") : t("error.generic"), description: ok ? t("invite.discordCopiedDesc") : text });
   };
 
   const handleShareInvite = async (text: string = roomCode) => {
@@ -798,6 +806,7 @@ export default function Game() {
     maxPlayers: Number(sessionStorage.getItem(`maxPlayers_${roomCode}`)) || null,
     onCopyCode: handleCopyCode,
     onShareInvite: () => void handleShareInvite(),
+    onCopyDiscordInvite: () => void handleCopyDiscordInvite(),
     onInviteFriend: (name: string) => void handleShareInvite(t("friends.inviteText", { name, code: roomCode })),
     onCopyLanUrl: handleCopyLanUrl,
     networkMode: getNetworkMode(),

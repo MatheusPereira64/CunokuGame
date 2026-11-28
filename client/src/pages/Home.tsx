@@ -18,6 +18,7 @@ import { RulesDialog } from "@/components/RulesDialog";
 import { InstallAppButton } from "@/components/InstallAppButton";
 import { AppInviteDialog } from "@/components/AppInviteDialog";
 import { ProfileDialog } from "@/components/ProfileDialog";
+import { HistoryDialog } from "@/components/HistoryDialog";
 import { DailyChallengeDialog } from "@/components/DailyChallengeDialog";
 import { LeagueDialog } from "@/components/LeagueDialog";
 import { LeaderboardDialog } from "@/components/LeaderboardDialog";
@@ -319,6 +320,7 @@ export default function Home() {
       >
         <InstallAppButton compact={isLandscapeMenu} />
         <AppInviteDialog />
+        <HistoryDialog compact={isLandscapeMenu} />
         <LeaderboardDialog compact={isLandscapeMenu} />
         <div className="relative shrink-0">
           {showNameHint && (

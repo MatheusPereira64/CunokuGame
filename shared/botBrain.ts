@@ -209,11 +209,11 @@ export function decideBotFinish(state: GameState, playerIndex: number, difficult
   return hardFinish(score, lead, random);
 }
 
-/** Fácil: só declara com a mão claramente baixa ou muito à frente, e às vezes hesita. */
+/** Fácil: declara cedo e sem muito cálculo (às vezes com a mão ruim), como um iniciante. */
 function easyFinish(score: number, lead: number, random: () => number): boolean {
   let probability = 0;
-  if (score < 12 || lead >= 6) probability = 0.3;
-  if (score < 7 || lead >= 10) probability = 0.6;
+  if (score < 15 || lead >= 4) probability = 0.25;
+  if (score < 9 || lead >= 8) probability = 0.55;
   return random() < probability;
 }
 

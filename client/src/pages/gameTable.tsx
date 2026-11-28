@@ -342,6 +342,7 @@ function ArcSeat({
       emoteId={emoteId}
       isDeclarer={isDeclarer(gameState, player.id)}
       heldCard={heldCardOf(gameState, player.id)}
+      reconnectSeconds={reconnectSecondsOf(gameState, player.id)}
       sealedCardIds={sealedIds(gameState)}
       skipNextTurnIds={gameState.skipNextTurnIds}
       className="absolute z-20"
@@ -369,12 +370,18 @@ function RowSeats(props: Omit<Parameters<typeof ArcSeats>[0], "isCompact">) {
           emoteId={activeEmotes[p.id]}
           isDeclarer={isDeclarer(gameState, p.id)}
           heldCard={heldCardOf(gameState, p.id)}
+          reconnectSeconds={reconnectSecondsOf(gameState, p.id)}
           sealedCardIds={sealedIds(gameState)}
           skipNextTurnIds={gameState.skipNextTurnIds}
         />
       ))}
     </div>
   );
+}
+
+/** Tempo para voltar de quem caiu na própria vez; fora da vez, a mesa não espera (null). */
+function reconnectSecondsOf(gameState: GameState, id: string): number | null {
+  return gameState.reconnectPlayerId === id ? graceLeft(gameState.reconnectDeadline) : null;
 }
 
 /** Carta comprada que o jogador da vez ainda está decidindo (do descarte, a face é pública). */
@@ -756,6 +763,7 @@ export function renderPregame(args: {
   maxPlayers: number | null;
   onCopyCode: () => void;
   onShareInvite: () => void;
+  onCopyDiscordInvite: () => void;
   onInviteFriend: (name: string) => void;
   onCopyLanUrl: () => void;
   networkMode: "lan" | "server";
@@ -779,6 +787,7 @@ export function renderPregame(args: {
       maxPlayers={args.maxPlayers}
       onCopyCode={args.onCopyCode}
       onShareInvite={args.onShareInvite}
+      onCopyDiscordInvite={args.onCopyDiscordInvite}
       onInviteFriend={args.onInviteFriend}
       onCopyLanUrl={args.onCopyLanUrl}
       networkMode={args.networkMode}
