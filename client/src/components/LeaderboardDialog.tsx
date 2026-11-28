@@ -12,6 +12,7 @@ import { useI18n } from "@/contexts/i18n-context";
 import { useIsCompactGame, useIsPortrait } from "@/hooks/use-landscape";
 import { cn } from "@/lib/utils";
 import { Trophy } from "lucide-react";
+import { Link } from "wouter";
 import { fetchLeaderboard, fetchRankMe, type LeaderboardEntry, type PublicRankProfile } from "@/lib/rankAuth";
 import { RankBadge } from "@/components/RankBadge";
 import { effectiveRank } from "@shared/rank";
@@ -196,7 +197,7 @@ export function LeaderboardDialog({ compact = false }: LeaderboardDialogProps) {
               <li
                 key={e.nickname}
                 className={cn(
-                  "flex items-center gap-2 rounded-lg border px-2.5 py-2",
+                  "relative flex items-center gap-2 rounded-lg border px-2.5 py-2 hover:bg-indigo-50/60",
                   e.position <= 10 ? "border-amber-300 bg-amber-50/60" : "border-gray-100 bg-white",
                   me?.nickname === e.nickname && "ring-2 ring-indigo-400",
                 )}
@@ -227,6 +228,13 @@ export function LeaderboardDialog({ compact = false }: LeaderboardDialogProps) {
                   )}
                 </div>
                 <RankBadge rank={e.rank} compact />
+                {e.nickname && (
+                  <Link
+                    href={`/p/${encodeURIComponent(e.nickname)}`}
+                    className="absolute inset-0 rounded-lg focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    aria-label={t("profilePage.open", { name: e.displayName || e.nickname })}
+                  />
+                )}
               </li>
               );
             })}

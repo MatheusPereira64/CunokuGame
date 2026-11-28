@@ -7,6 +7,7 @@ import {
   normalizeEmail,
   isValidPassword,
   type PublicRankProfile,
+  type PublicProfileView,
   type LeaderboardEntry,
   type RankTier,
 } from "./rank";
@@ -393,6 +394,19 @@ export async function recordRankMatch(
       newlyUnlocked,
     }),
   };
+}
+
+/** Perfil público pelo nome de usuário (como aparece no ranking). null se não existir. */
+export async function getPublicProfile(db: any, nickname: string): Promise<PublicProfileView | null> {
+  const wanted = normalizeNickname(nickname);
+  if (!wanted) return null;
+  const [row] = await db.select().from(rankPlayers).where(eq(rankPlayers.nickname, wanted)).limit(1);
+  if (!row) return null;
+  const { playerId: _id, email: _email, progress: _progress, newlyUnlocked: _new, ...publicView } = toPublic(
+    row,
+    await findPosition(db, row.id),
+  );
+  return publicView;
 }
 
 export async function getLeaderboard(db: any, limit = 50): Promise<LeaderboardEntry[]> {

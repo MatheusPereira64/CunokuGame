@@ -166,6 +166,20 @@ function GameTopBar({
   );
 }
 
+function SpectatorBadge({ isCompact, t }: { isCompact: boolean; t: Translate }) {
+  return (
+    <div
+      role="status"
+      className={cn(
+        "pointer-events-none absolute left-1/2 z-40 -translate-x-1/2 rounded-full border border-sky-300/60 bg-sky-950/85 font-semibold text-sky-100 shadow-lg",
+        cx(isCompact, "bottom-1 px-2.5 py-0.5 text-[10px]", "bottom-3 px-4 py-1 text-sm"),
+      )}
+    >
+      👁 {t("watch.badge")}
+    </div>
+  );
+}
+
 function ReconnectBanner({ t }: { t: Translate }) {
   return (
     <div className="pointer-events-none rounded-full bg-amber-500/90 text-amber-950 text-xs font-semibold px-3 py-1">
@@ -616,6 +630,8 @@ export function ActiveTable(props: {
   onEmote: (emoteId: EmoteId) => void;
   matchReward: MatchReward | null;
   swapHighlights: Record<string, SwapHighlight>;
+  /** Só assistindo: sem emotes nem ações */
+  spectating?: boolean;
   professorTip: (CoachTip & { id: number }) | null;
   onProfessorTipDone: () => void;
   newFeats: readonly FeatId[];
@@ -629,12 +645,13 @@ export function ActiveTable(props: {
     <TargetingSpreadContext.Provider value={targetingSpread(props.abilityOpen, gameState, props.playerId)}>
     <div className={cn("min-h-[100dvh] bg-neutral-900 text-white relative overflow-hidden flex flex-col pwa-safe game-landscape", props.cunokuCaller && "cunoku-shake")}>
       {props.isPortrait ? <LandscapePrompt /> : null}
+      {props.spectating ? <SpectatorBadge isCompact={isCompact} t={t} /> : null}
       {props.cunokuCaller ? <CunokuCallOverlay playerName={props.cunokuCaller} onComplete={props.onCunokuCallDone} /> : null}
       <AnimationRenderer currentAnimation={props.currentAnimation} onComplete={props.onAnimationComplete} playerId={props.playerId} />
       <GameTopBar
         isDaily={!!gameState.dailyDay}
         hideCode={props.abilityOpen}
-        canEmote={!gameState.winnerId}
+        canEmote={!gameState.winnerId && !props.spectating}
         onEmote={props.onEmote}
         isCompact={isCompact}
         isOffline={props.isOffline}

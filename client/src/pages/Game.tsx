@@ -46,7 +46,9 @@ export default function Game() {
   const roomCode = params?.code || "";
 
   const searchParams = new URLSearchParams(window.location.search);
-  const playerId = searchParams.get("player") || "";
+  // ?watch=1: só assistir. O id fictício nunca vai ao servidor e não bate com nenhum jogador
+  const isSpectator = searchParams.get("watch") === "1";
+  const playerId = isSpectator ? "spectator" : searchParams.get("player") || "";
   const isOffline = searchParams.get("mode") === "offline" || roomCode === "offline";
   const fromQueue = searchParams.get("queue") === "1";
   const tableTheme = useSyncExternalStore(subscribeTableTheme, loadTableTheme, loadTableTheme);
@@ -72,7 +74,7 @@ export default function Game() {
   }, [isOffline, playerId, toast, t]);
 
   useEffect(() => {
-    if (isOffline || !roomCode || !playerId) return;
+    if (isOffline || isSpectator || !roomCode || !playerId) return;
     const name = sessionStorage.getItem(`playerName_${roomCode}`) || "";
     saveActiveSession({ code: roomCode, playerId, name, savedAt: Date.now() });
   }, [isOffline, roomCode, playerId]);
@@ -94,7 +96,7 @@ export default function Game() {
     incomingEmote,
     matchReward,
     privateReveal,
-  } = useGameSocket(isOffline ? "" : roomCode, isOffline ? "" : playerId);
+  } = useGameSocket(isOffline ? "" : roomCode, isOffline ? "" : playerId, isSpectator);
 
   // Posições das cartas na tela (para animações)
   const cardRefs = useRef<Map<string, { x: number; y: number; card?: Card; element?: HTMLElement }>>(new Map());
@@ -860,6 +862,7 @@ export default function Game() {
       onEmote={handleSendEmote}
       matchReward={matchReward}
       swapHighlights={swapHighlights}
+      spectating={isSpectator}
       professorTip={professorTip}
       onProfessorTipDone={clearProfessorTip}
       newFeats={newFeats}

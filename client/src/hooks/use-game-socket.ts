@@ -22,7 +22,7 @@ function translateServerError(message: string, t: (key: string, vars?: Record<st
   return match ? t(match[1]) : message;
 }
 
-export function useGameSocket(roomCode: string, playerId: string) {
+export function useGameSocket(roomCode: string, playerId: string, spectate = false) {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
@@ -96,6 +96,10 @@ export function useGameSocket(roomCode: string, playerId: string) {
         attempt = 0;
         lastHeardAt = Date.now();
         setConnected(true);
+        if (spectate) {
+          ws?.send(JSON.stringify({ type: "watch", code: roomCode }));
+          return;
+        }
         const { iconId, accent } = loadProfile();
         ws?.send(JSON.stringify({
           type: "join",
@@ -230,7 +234,7 @@ export function useGameSocket(roomCode: string, playerId: string) {
       window.removeEventListener("online", onOnline);
       ws?.close();
     };
-  }, [roomCode, playerId]);
+  }, [roomCode, playerId, spectate]);
 
   const sendAction = useCallback((action: GameAction) => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {

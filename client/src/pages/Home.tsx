@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/Button";
 import { useCreateRoom, useJoinRoom, fetchLanInfo } from "@/hooks/use-rooms";
 import { useToast } from "@/hooks/use-toast";
-import { Spade, Heart, Club, Diamond, ArrowRight, Gamepad2, Users, Bot, Languages, Wifi, Cloud, ArrowLeft, ArrowUp } from "lucide-react";
+import { Spade, Heart, Club, Diamond, ArrowRight, Gamepad2, Users, Bot, Languages, Wifi, Cloud, ArrowLeft, ArrowUp, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -232,9 +232,8 @@ export default function Home() {
     }
   };
 
-  const handleJoin = async () => {
-    if (!name || !roomCode) return toast({ title: t("error.missingDetails"), description: t("error.missingDetailsDesc"), variant: "destructive" });
-
+  /** Escolhe o servidor da sala (nuvem ou o host da Wi-Fi local). Falso se o endereço for inválido. */
+  const applyJoinNetwork = (): boolean => {
     if (hostAddress.trim()) {
       const normalized = normalizeServerBase(hostAddress);
       if (!normalized) {
@@ -243,7 +242,7 @@ export default function Home() {
           description: t("join.invalidHostDesc"),
           variant: "destructive",
         });
-        return;
+        return false;
       }
       setServerBase(normalized);
       setLanJoinUrl(normalized);
@@ -257,6 +256,20 @@ export default function Home() {
       setLanJoinUrl(null);
       setNetworkMode("server");
     }
+    return true;
+  };
+
+  /** Assistir uma sala: não precisa de nome nem ocupa vaga. */
+  const handleWatch = () => {
+    const code = roomCode.trim().toUpperCase();
+    if (!code) return toast({ title: t("error.missingDetails"), description: t("watch.needCode"), variant: "destructive" });
+    if (!applyJoinNetwork()) return;
+    setLocation(`/game/${code}?watch=1`);
+  };
+
+  const handleJoin = async () => {
+    if (!name || !roomCode) return toast({ title: t("error.missingDetails"), description: t("error.missingDetailsDesc"), variant: "destructive" });
+    if (!applyJoinNetwork()) return;
 
     try {
       const result = await joinRoom.mutateAsync({ name, code: roomCode });
@@ -824,6 +837,9 @@ export default function Home() {
                   isLoading={joinRoom.isPending}
                 >
                   {t("join.joinRoom")} <ArrowRight className="ml-2 w-4 h-4" />
+              <Button variant="ghost" className={cn("w-full text-indigo-800", isLandscapeMenu ? "h-8 text-xs" : "-mt-2")} onClick={handleWatch}>
+                <Eye className="mr-2 h-4 w-4" /> {t("watch.button")}
+              </Button>
                 </Button>
               )}
             </DialogContent>

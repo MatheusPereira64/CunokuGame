@@ -15,6 +15,7 @@ import {
   executeBotTurn,
   handleEmote,
   handleJoinMessage,
+  handleWatchMessage,
   handlePlayerAction,
   handlePlayerDisconnect,
   handleRematch,
@@ -28,6 +29,7 @@ import { getMatchmaker } from "./matchmaking";
 import {
   bearerToken,
   getLeaderboard,
+  getPublicProfile,
   getMe,
   loginRankPlayer,
   linkRankEmail,
@@ -38,6 +40,8 @@ import {
 
 type RoomLive = {
   sockets: Map<string, WebSocket>;
+  /** Quem só assiste a sala */
+  spectators: Set<WebSocket>;
   session: RoomSessionData;
   botTimer?: ReturnType<typeof setTimeout>;
 };
@@ -244,6 +248,18 @@ export function registerRoutes(
     }
   });
 
+  app.get(`${api.profile.view.path}:nickname`, async (req, res) => {
+    try {
+      const db = await ensureRankSchema();
+      if (!db) return res.status(503).json({ message: "Database unavailable" });
+      const profile = await getPublicProfile(db, String(req.params.nickname || ""));
+      if (!profile) return res.status(404).json({ message: "Profile not found" });
+      res.json({ profile });
+    } catch (err: any) {
+      res.status(400).json({ message: err?.message || "Invalid input" });
+    }
+  });
+
   app.get(api.rank.leaderboard.path, async (req, res) => {
     try {
       const db = await ensureRankSchema();
@@ -262,7 +278,7 @@ export function registerRoutes(
   function getOrCreateLive(code: string): RoomLive {
     let live = roomsLive.get(code);
     if (!live) {
-      live = { sockets: new Map(), session: createEmptySession() };
+      live = { sockets: new Map(), spectators: new Set(), session: createEmptySession() };
       roomsLive.set(code, live);
     }
     return live;
@@ -280,6 +296,11 @@ export function registerRoutes(
         };
       },
       () => Array.from(live.sockets.keys()),
+      () =>
+        Array.from(live.spectators, (sock) => ({
+          open: sock.readyState === WebSocket.OPEN,
+          send: (data: string) => sock.send(data),
+        })),
     );
   }
 
@@ -349,6 +370,20 @@ export function registerRoutes(
           return;
         }
         const msg = JSON.parse(data.toString());
+
+        if (msg.type === "watch") {
+          // Espectador: fica fora de live.sockets, então não ocupa vaga nem conta como jogador
+          const code = String(msg.code || "").toUpperCase();
+          const live = getOrCreateLive(code);
+          const ok = await handleWatchMessage(storage, live.session, makeMessenger(code), code, (m) => {
+            if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m));
+          });
+          if (ok) {
+            live.spectators.add(ws);
+            ws.once("close", () => live.spectators.delete(ws));
+          }
+          return;
+        }
 
         if (msg.type === "join") {
           const { code, playerId, name, rankToken, iconId, accent } = msg;

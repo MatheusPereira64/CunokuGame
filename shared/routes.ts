@@ -115,6 +115,13 @@ export const api = {
       },
     },
   },
+  profile: {
+    view: {
+      method: 'GET' as const,
+      /** /api/rank/profile/:nickname (sob /api/rank, como as outras rotas de conta) */
+      path: '/api/rank/profile/',
+    },
+  },
   league: {
     standings: {
       method: 'GET' as const,

@@ -1,4 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
+import { publicProfileUrl } from "@/pages/PublicProfile";
+import { copyToClipboard } from "@/lib/clipboard";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -87,6 +90,7 @@ function authErrorKey(code: string) {
 
 export function ProfileDialog({ compact = false, highlight = false, onSaved }: ProfileDialogProps) {
   const { t } = useI18n();
+  const { toast } = useToast();
   const isPortrait = useIsPortrait();
   const isCompactGame = useIsCompactGame();
   const isLandscapeMenu = compact || (isCompactGame && !isPortrait);
@@ -558,6 +562,18 @@ export function ProfileDialog({ compact = false, highlight = false, onSaved }: P
                         {rankProfile.position ? `#${rankProfile.position} · ` : ""}
                         {rankProfile.wins}W
                       </div>
+                      {rankProfile.nickname && (
+                        <button
+                          type="button"
+                          className="mt-1 text-xs font-semibold underline underline-offset-2 opacity-90 hover:opacity-100"
+                          onClick={async () => {
+                            const ok = await copyToClipboard(publicProfileUrl(rankProfile.nickname));
+                            toast({ title: ok ? t("profilePage.copied") : t("error.generic") });
+                          }}
+                        >
+                          {t("profilePage.copyMine")}
+                        </button>
+                      )}
                     </div>
                     <div
                       className={cn(

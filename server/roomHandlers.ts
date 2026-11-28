@@ -1,6 +1,6 @@
 import { applyBotReactions } from "@shared/cardPowers";
 import type { GameState, Player, Room } from "@shared/schema";
-import { filterGameStateForPlayer } from "@shared/gameFilter";
+import { filterGameStateForPlayer, SPECTATOR_ID } from "@shared/gameFilter";
 import { GameLogic } from "./game";
 import { BotPlayer, createBots, type BotDifficulty } from "./bot";
 import { autoPlayDisconnectedTurn, autoPlayTimedOutTurn, syncTurnClock } from "./disconnectTurn";
@@ -131,6 +131,35 @@ export async function handleJoinMessage(
     null,
   );
   messenger.broadcast({ type: "player_joined", playerId, name }, playerId);
+}
+
+/**
+ * Alguém quer só assistir: não ocupa vaga nem entra na partida. Recebe o estado público agora
+ * e, depois, os mesmos broadcasts da sala.
+ */
+export async function handleWatchMessage(
+  storage: IStorage,
+  session: RoomSessionData,
+  messenger: RoomMessenger,
+  code: string,
+  reply: (msg: unknown) => void,
+): Promise<boolean> {
+  const room = await storage.getRoom(code);
+  if (!room) {
+    reply({ type: "error", message: "Room not found" });
+    return false;
+  }
+  if (room.gameState) {
+    reply({ type: "game_state", state: filterGameStateForPlayer(room.gameState as GameState, SPECTATOR_ID) });
+  } else {
+    reply({
+      type: "lobby_state",
+      players: buildLobbyPlayers(session, messenger.getConnectedPlayerIds()),
+      hostId: room.hostId,
+      maxPlayers: (room as { maxPlayers?: number }).maxPlayers || 4,
+    });
+  }
+  return true;
 }
 
 /** Marca o jogador como desconectado se não houver outro socket dele. */
@@ -547,10 +576,16 @@ export function handleEmote(
   messenger.broadcast({ type: "emote", playerId, emoteId });
 }
 
-/** Cria messenger que filtra game_state por jogador. */
+type SocketLike = { send: (data: string) => void; open: boolean };
+
+/**
+ * Cria messenger que filtra game_state por jogador.
+ * Espectadores (getSpectators) recebem os broadcasts, que já são públicos, com o estado sem nenhuma face.
+ */
 export function createFilteringMessenger(
-  getSocket: (playerId: string) => { send: (data: string) => void; open: boolean } | undefined,
+  getSocket: (playerId: string) => SocketLike | undefined,
   getIds: () => string[],
+  getSpectators: () => SocketLike[] = () => [],
 ): RoomMessenger {
   const sendRaw = (playerId: string, msg: unknown) => {
     const sock = getSocket(playerId);
@@ -571,6 +606,12 @@ export function createFilteringMessenger(
           sendRaw(id, msg);
         }
       }
+      const spectators = getSpectators().filter((sock) => sock.open);
+      if (spectators.length === 0) return;
+      const data = JSON.stringify(
+        m.type === "game_state" && m.state ? { ...m, state: filterGameStateForPlayer(m.state, SPECTATOR_ID) } : msg,
+      );
+      for (const sock of spectators) sock.send(data);
     },
     getConnectedPlayerIds: getIds,
     connectionCount: () => getIds().length,

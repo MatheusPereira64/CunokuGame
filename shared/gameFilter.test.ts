@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterGameStateForPlayer, toPublicRoom } from "./gameFilter";
+import { filterGameStateForPlayer, toPublicRoom, SPECTATOR_ID } from "./gameFilter";
 import type { Card, GameState, Player, Room } from "./schema";
 
 function card(id: string, rank: Card["rank"], value: number, suit: Card["suit"] = "hearts"): Card {
@@ -75,9 +75,18 @@ describe("filterGameStateForPlayer", () => {
     expect(JSON.stringify(deck)).not.toContain("deck-top");
   });
 
-  it("drawnCard só vai para o jogador do turno", () => {
+  it("a face da carta comprada só vai para o jogador do turno; os outros recebem o verso", () => {
     expect(filterGameStateForPlayer(baseState(), "p1").drawnCard?.rank).toBe("7");
-    expect(filterGameStateForPlayer(baseState(), "p2").drawnCard).toBeNull();
+    const other = filterGameStateForPlayer(baseState(), "p2").drawnCard;
+    expect(other).toMatchObject({ id: "drawn", isHidden: true });
+    expect(JSON.stringify(other)).not.toContain("\"7\"");
+  });
+
+  it("espectador não vê nenhuma face nem a carta comprada", () => {
+    const seen = filterGameStateForPlayer(baseState(), SPECTATOR_ID);
+    expect(seen.players.every((p) => p.hand.every((c) => c.isHidden))).toBe(true);
+    expect(seen.drawnCard?.isHidden).toBe(true);
+    expect(seen.players.every((p) => Object.keys(p.knownCards).length === 0)).toBe(true);
   });
 
   it("não envia a seed e mantém o descarte público", () => {

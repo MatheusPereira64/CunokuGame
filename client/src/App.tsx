@@ -11,6 +11,7 @@ import Home from "@/pages/Home";
 import Game from "@/pages/Game";
 import JoinInvite from "@/pages/JoinInvite";
 import NotFound from "@/pages/not-found";
+import PublicProfile from "@/pages/PublicProfile";
 import { parseInviteCode } from "@shared/invite";
 import { isNativeApp } from "@/lib/gameServer";
 
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/join/:code">{(params) => <JoinInvite code={params.code ?? ""} />}</Route>
       <Route path="/game/:code" component={Game} />
+      <Route path="/p/:nickname">{(params) => <PublicProfile nickname={params.nickname ?? ""} />}</Route>
       <Route component={NotFound} />
     </Switch>
   );

@@ -8,6 +8,7 @@ import {
   executeBotTurn,
   handleEmote,
   handleJoinMessage,
+  handleWatchMessage,
   handlePlayerAction,
   handlePlayerDisconnect,
   handleRematch,
@@ -25,6 +26,8 @@ import type { Env } from "./env";
 type Attachment = {
   playerId: string | null;
   roomCode: string;
+  /** Só assiste: recebe os broadcasts, mas não é jogador */
+  spectator?: boolean;
 };
 
 /**
@@ -131,7 +134,25 @@ export class RoomDurableObject extends DurableObject<Env> {
         return undefined;
       },
       () => this.connectedIds(),
+      () => this.spectatorSockets(),
     );
+  }
+
+  /** Quem só assiste: socket sem playerId, marcado como espectador. */
+  private spectatorSockets() {
+    return this.ctx
+      .getWebSockets()
+      .filter((ws) => (ws.deserializeAttachment() as Attachment | null)?.spectator)
+      .map((ws) => ({
+        open: true,
+        send: (data: string) => {
+          try {
+            ws.send(data);
+          } catch {
+            /* ignore */
+          }
+        },
+      }));
   }
 
   private scheduleBot(_roomCode: string, state: GameState): void {
@@ -209,6 +230,19 @@ export class RoomDurableObject extends DurableObject<Env> {
       const msg = JSON.parse(text);
       const storage = this.storage();
       const messenger = this.makeMessenger();
+
+      if (msg.type === "watch") {
+        this.roomCode = String(msg.code || "").toUpperCase();
+        const ok = await handleWatchMessage(storage, this.session, messenger, this.roomCode, (m) => {
+          try {
+            ws.send(JSON.stringify(m));
+          } catch {
+            /* ignore */
+          }
+        });
+        if (ok) this.setAttachment(ws, { playerId: null, roomCode: this.roomCode, spectator: true });
+        return;
+      }
 
       if (msg.type === "join") {
         const { code, playerId, name, rankToken, iconId, accent } = msg;

@@ -40,6 +40,9 @@ export type PublicRankProfile = {
   newlyUnlocked?: string[];
 };
 
+/** Perfil aberto a qualquer um (página /p/:nome): sem id interno, e-mail nem progresso. */
+export type PublicProfileView = Omit<PublicRankProfile, "playerId" | "email" | "progress" | "newlyUnlocked">;
+
 export type LeaderboardEntry = {
   position: number;
   nickname: string;

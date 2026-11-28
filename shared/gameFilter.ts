@@ -9,7 +9,7 @@ function hiddenCard(id: string): Card {
  * Estado que cada jogador pode ver:
  * - seed nunca sai do servidor
  * - baralho sempre mascarado, inclusive no fim: no desafio diário a ordem vale para todos os jogadores do dia
- * - drawnCard só para quem está no turno
+ * - drawnCard com face só para quem está no turno; os outros recebem o verso
  * - até haver vencedor, só as cartas da própria mão marcadas em knownCards mantêm a face
  *   (a habilidade 5/6 entrega a face por private_info)
  */
@@ -22,8 +22,9 @@ export function filterGameStateForPlayer(state: GameState, playerId: string): Ga
   if (filteredState.drawnCard) {
     const currentPlayer = state.players[state.currentPlayerIndex];
     const isCurrentPlayer = currentPlayer?.id === playerId;
+    // Os outros sabem que há uma carta na mão de quem joga (e a veem segurada), sem ver a face
     if (!isCurrentPlayer) {
-      filteredState.drawnCard = null;
+      filteredState.drawnCard = hiddenCard(filteredState.drawnCard.id);
     }
   }
 
@@ -45,3 +46,6 @@ export function toPublicRoom(room: Room): Omit<Room, "gameState"> {
   const { gameState: _gameState, ...publicRoom } = room;
   return publicRoom;
 }
+
+/** Quem assiste a partida: não é jogador, então recebe o estado como um estranho à mesa. */
+export const SPECTATOR_ID = "";

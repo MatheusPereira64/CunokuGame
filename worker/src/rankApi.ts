@@ -2,6 +2,7 @@ import { api } from "../../shared/routes";
 import {
   bearerToken,
   getLeaderboard,
+  getPublicProfile,
   getMe,
   linkRankEmail,
   loginRankPlayer,
@@ -40,6 +41,11 @@ async function dispatchRankRoute(
     const result = await loginRankPlayer(db, body);
     if ("error" in result) return json({ message: result.error }, result.status);
     return json(result);
+  }
+  if (method === "GET" && path.startsWith(api.profile.view.path)) {
+    const profile = await getPublicProfile(db, decodeURIComponent(path.slice(api.profile.view.path.length)));
+    if (!profile) return json({ message: "Profile not found" }, 404);
+    return json({ profile });
   }
   if (method === "GET" && path === api.rank.leaderboard.path) {
     const limit = Number(new URL(request.url).searchParams.get("limit") || "50");
